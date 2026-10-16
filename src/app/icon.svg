@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Dočasná neutrální ikona (vlny na hladině). Po dodání originálního loga nahraďte souborem z loga. -->
+  <rect width="64" height="64" rx="14" fill="#14302a"/>
+  <g fill="none" stroke="#e6ad45" stroke-width="3">
+    <ellipse cx="32" cy="34" rx="8" ry="5"/>
+    <ellipse cx="32" cy="34" rx="17" ry="10.5" opacity=".7"/>
+    <ellipse cx="32" cy="34" rx="26" ry="16" opacity=".4"/>
+  </g>
+</svg>

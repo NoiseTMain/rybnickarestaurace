@@ -1,0 +1,193 @@
+@import "tailwindcss";
+
+/*
+ * Barevná paleta: hluboká zelená rybníků, krémový papír a jantarová
+ * barva piva. Po dodání originálního loga lze barvy doladit zde.
+ */
+@theme {
+  --color-ink: #1b1d1a;
+  --color-ink-soft: #4a4d47;
+  --color-paper: #faf6ee;
+  --color-cream: #f2eadb;
+  --color-sand: #e3d5bb;
+  --color-line: #ddd1bb;
+
+  --color-pond-50: #eef5f1;
+  --color-pond-100: #dce9e2;
+  --color-pond-200: #b6d1c3;
+  --color-pond-500: #3d7a68;
+  --color-pond-600: #2f6656;
+  --color-pond-700: #255244;
+  --color-pond-800: #1c4137;
+  --color-pond-900: #14302a;
+  --color-pond-950: #0d211d;
+
+  --color-amber-300: #f2c873;
+  --color-amber-400: #e6ad45;
+  --color-amber-500: #d4922a;
+  --color-amber-600: #b4771b;
+  --color-amber-700: #8e5c14;
+
+  --color-brick: #9a4a2e;
+
+  --font-display: "Fraunces Variable", Georgia, "Times New Roman", serif;
+  --font-sans: "Inter Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --shadow-card: 0 1px 2px rgb(27 29 26 / 0.06), 0 8px 24px -12px rgb(27 29 26 / 0.18);
+  --shadow-lift: 0 2px 4px rgb(27 29 26 / 0.08), 0 18px 40px -18px rgb(27 29 26 / 0.35);
+
+  --animate-rise: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5.5rem;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  h1, h2, h3, .font-display {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    letter-spacing: -0.01em;
+  }
+  ::selection {
+    background: var(--color-amber-300);
+    color: var(--color-ink);
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-amber-400);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+}
+
+@layer components {
+  .container-page {
+    width: 100%;
+    max-width: 76rem;
+    margin-inline: auto;
+    padding-inline: 1rem;
+  }
+  @media (min-width: 640px) {
+    .container-page { padding-inline: 1.5rem; }
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-amber-700);
+  }
+  .eyebrow::before {
+    content: "";
+    width: 1.75rem;
+    height: 2px;
+    background: currentColor;
+    border-radius: 2px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 3rem;
+    padding: 0.75rem 1.4rem;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    transition: transform 0.15s ease, background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn:active { transform: translateY(1px) scale(0.99); }
+  .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .btn-primary { background: var(--color-amber-500); color: var(--color-pond-950); }
+  .btn-primary:hover { background: var(--color-amber-400); box-shadow: 0 10px 24px -12px rgb(212 146 42 / 0.9); }
+  .btn-dark { background: var(--color-pond-900); color: var(--color-paper); }
+  .btn-dark:hover { background: var(--color-pond-800); }
+  .btn-ghost-light { border: 1.5px solid rgb(250 246 238 / 0.45); color: var(--color-paper); }
+  .btn-ghost-light:hover { background: rgb(250 246 238 / 0.12); border-color: rgb(250 246 238 / 0.8); }
+  .btn-outline { border: 1.5px solid var(--color-line); color: var(--color-ink); background: white; }
+  .btn-outline:hover { border-color: var(--color-pond-600); color: var(--color-pond-800); }
+  .btn-danger { background: #a3311f; color: white; }
+  .btn-danger:hover { background: #8a2716; }
+
+  .card {
+    background: white;
+    border: 1px solid var(--color-line);
+    border-radius: 1.25rem;
+    box-shadow: var(--shadow-card);
+  }
+
+  .field-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-ink);
+    margin-bottom: 0.35rem;
+  }
+  .field {
+    width: 100%;
+    min-height: 2.9rem;
+    border-radius: 0.8rem;
+    border: 1.5px solid var(--color-line);
+    background: white;
+    padding: 0.6rem 0.85rem;
+    font-size: 1rem; /* 16px – iOS při fokusu nezvětšuje stránku */
+    color: var(--color-ink);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .field:focus {
+    outline: none;
+    border-color: var(--color-pond-600);
+    box-shadow: 0 0 0 3px rgb(47 102 86 / 0.18);
+  }
+  textarea.field { min-height: 7rem; }
+
+  /* tečkovaná linka mezi názvem a cenou v lístku */
+  .dot-leader {
+    flex: 1;
+    min-width: 1.5rem;
+    border-bottom: 2px dotted var(--color-sand);
+    transform: translateY(-0.3rem);
+  }
+
+  .ripple-bg {
+    background-image:
+      radial-gradient(ellipse 80% 60% at 85% 10%, rgb(212 146 42 / 0.22), transparent 60%),
+      radial-gradient(ellipse 70% 70% at 0% 100%, rgb(61 122 104 / 0.45), transparent 60%),
+      linear-gradient(160deg, var(--color-pond-900), var(--color-pond-950));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
+}
