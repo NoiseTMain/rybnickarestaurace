@@ -18,7 +18,7 @@ end $$;
 \echo '1) Alice založí domácnost a stane se vlastníkem'
 select pg_temp.as_user(:alice);
 insert into public.households (id, name) values ('11111111-0000-0000-0000-000000000001', 'Domácnost Alice');
-insert into public.household_users (household_id, user_id, role) values ('11111111-0000-0000-0000-000000000001', :alice, 'owner');
+insert into public.household_users (household_id, user_id, role) values ('11111111-0000-0000-0000-000000000001', :alice, 'owner') returning id;
 insert into public.accounts (id, household_id, name, opening_balance, opening_date)
   values ('22222222-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'Běžný účet', 1234567, '2026-11-01');
 insert into public.categories (id, household_id, name, is_food) values ('33333333-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'Potraviny', true);
@@ -113,7 +113,7 @@ reset role;
 \echo '5) Záznam nemůže odkazovat na účet jiné domácnosti'
 select pg_temp.as_user(:bob);
 insert into public.households (id, name) values ('11111111-0000-0000-0000-000000000002', 'Domácnost Boba');
-insert into public.household_users (household_id, user_id, role) values ('11111111-0000-0000-0000-000000000002', :bob, 'owner');
+insert into public.household_users (household_id, user_id, role) values ('11111111-0000-0000-0000-000000000002', :bob, 'owner') returning id;
 do $$
 declare ok boolean;
 begin

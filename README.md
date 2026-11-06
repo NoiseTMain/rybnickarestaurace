@@ -182,7 +182,7 @@ přihlaste a heslo změňte v Nastavení.
 
 1. Vytvořte projekt na [supabase.com](https://supabase.com) (region EU, např. Frankfurt).
 2. Spusťte migrace – buď v **SQL Editoru** postupně obsah souborů
-   `supabase/migrations/20261106000100_schema.sql`, `…0200_security.sql`, `…0300_storage.sql`,
+   `supabase/migrations/20261106000100_schema.sql`, `…0200_security.sql`, `…0300_storage.sql`, `…0400_fix_member_select.sql`,
    nebo přes CLI:
    ```bash
    npx supabase link --project-ref <ref>
