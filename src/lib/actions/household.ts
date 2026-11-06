@@ -175,10 +175,18 @@ export async function createInvite(): Promise<ActionResult> {
 export async function acceptInvite(_: ActionResult, fd: FormData): Promise<ActionResult> {
   let id: string;
   try {
-    const { store } = await requireUser();
-    const code = String(fd.get("code") ?? "").trim();
+    const { user, store } = await requireUser();
+    const code = String(fd.get("code") ?? "").trim().toUpperCase();
     if (code.length < 10) return fail("Zadejte kód pozvánky.", { code: "Neplatný kód" });
     id = await store.acceptInvite(code);
+    // připojený uživatel se automaticky objeví mezi členy domácnosti (vidí ho i vlastník)
+    const members = await store.select("members", { household_id: id });
+    if (!members.some((m) => m.user_id === user.id)) {
+      const name = String(fd.get("member_name") ?? "").trim().slice(0, 80) || user.email.split("@")[0] || "Nový člen";
+      await store.insert("members", [{
+        household_id: id, name, color: MEMBER_COLORS[members.length % MEMBER_COLORS.length], user_id: user.id, is_active: true, sort: members.length,
+      }]);
+    }
     await setHouseholdCookie(id);
   } catch (e) {
     return errorToResult(e);

@@ -276,7 +276,36 @@ await other.addCookies([{ name: "homeos_household", value: backup.household.id, 
 const foreign = await (await op.request.get(`${B}/api/zaloha`)).json();
 assert.notEqual(foreign.household.id, backup.household.id, "podvržená domácnost");
 assert.equal(foreign.tables.transactions.length, 0);
-await other.close();
+
+step("pozvánka: připojení k domácnosti přes Nastavení");
+// vlastník (Jana) je v DEMO domácnosti – přepne zpět na svou
+await page.goto(B + "/nastaveni");
+await page.getByRole("button", { name: /Ukázková domácnost/ }).first().click();
+await page.getByRole("button", { name: "Naše domácnost" }).click();
+await page.getByText("Disponibilní zůstatek").first().waitFor();
+await page.goto(B + "/nastaveni#domacnost");
+await page.getByRole("button", { name: "Vytvořit pozvánku" }).click();
+const code = (await page.locator("code.num").innerText()).trim();
+assert.ok(code.length >= 10);
+await op.goto(B + "/nastaveni#domacnost");
+await op.locator("input[name=code]").fill(code.toLowerCase());
+await op.locator("input[name=member_name]").fill("Partner");
+await op.getByRole("button", { name: "Přidat se do domácnosti" }).click();
+await op.getByText("Disponibilní zůstatek").first().waitFor({ timeout: 30000 });
+await op.goto(B + "/nastaveni#clenove");
+await op.locator("#clenove li", { hasText: "Jana" }).waitFor(); // vidí členy a data cizí (pozvané) domácnosti
+await op.locator("#clenove li", { hasText: "Partner" }).getByText("vy").waitFor();
+await op.goto(B + "/faktury");
+await op.getByText("2026-0999").first().waitFor(); // faktura vlastníka
+await page.reload();
+await page.locator("li", { hasText: "Partner" }).getByText("připojen(a)").first().waitFor();
+await page.getByText("připojen(a) účtem").first().waitFor();
+// stejný kód podruhé nefunguje
+await op.goto(B + "/nastaveni#domacnost");
+await op.locator("input[name=code]").fill(code);
+await op.getByRole("button", { name: "Přidat se do domácnosti" }).click();
+await op.getByText("Pozvánka neexistuje nebo vypršela").waitFor();
+
 
 assert.deepEqual(errors, [], "chyby v konzoli prohlížeče");
 console.log("✓ Všechny end-to-end kontroly prošly");

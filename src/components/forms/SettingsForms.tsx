@@ -2,7 +2,7 @@
 import { Check, Copy, FlaskConical, Loader2, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createDemoHousehold, createInvite, deleteHousehold, renameHousehold, saveSetting } from "@/lib/actions/household";
+import { acceptInvite, createDemoHousehold, createInvite, deleteHousehold, renameHousehold, saveSetting } from "@/lib/actions/household";
 import { restoreFromBackup } from "@/lib/actions/backup";
 import { changePassword } from "@/lib/actions/auth";
 import { parseMoney, toInputValue } from "@/lib/money";
@@ -110,6 +110,22 @@ export function PasswordForm() {
     <form action={formAction} className="flex flex-wrap items-end gap-2">
       <Input name="password" type="password" label="Nové heslo" autoComplete="new-password" error={fe("password")} className="min-w-56 flex-1" />
       <Button type="submit" loading={pending}>Změnit heslo</Button>
+      <FormError error={state.ok ? undefined : state.error} />
+    </form>
+  );
+}
+
+/** Připojení k jiné domácnosti pomocí kódu pozvánky. */
+export function JoinHouseholdForm() {
+  const { state, formAction, pending, fe } = useFormAction(acceptInvite);
+  return (
+    <form action={formAction} className="space-y-2">
+      <p className="text-sm text-ink-2">Máte kód od jiné domácnosti? Po připojení uvidíte její finance a vlastník vás uvidí mezi členy.</p>
+      <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+        <Input name="code" label="Kód pozvánky" placeholder="např. K3J9QW2XAB7P" autoComplete="off" className="[&_input]:uppercase" error={fe("code")} required />
+        <Input name="member_name" label="Vaše jméno v domácnosti" placeholder="nepovinné" />
+        <Button type="submit" variant="primary" loading={pending}>Přidat se do domácnosti</Button>
+      </div>
       <FormError error={state.ok ? undefined : state.error} />
     </form>
   );

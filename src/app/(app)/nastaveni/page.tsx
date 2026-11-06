@@ -13,7 +13,7 @@ import { LinkButton } from "@/components/ui/Button";
 import { SetupButton } from "@/components/forms/SetupForms";
 import { WorkSettingsForm } from "@/components/forms/WorkForms";
 import { BankImportButton } from "@/components/forms/CsvImport";
-import { AutosaveField, AutosaveToggle, CreateDemoButton, DeleteHouseholdForm, InviteBox, PasswordForm, RenameHousehold, RestoreForm } from "@/components/forms/SettingsForms";
+import { AutosaveField, AutosaveToggle, CreateDemoButton, DeleteHouseholdForm, InviteBox, JoinHouseholdForm, PasswordForm, RenameHousehold, RestoreForm } from "@/components/forms/SettingsForms";
 
 export const metadata = { title: "Nastavení" };
 
@@ -23,6 +23,7 @@ export default async function SettingsPage() {
   const ctx = await requireContext();
   const { data, snapshot: s } = await loadSnapshot(ctx);
   const st = data.settings!;
+  const access = (await ctx.store.select("household_users", { household_id: ctx.household.id })).sort((a, b) => (a.role === "owner" ? -1 : 1) - (b.role === "owner" ? -1 : 1) || a.created_at.localeCompare(b.created_at));
   return (
     <div className="space-y-4">
       <PageHeader title="Nastavení" subtitle="Všechny finanční údaje zadáváte vy. Změny se ukládají automaticky." />
@@ -41,7 +42,24 @@ export default async function SettingsPage() {
             {!ctx.households.some((h) => h.is_demo) && <CreateDemoButton />}
             {ctx.role === "owner" && <DeleteHouseholdForm id={ctx.household.id} name={ctx.household.name} isDemo={ctx.household.is_demo} />}
           </div>
+          <div className="mt-5 border-t border-white/[0.06] pt-4">
+            <p className="mb-2 text-sm font-medium">Lidé s přístupem</p>
+            <ul className="space-y-1.5">
+              {access.map((u) => {
+                const m = data.members.find((x) => x.user_id === u.user_id);
+                return (
+                  <li key={u.id} className="flex items-center gap-2 text-sm">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: m?.color ?? "#6b665e" }} />
+                    <span className="flex-1">{m?.name ?? "Člen bez jména"}{u.user_id === ctx.user.id && " (vy)"}</span>
+                    <Badge tone={u.role === "owner" ? "gold" : "neutral"}>{u.role === "owner" ? "vlastník" : "připojen(a)"}</Badge>
+                    <span className="text-[11px] text-ink-3">od {formatDate(u.created_at.slice(0, 10))}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
           {ctx.role === "owner" && <div className="mt-5 border-t border-white/[0.06] pt-4"><p className="mb-2 text-sm font-medium">Pozvat člena s vlastním přihlášením</p><InviteBox /></div>}
+          <div className="mt-5 border-t border-white/[0.06] pt-4"><p className="mb-2 text-sm font-medium">Přidat se do jiné domácnosti</p><JoinHouseholdForm /></div>
         </Card>
 
         <Card id="clenove" title="Členové domácnosti" subtitle="Kdo platí a komu patří příjmy" action={<SetupButton kind="member" label="Přidat" />}>
@@ -49,7 +67,7 @@ export default async function SettingsPage() {
             {data.members.map((m) => (
               <li key={m.id} className="flex items-center gap-3 py-2">
                 <span className="h-3 w-3 rounded-full" style={{ background: m.color }} />
-                <span className="flex-1 text-sm">{m.name} {m.user_id === ctx.user.id && <Badge>vy</Badge>} {!m.is_active && <Badge>neaktivní</Badge>}</span>
+                <span className="flex-1 text-sm">{m.name} {m.user_id === ctx.user.id ? <Badge>vy</Badge> : m.user_id ? <Badge tone="gold">připojen(a) účtem</Badge> : null} {!m.is_active && <Badge>neaktivní</Badge>}</span>
                 <SetupButton kind="member" initial={m} size="icon" variant="ghost" />
                 <ActionButton action={deleteSetupItem.bind(null, "members", m.id)} confirm="Smazat člena? U záznamů zůstane prázdné pole „kdo“." size="icon" icon={<Trash2 className="h-4 w-4" />} />
               </li>
