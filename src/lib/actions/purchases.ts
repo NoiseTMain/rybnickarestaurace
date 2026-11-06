@@ -16,6 +16,10 @@ const purchaseSchema = z.object({
   status: enumOf(["planned", "buying", "bought"]),
   is_wish: checkbox(),
   note: optText(1000),
+  kind: enumOf(["general", "home"]).default("general"),
+  room: optText(60),
+  image_document_id: optionalUuid(),
+  source_url_title: optText(200),
 });
 
 export async function savePurchase(_: ActionResult, fd: FormData): Promise<ActionResult> {
@@ -23,7 +27,7 @@ export async function savePurchase(_: ActionResult, fd: FormData): Promise<Actio
     const p = parse(purchaseSchema, fd);
     if (!p.ok) return p.result;
     const { id, ...row } = p.data;
-    await own(ctx, "categories", row.category_id);
+    await Promise.all([own(ctx, "categories", row.category_id), own(ctx, "documents", row.image_document_id)]);
     if (id) {
       await own(ctx, "purchases", id);
       await ctx.store.update("purchases", { id, household_id: ctx.household.id }, row);
@@ -70,5 +74,14 @@ export async function deletePurchase(id: string): Promise<ActionResult> {
     await own(ctx, "purchases", id);
     await ctx.store.remove("purchases", { id, household_id: ctx.household.id });
     return done("Nákup smazán");
+  });
+}
+
+export async function fetchProductPreview(url: string): Promise<ActionResult & { preview?: { title: string | null; price: number | null; documentId: string | null } }> {
+  return withContext(async (ctx) => {
+    const { loadProductPreview } = await import("@/lib/product-preview");
+    const r = await loadProductPreview(ctx, url);
+    if (!r.ok) return fail(r.error);
+    return { ok: true, at: Date.now(), preview: r.preview, message: r.preview.documentId ? "Fotka načtena" : "Fotku se na stránce nepodařilo najít – nahrajte ji ručně" };
   });
 }

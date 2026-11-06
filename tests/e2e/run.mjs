@@ -2,7 +2,7 @@
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
-import { invoicePdf } from "./make-pdf.mjs";
+import { goldPng, invoicePdf } from "./make-pdf.mjs";
 
 const B = process.env.BASE_URL ?? "http://localhost:3100";
 const SHOTS = process.env.SHOTS_DIR ?? "test-results";
@@ -306,6 +306,77 @@ await op.locator("input[name=code]").fill(code);
 await op.getByRole("button", { name: "Přidat se do domácnosti" }).click();
 await op.getByText("Pozvánka neexistuje nebo vypršela").waitFor();
 
+
+step("plánování: nákupní seznam jídla → výdaj");
+await page.goto(B + "/planovani");
+await page.getByRole("button", { name: "Nový seznam" }).click();
+await page.locator("[role=dialog] input[name=name]").fill("Víkendový nákup");
+await modalSubmit("Vytvořit seznam");
+await toast("Seznam vytvořen");
+for (const [n, c] of [["Mléko", "24,90"], ["Chleba", "45"]]) {
+  await page.getByLabel("Položka").fill(n);
+  await page.getByLabel("Odhad ceny").fill(c);
+  await page.getByRole("button", { name: "Přidat položku" }).click();
+  await page.getByText(n, { exact: true }).waitFor();
+}
+await page.getByText("69,90\u00a0Kč").first().waitFor(); // odhad
+await page.getByRole("button", { name: "Označit jako koupené" }).first().click();
+await page.screenshot({ path: `${SHOTS}/planovani-jidlo.png`, fullPage: true });
+await page.getByRole("button", { name: "Nakoupeno" }).click();
+await page.locator("[role=dialog] input[name=amount]").fill("72,40");
+await modalSubmit("Zapsat nákup");
+await toast("Nakoupeno");
+await page.goto(B + "/transakce");
+await page.getByText("Nákup: Víkendový nákup").waitFor();
+await page.getByText("72,40\u00a0Kč").first().waitFor();
+
+step("plánování: nábytek s fotkou");
+await page.goto(B + "/planovani?tab=domov");
+await page.getByRole("button", { name: "Přidat věc" }).click();
+await page.locator("[role=dialog] input[type=file][accept='image/*']").setInputFiles({ name: "sedacka.png", mimeType: "image/png", buffer: goldPng() });
+await page.locator("[role=dialog] img[alt='Fotka produktu']").waitFor({ timeout: 20000 });
+await page.locator("[role=dialog] input[name=url]").fill("http://127.0.0.1/admin");
+await page.locator("[role=dialog]").getByRole("button", { name: "Načíst" }).click();
+await page.locator("[role=dialog]").getByText("Tento odkaz nelze načíst").waitFor(); // ochrana proti zneužití serveru
+await page.locator("[role=dialog] input[name=url]").fill("");
+await page.locator("[role=dialog] input[name=name]").fill("Rohová sedačka");
+await page.locator("[role=dialog] input[name=price]").fill("18 990");
+await page.locator("[role=dialog] input[name=room]").fill("Obývací pokoj");
+await modalSubmit("Uložit");
+await toast("Nákup přidán");
+const img = page.locator("img[alt='Rohová sedačka']");
+await img.waitFor();
+assert.ok(await img.evaluate((el) => el.complete && el.naturalWidth > 0), "fotka se zobrazí");
+await page.getByRole("button", { name: /Obývací pokoj/ }).waitFor();
+await page.screenshot({ path: `${SHOTS}/planovani-domov.png`, fullPage: true });
+
+step("odebrání člena vlastníkem – domácnost mu hned zmizí");
+await op.goto(B + "/faktury");
+await op.getByText("2026-0999").first().waitFor();
+await page.goto(B + "/nastaveni#domacnost");
+page.once("dialog", (d) => d.accept());
+await page.locator("li", { hasText: "Partner" }).getByRole("button", { name: "Odebrat" }).click();
+await toast("Přístup odebrán");
+await op.getByText("Přístup k této domácnosti byl odebrán").waitFor({ timeout: 30000 }); // bez obnovení stránky
+await op.goto(B + "/faktury");
+assert.equal(await op.getByText("2026-0999").count(), 0, "odebraný vidí faktury");
+assert.equal((await op.request.get(B + docLink)).status(), 404);
+await page.reload();
+assert.equal(await page.locator("li", { hasText: "Partner" }).getByRole("button", { name: "Odebrat" }).count(), 0);
+
+step("člen může domácnost sám opustit");
+await page.getByRole("button", { name: "Vytvořit pozvánku" }).click();
+const code2 = (await page.locator("code.num").innerText()).trim();
+await op.goto(B + "/nastaveni#domacnost");
+await op.locator("input[name=code]").fill(code2);
+await op.getByRole("button", { name: "Přidat se do domácnosti" }).click();
+await op.getByText("Disponibilní zůstatek").first().waitFor();
+await op.goto(B + "/nastaveni#domacnost");
+op.once("dialog", (d) => d.accept());
+await op.getByRole("button", { name: "Opustit domácnost" }).click();
+await op.getByText("Disponibilní zůstatek").first().waitFor();
+await op.goto(B + "/faktury");
+assert.equal(await op.getByText("2026-0999").count(), 0);
 
 assert.deepEqual(errors, [], "chyby v konzoli prohlížeče");
 console.log("✓ Všechny end-to-end kontroly prošly");

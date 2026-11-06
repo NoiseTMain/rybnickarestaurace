@@ -1,5 +1,5 @@
 import {
-  Bot, Briefcase, CalendarClock, FileText, FolderArchive, Home, LayoutDashboard, PiggyBank, Receipt, Settings, ShoppingBag, Wallet,
+  Bot, Briefcase, ClipboardList, CalendarClock, FileText, FolderArchive, Home, LayoutDashboard, PiggyBank, Receipt, Settings, ShoppingBag, Wallet,
 } from "lucide-react";
 
 export const NAV = [
@@ -9,6 +9,7 @@ export const NAV = [
   { href: "/prace", label: "Práce", icon: Briefcase },
   { href: "/faktury", label: "Faktury", icon: Receipt },
   { href: "/nakupy", label: "Nákupy", icon: ShoppingBag },
+  { href: "/planovani", label: "Plánování", icon: ClipboardList },
   { href: "/sporeni", label: "Spoření", icon: PiggyBank },
   { href: "/rozpocty", label: "Rozpočty", icon: FileText },
   { href: "/platby", label: "Pravidelné platby", icon: CalendarClock },

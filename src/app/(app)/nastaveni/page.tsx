@@ -13,7 +13,7 @@ import { LinkButton } from "@/components/ui/Button";
 import { SetupButton } from "@/components/forms/SetupForms";
 import { WorkSettingsForm } from "@/components/forms/WorkForms";
 import { BankImportButton } from "@/components/forms/CsvImport";
-import { AutosaveField, AutosaveToggle, CreateDemoButton, DeleteHouseholdForm, InviteBox, JoinHouseholdForm, PasswordForm, RenameHousehold, RestoreForm } from "@/components/forms/SettingsForms";
+import { AutosaveField, AutosaveToggle, CreateDemoButton, DeleteHouseholdForm, InviteBox, JoinHouseholdForm, LeaveHouseholdButton, RemoveAccessButton, PasswordForm, RenameHousehold, RestoreForm } from "@/components/forms/SettingsForms";
 
 export const metadata = { title: "Nastavení" };
 
@@ -41,6 +41,7 @@ export default async function SettingsPage() {
           <div className="mt-4 flex flex-wrap gap-2">
             {!ctx.households.some((h) => h.is_demo) && <CreateDemoButton />}
             {ctx.role === "owner" && <DeleteHouseholdForm id={ctx.household.id} name={ctx.household.name} isDemo={ctx.household.is_demo} />}
+            {ctx.role !== "owner" && <LeaveHouseholdButton />}
           </div>
           <div className="mt-5 border-t border-white/[0.06] pt-4">
             <p className="mb-2 text-sm font-medium">Lidé s přístupem</p>
@@ -52,7 +53,8 @@ export default async function SettingsPage() {
                     <span className="h-2.5 w-2.5 rounded-full" style={{ background: m?.color ?? "#6b665e" }} />
                     <span className="flex-1">{m?.name ?? "Člen bez jména"}{u.user_id === ctx.user.id && " (vy)"}</span>
                     <Badge tone={u.role === "owner" ? "gold" : "neutral"}>{u.role === "owner" ? "vlastník" : "připojen(a)"}</Badge>
-                    <span className="text-[11px] text-ink-3">od {formatDate(u.created_at.slice(0, 10))}</span>
+                    <span className="hidden text-[11px] text-ink-3 sm:inline">od {formatDate(u.created_at.slice(0, 10))}</span>
+                    {ctx.role === "owner" && u.user_id !== ctx.user.id && <RemoveAccessButton userId={u.user_id} name={m?.name ?? "člena"} />}
                   </li>
                 );
               })}

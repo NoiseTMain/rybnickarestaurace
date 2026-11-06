@@ -97,7 +97,7 @@ export type TxType = "income" | "expense" | "transfer";
 export type TxStatus = "posted" | "cancelled";
 export type PaymentMethod = "card" | "cash" | "transfer" | "direct_debit" | "other";
 export type TxScope = "shared" | "personal";
-export type TxSource = "manual" | "csv" | "payout" | "recurring" | "invoice" | "purchase" | "income_source" | "savings";
+export type TxSource = "manual" | "csv" | "payout" | "recurring" | "invoice" | "purchase" | "income_source" | "savings" | "shopping";
 
 export interface Transaction {
   id: string;
@@ -123,6 +123,7 @@ export interface Transaction {
   invoice_id: string | null;
   purchase_id: string | null;
   contribution_id: string | null;
+  shopping_list_id: string | null;
   document_id: string | null;
   note: string | null;
   cancelled_at: string | null;
@@ -309,6 +310,32 @@ export interface Purchase {
   status: "planned" | "buying" | "bought";
   is_wish: boolean;
   note: string | null;
+  kind: "general" | "home";
+  room: string | null;
+  image_document_id: string | null;
+  source_url_title: string | null;
+  created_at: string;
+}
+
+export interface ShoppingList {
+  id: string;
+  household_id: string;
+  name: string;
+  planned_date: ISODate | null;
+  status: "open" | "done";
+  note: string | null;
+  created_at: string;
+}
+
+export interface ShoppingItem {
+  id: string;
+  household_id: string;
+  list_id: string;
+  name: string;
+  quantity: string | null;
+  est_price: Cents | null;
+  checked: boolean;
+  sort: number;
   created_at: string;
 }
 
@@ -343,6 +370,8 @@ export interface Tables {
   documents: DocumentRow;
   purchases: Purchase;
   occurrence_marks: OccurrenceMark;
+  shopping_lists: ShoppingList;
+  shopping_items: ShoppingItem;
 }
 
 export type TableName = keyof Tables;
@@ -365,6 +394,8 @@ export const HOUSEHOLD_TABLES = [
   "work_shifts",
   "purchases",
   "occurrence_marks",
+  "shopping_lists",
+  "shopping_items",
   "transactions",
 ] as const satisfies readonly TableName[];
 
@@ -385,4 +416,5 @@ export const MONEY_COLUMNS: Partial<Record<TableName, string[]>> = {
   payouts: ["expected_amount", "received_amount"],
   invoices: ["amount"],
   purchases: ["price"],
+  shopping_items: ["est_price"],
 };

@@ -146,7 +146,16 @@ export async function seedDemo(store: Store, user: AppUser, hid: string, today: 
     { name: "Sedačka (demo)", price: 1_500_000, priority: 2, status: "planned", is_wish: false, planned_date: addMonths(today, 2), url: null },
     { name: "Robotický vysavač (demo)", price: 699_000, priority: 3, status: "planned", is_wish: true, planned_date: null, url: null },
     { name: "Zimní pneumatiky (demo)", price: 1_100_000, priority: 1, status: "buying", is_wish: false, planned_date: addDays(today, 10), url: null },
-  ].map((p) => ({ household_id: hid, category_id: null, note: null, ...p } as never)));
+  ].map((p) => ({ household_id: hid, category_id: null, note: null, kind: "general", room: null, image_document_id: null, source_url_title: null, ...p } as never)));
+  await store.insert("purchases", [
+    { name: "Komoda do ložnice (demo)", price: 499_000, priority: 2, room: "Ložnice", url: null },
+    { name: "Jídelní stůl a 4 židle (demo)", price: 1_290_000, priority: 3, room: "Kuchyně", url: null },
+    { name: "Koberec do obýváku (demo)", price: 259_000, priority: 4, room: "Obývací pokoj", url: null, is_wish: true },
+  ].map((p) => ({ household_id: hid, category_id: null, note: null, status: "planned", is_wish: false, planned_date: null, kind: "home", image_document_id: null, source_url_title: null, ...p } as never)));
+  const [list] = await store.insert("shopping_lists", [{ household_id: hid, name: "Velký nákup na víkend (demo)", planned_date: addDays(today, 1), status: "open", note: "Lidl" }]);
+  await store.insert("shopping_items", [
+    ["Mléko 2×", "2 ks", 4_980], ["Chléb", "1 ks", 4_490], ["Kuřecí prsa", "1 kg", 18_990], ["Zelenina na salát", null, 8_900], ["Těstoviny", "2 bal.", 5_980], ["Káva", "1 ks", null],
+  ].map(([name, quantity, est_price], i) => ({ household_id: hid, list_id: list.id, name: name as string, quantity: quantity as string | null, est_price: est_price as number | null, checked: i < 2, sort: i })));
 
   await store.update("household_settings", { household_id: hid }, { safety_buffer: 500_000, onboarded_at: new Date().toISOString() });
 }

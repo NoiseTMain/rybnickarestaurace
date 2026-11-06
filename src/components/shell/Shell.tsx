@@ -9,6 +9,7 @@ import { switchHousehold } from "@/lib/actions/household";
 import { cn } from "@/components/ui/cn";
 import { MOBILE_TABS, NAV } from "./nav";
 import { QuickAdd } from "./QuickAdd";
+import { AccessWatcher } from "./AccessWatcher";
 
 interface ShellProps {
   children: ReactNode;
@@ -90,6 +91,7 @@ export function Shell({ children, email, household, households, mode }: ShellPro
   );
   return (
     <div className="min-h-dvh">
+      <AccessWatcher householdId={household.id} />
       {/* desktop sidebar */}
       <aside className="glass fixed inset-y-3 left-3 z-30 hidden w-64 flex-col gap-4 rounded-[28px] p-4 lg:flex">
         <Logo />

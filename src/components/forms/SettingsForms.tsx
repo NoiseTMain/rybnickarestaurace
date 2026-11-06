@@ -2,7 +2,7 @@
 import { Check, Copy, FlaskConical, Loader2, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { acceptInvite, createDemoHousehold, createInvite, deleteHousehold, renameHousehold, saveSetting } from "@/lib/actions/household";
+import { acceptInvite, createDemoHousehold, createInvite, leaveHousehold, removeAccess, deleteHousehold, renameHousehold, saveSetting } from "@/lib/actions/household";
 import { restoreFromBackup } from "@/lib/actions/backup";
 import { changePassword } from "@/lib/actions/auth";
 import { parseMoney, toInputValue } from "@/lib/money";
@@ -128,5 +128,27 @@ export function JoinHouseholdForm() {
       </div>
       <FormError error={state.ok ? undefined : state.error} />
     </form>
+  );
+}
+
+export function RemoveAccessButton({ userId, name }: { userId: string; name: string }) {
+  const [pending, start] = useTransition();
+  const toast = useToast();
+  return (
+    <Button size="sm" variant="danger" loading={pending} onClick={() => {
+      if (!window.confirm(`Odebrat ${name} z domácnosti? Okamžitě přestane vidět všechna data.`)) return;
+      start(async () => { const r = await removeAccess(userId); toast(r.ok ? r.message ?? "Odebráno" : r.error ?? "Chyba", r.ok ? "ok" : "error"); });
+    }}>Odebrat</Button>
+  );
+}
+
+export function LeaveHouseholdButton() {
+  const [pending, start] = useTransition();
+  const toast = useToast();
+  return (
+    <Button size="sm" variant="danger" loading={pending} onClick={() => {
+      if (!window.confirm("Opustit domácnost? Přestanete vidět její data. Vrátit se půjde jen s novou pozvánkou.")) return;
+      start(async () => { const r = await leaveHousehold(); if (r && !r.ok) toast(r.error ?? "Chyba", "error"); });
+    }}>Opustit domácnost</Button>
   );
 }

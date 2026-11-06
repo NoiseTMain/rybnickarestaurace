@@ -14,7 +14,7 @@ const tx = (p: Partial<Transaction>): Transaction => ({
   id: `t${++n}`, household_id: H, type: "expense", status: "posted", amount: 0, date: "2026-11-02", account_id: "main", transfer_account_id: null,
   category_id: null, description: "", member_id: null, scope: "shared", is_recurring: false, payment_method: "card", source: "manual",
   external_id: null, recurring_payment_id: null, income_source_id: null, occurrence_date: null, payout_id: null, invoice_id: null,
-  purchase_id: null, contribution_id: null, document_id: null, note: null, cancelled_at: null, created_at: "", updated_at: "", ...p,
+  purchase_id: null, contribution_id: null, shopping_list_id: null, document_id: null, note: null, cancelled_at: null, created_at: "", updated_at: "", ...p,
 });
 const rent: RecurringPayment = {
   id: "rent", household_id: H, name: "Nájem", amount: 1_500_000, frequency: "monthly", start_date: "2026-11-05", end_date: null, category_id: null,

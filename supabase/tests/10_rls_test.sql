@@ -169,3 +169,29 @@ begin
   assert ok, 'Alice nahrála soubor do cizí složky';
 end $$;
 reset role;
+
+\echo '8) Nákupní seznam a odebrání člena vlastníkem'
+select pg_temp.as_user(:alice);
+insert into public.shopping_lists (id, household_id, name) values ('55555555-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'Víkend');
+insert into public.shopping_items (household_id, list_id, name, est_price) values ('11111111-0000-0000-0000-000000000001', '55555555-0000-0000-0000-000000000001', 'Mléko', 2490);
+insert into public.transactions (household_id, type, amount, date, account_id, description, shopping_list_id, source)
+  values ('11111111-0000-0000-0000-000000000001', 'expense', 2490, '2026-11-07', '22222222-0000-0000-0000-000000000001', 'Nákup', '55555555-0000-0000-0000-000000000001', 'shopping');
+do $$
+declare ok boolean;
+begin
+  begin
+    insert into public.transactions (household_id, type, amount, date, account_id, description, shopping_list_id, source)
+      values ('11111111-0000-0000-0000-000000000001', 'expense', 2490, '2026-11-07', '22222222-0000-0000-0000-000000000001', 'Znovu', '55555555-0000-0000-0000-000000000001', 'shopping');
+    ok := false;
+  exception when unique_violation then ok := true;
+  end;
+  assert ok, 'nákupní seznam zapsán jako výdaj dvakrát';
+end $$;
+delete from public.household_users where household_id = '11111111-0000-0000-0000-000000000001' and user_id = :bob;
+reset role;
+select pg_temp.as_user(:bob);
+do $$ begin
+  assert (select count(*) from public.transactions where household_id = '11111111-0000-0000-0000-000000000001') = 0, 'odebraný člen stále vidí data';
+  assert (select count(*) from public.shopping_items) = 0, 'odebraný člen vidí nákupní seznam';
+end $$;
+reset role;

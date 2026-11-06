@@ -82,9 +82,15 @@ export async function saveCategory(_: ActionResult, fd: FormData): Promise<Actio
 export async function deleteSetupItem(table: "members" | "accounts" | "categories" | "income_sources", id: string): Promise<ActionResult> {
   return withContext(async (ctx) => {
     if (!["members", "accounts", "categories", "income_sources"].includes(table)) return fail("Neplatná tabulka.");
-    await own(ctx, table, id);
+    const row = (await own(ctx, table, id)) as { user_id?: string | null };
+    if (table === "members" && row.user_id) {
+      if (row.user_id === ctx.user.id) return fail("Sami sebe nesmažete. Pokud chcete odejít, použijte „Opustit domácnost“.");
+      if (ctx.role !== "owner") return fail("Člena s vlastním účtem může odebrat jen vlastník.");
+      // spolu se členem zaniká i jeho přístup do domácnosti
+      await ctx.store.remove("household_users", { household_id: ctx.household.id, user_id: row.user_id });
+    }
     await ctx.store.remove(table, { id, household_id: ctx.household.id });
-    return done("Smazáno");
+    return done(table === "members" && row.user_id ? "Člen odebrán i s přístupem" : "Smazáno");
   });
 }
 

@@ -37,6 +37,7 @@ export const UNIQUE: Partial<Record<TableName, UniqueConstraint[]>> = {
     { columns: ["invoice_id"], where: posted("invoice_id"), message: "Platba faktury už je zaznamenána." },
     { columns: ["purchase_id"], where: posted("purchase_id"), message: "Nákup už je zaznamenán." },
     { columns: ["contribution_id"], where: posted("contribution_id"), message: "Vklad už je zaznamenán." },
+    { columns: ["shopping_list_id"], where: posted("shopping_list_id"), message: "Nákup podle seznamu už je zaznamenán." },
   ],
 };
 
@@ -75,7 +76,11 @@ export const REFS: Partial<Record<TableName, Ref[]>> = {
     { column: "invoice_id", table: "invoices", onDelete: "set_null" },
   ],
   work_shifts: [{ column: "member_id", table: "members", onDelete: "set_null" }],
-  purchases: [{ column: "category_id", table: "categories", onDelete: "set_null" }],
+  purchases: [
+    { column: "category_id", table: "categories", onDelete: "set_null" },
+    { column: "image_document_id", table: "documents", onDelete: "set_null" },
+  ],
+  shopping_items: [{ column: "list_id", table: "shopping_lists", onDelete: "cascade" }],
   transactions: [
     { column: "account_id", table: "accounts", onDelete: "restrict" },
     { column: "transfer_account_id", table: "accounts", onDelete: "restrict" },
@@ -87,6 +92,7 @@ export const REFS: Partial<Record<TableName, Ref[]>> = {
     { column: "invoice_id", table: "invoices", onDelete: "set_null" },
     { column: "purchase_id", table: "purchases", onDelete: "set_null" },
     { column: "contribution_id", table: "savings_contributions", onDelete: "set_null" },
+    { column: "shopping_list_id", table: "shopping_lists", onDelete: "set_null" },
     { column: "document_id", table: "documents", onDelete: "set_null" },
   ],
 };

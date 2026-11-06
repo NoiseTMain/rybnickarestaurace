@@ -57,6 +57,7 @@ async function afterCancel(ctx: AppContext, t: Transaction) {
   if (t.payout_id) await ctx.store.update("payouts", { id: t.payout_id, household_id: h }, { status: "expected", received_amount: null, received_date: null });
   if (t.invoice_id) await ctx.store.update("invoices", { id: t.invoice_id, household_id: h, status: "paid" }, { status: "unpaid", paid_date: null });
   if (t.purchase_id) await ctx.store.update("purchases", { id: t.purchase_id, household_id: h, status: "bought" }, { status: "buying" });
+  if (t.shopping_list_id) await ctx.store.update("shopping_lists", { id: t.shopping_list_id, household_id: h }, { status: "open" });
   if (t.contribution_id) {
     const cid = t.contribution_id;
     await ctx.store.update("transactions", { id: t.id, household_id: h }, { contribution_id: null });
@@ -79,7 +80,7 @@ export async function restoreTransaction(id: string): Promise<ActionResult> {
     const t = (await own(ctx, "transactions", id)) as Transaction;
     if (t.status !== "cancelled") return fail("Transakce není stornovaná.");
     // obnovení může narazit na unikátní omezení (termín mezitím zaplacen jinou platbou) → chyba, nic se nezapočte dvakrát
-    await ctx.store.update("transactions", { id, household_id: ctx.household.id }, { status: "posted", cancelled_at: null, payout_id: null, invoice_id: null, purchase_id: null });
+    await ctx.store.update("transactions", { id, household_id: ctx.household.id }, { status: "posted", cancelled_at: null, payout_id: null, invoice_id: null, purchase_id: null, shopping_list_id: null });
     return done("Transakce obnovena");
   });
 }

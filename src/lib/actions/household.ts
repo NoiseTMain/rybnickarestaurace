@@ -194,3 +194,42 @@ export async function acceptInvite(_: ActionResult, fd: FormData): Promise<Actio
   revalidatePath("/", "layout");
   redirect("/");
 }
+
+/** Vlastník odebere člověka s přístupem – ten okamžitě přestane domácnost vidět. */
+export async function removeAccess(userId: string): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    if (ctx.role !== "owner") return fail("Odebírat členy může jen vlastník domácnosti.");
+    if (userId === ctx.user.id) return fail("Sebe odebrat nemůžete.");
+    const h = ctx.household.id;
+    const rows = await ctx.store.select("household_users", { household_id: h, user_id: userId });
+    if (!rows.length) return fail("Uživatel už k domácnosti přístup nemá.");
+    // člen zůstane v historii (kdo platil), ale bez vazby na účet
+    await ctx.store.update("members", { household_id: h, user_id: userId }, { user_id: null, is_active: false });
+    await ctx.store.remove("household_invites", { household_id: h, used_by: userId });
+    await ctx.store.remove("household_users", { household_id: h, user_id: userId });
+    return done("Přístup odebrán – domácnost mu okamžitě zmizí");
+  });
+}
+
+/** Připojený člen opustí domácnost. */
+export async function leaveHousehold(): Promise<ActionResult> {
+  try {
+    const ctx = await requireContext();
+    const h = ctx.household.id;
+    if (ctx.role === "owner") return fail("Vlastník domácnost opustit nemůže – může ji smazat.");
+    await ctx.store.update("members", { household_id: h, user_id: ctx.user.id }, { user_id: null, is_active: false });
+    await ctx.store.remove("household_users", { household_id: h, user_id: ctx.user.id });
+    (await cookies()).delete(HOUSEHOLD_COOKIE);
+  } catch (e) {
+    return errorToResult(e);
+  }
+  revalidatePath("/", "layout");
+  redirect("/");
+}
+
+/** Lehká kontrola pro otevřenou aplikaci: má uživatel stále přístup k domácnosti? */
+export async function checkHouseholdAccess(householdId: string): Promise<boolean> {
+  const { tryContext } = await import("@/lib/context");
+  const ctx = await tryContext();
+  return ctx !== null && ctx !== "no_household" && ctx.household.id === householdId;
+}
