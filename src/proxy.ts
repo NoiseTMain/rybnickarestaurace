@@ -2,44 +2,46 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isSupabaseConfigured, publicEnv } from "@/lib/env";
 
+const PUBLIC = ["/prihlaseni", "/registrace", "/obnova-hesla", "/auth/confirm", "/konfigurace"];
+
 /**
- * Obnovuje přihlašovací relaci Supabase a nepřihlášené uživatele
- * přesměruje z /admin na přihlášení. Jde jen o první vrstvu – oprávnění
- * se vždy znovu ověřují na serveru (requireAdmin) a v databázi (RLS).
+ * První vrstva ochrany: obnovení relace Supabase a přesměrování nepřihlášených.
+ * Skutečná autorizace probíhá vždy znovu na serveru (getUser) a v databázi (RLS).
  */
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
-  if (!isSupabaseConfigured()) return response;
-
-  const supabase = createServerClient(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet) {
-        for (const { name, value } of cookiesToSet) request.cookies.set(name, value);
-        response = NextResponse.next({ request });
-        for (const { name, value, options } of cookiesToSet) response.cookies.set(name, value, options);
-      },
-    },
-  });
-
-  const { data } = await supabase.auth.getClaims();
-  const isLoggedIn = Boolean(data?.claims?.sub);
   const { pathname } = request.nextUrl;
-  const isPublicAdminPage = pathname === "/admin/prihlaseni" || pathname === "/admin/obnova-hesla";
+  const isPublic = PUBLIC.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  let response = NextResponse.next({ request });
+  let loggedIn: boolean;
 
-  if (pathname.startsWith("/admin") && !isPublicAdminPage && !isLoggedIn) {
+  if (isSupabaseConfigured()) {
+    const supabase = createServerClient(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey, {
+      cookies: {
+        getAll: () => request.cookies.getAll(),
+        setAll(cookiesToSet) {
+          for (const { name, value } of cookiesToSet) request.cookies.set(name, value);
+          response = NextResponse.next({ request });
+          for (const { name, value, options } of cookiesToSet) response.cookies.set(name, value, options);
+        },
+      },
+    });
+    const { data } = await supabase.auth.getClaims();
+    loggedIn = Boolean(data?.claims?.sub);
+  } else {
+    loggedIn = request.cookies.has("homeos_local_session");
+  }
+
+  if (!isPublic && !loggedIn) {
+    if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Nepřihlášeno" }, { status: 401 });
     const url = request.nextUrl.clone();
-    url.pathname = "/admin/prihlaseni";
+    url.pathname = "/prihlaseni";
     url.search = "";
     return NextResponse.redirect(url);
   }
-
   response.headers.set("Cache-Control", "private, no-store");
   return response;
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*", "/auth/:path*"],
+  matcher: ["/((?!_next/static|_next/image|icon.svg|favicon.ico|manifest.webmanifest|.*\\.(?:png|jpg|svg|webp)$).*)"],
 };

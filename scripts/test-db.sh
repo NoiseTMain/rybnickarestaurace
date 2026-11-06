@@ -30,3 +30,4 @@ for f in "$ROOT"/supabase/migrations/*.sql; do
   "${PSQL[@]}" -f "$f"
 done
 "${PSQL[@]}" -o /dev/null -f "$ROOT/supabase/tests/10_rls_test.sql"
+echo "✓ Migrace a testy RLS prošly"

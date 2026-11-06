@@ -1,15 +1,20 @@
-/**
- * Proměnné prostředí. Veřejné (NEXT_PUBLIC_*) se dostanou do prohlížeče,
- * ostatní jsou dostupné pouze na serveru (viz server-env.ts).
- */
+/** Veřejné proměnné (bezpečné pro prohlížeč). Tajné klíče sem NEPATŘÍ. */
 export const publicEnv = {
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
   supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
-  siteUrl: (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.rybnickarestaurace.cz").replace(/\/$/, ""),
-  /** Volitelná cesta k originálnímu logu v /public (např. /brand/logo.svg). */
-  logoPath: process.env.NEXT_PUBLIC_LOGO_PATH ?? "",
 };
 
 export function isSupabaseConfigured(): boolean {
   return Boolean(publicEnv.supabaseUrl && publicEnv.supabaseAnonKey);
+}
+
+export type AppMode = "supabase" | "local";
+
+export function appMode(): AppMode {
+  return isSupabaseConfigured() ? "supabase" : "local";
+}
+
+/** Lokální režim ukládá data na disk – na Vercelu (dočasný disk) by se ztratila. */
+export function localModeBlocked(): boolean {
+  return appMode() === "local" && process.env.VERCEL === "1" && process.env.HOMEOS_ALLOW_LOCAL_ON_VERCEL !== "1";
 }

@@ -9,5 +9,6 @@ next-env.d.ts
 .env.*.local
 .vercel
 .DS_Store
+.data/
+test-results/
 supabase/.temp/
-supabase/.branches/

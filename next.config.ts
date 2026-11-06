@@ -1,38 +1,27 @@
+import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabase = supabaseUrl ? new URL(supabaseUrl) : null;
 
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "X-Frame-Options", value: "SAMEORIGIN" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), interest-cohort=()" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(), interest-cohort=()" },
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+  { key: "X-Robots-Tag", value: "noindex, nofollow" },
 ];
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  images: {
-    formats: ["image/avif", "image/webp"],
-    // jen pro lokální end-to-end testy proti mock serveru
-    unoptimized: process.env.NEXT_IMAGE_UNOPTIMIZED === "1",
-    remotePatterns: supabase
-      ? [
-          {
-            protocol: supabase.protocol === "http:" ? "http" : "https",
-            hostname: supabase.hostname,
-            port: supabase.port,
-            pathname: "/storage/v1/object/public/**",
-          },
-        ]
-      : [],
+  agentRules: false,
+  // aplikace leží v podsložce repozitáře – kořen projektu je tato složka
+  turbopack: { root: fileURLToPath(new URL(".", import.meta.url)) },
+  outputFileTracingRoot: fileURLToPath(new URL(".", import.meta.url)),
+  experimental: {
+    // obnova zálohy (JSON) přes serverovou akci; na Vercelu platí limit platformy 4,5 MB
+    serverActions: { bodySizeLimit: "50mb" },
   },
   async headers() {
-    return [
-      { source: "/:path*", headers: securityHeaders },
-      { source: "/admin/:path*", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] },
-    ];
+    return [{ source: "/:path*", headers: securityHeaders }];
   },
 };
 

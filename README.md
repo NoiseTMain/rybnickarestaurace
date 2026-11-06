@@ -1,230 +1,263 @@
-# Restaurace Rybníky – web a administrace denního menu
+# HomeOS – osobní a rodinná finanční centrála
 
-Nový web Restaurace Rybníky (Rybníky 40, 263 01 Dobříš) s administrací, ve které majitel
-každý den nahraje PNG s menu, zveřejní ho jedním kliknutím a systém ho automaticky
-odešle e-mailem k tisku.
-
-- **Veřejný web:** úvod, denní menu, jídelní a nápojový lístek, prostory a akce,
-  sportovní přenosy, fotogalerie, kontakt s mapou, rezervace / poptávka akce.
-- **Administrace `/admin`:** denní menu (nahrání, historie, opakované odeslání,
-  znovuzveřejnění, mazání), otevírací doba, kontakt, texty, služby, lístek a ceny,
-  prostory, sportovní přenosy, fotografie, logo, příjemci e-mailů, poptávky.
-- **Návod pro majitele:** [`docs/NAVOD-PRO-MAJITELE.md`](docs/NAVOD-PRO-MAJITELE.md)
+Webová aplikace pro každodenní správu domácích financí: zůstatky a disponibilní peníze,
+rodinný rozpočet, inteligentní rozpočet na jídlo, spoření a finanční plánovač,
+pracovní příjmy (Rohlík na IČO), faktury s OCR, plánované nákupy, pravidelné platby,
+finanční asistent a archiv dokumentů. Tmavý „glassy“ design se zlatými akcenty,
+česky, s formáty data a měny Kč, pro mobil i desktop.
 
 ---
 
-## Co je potřeba doplnit před spuštěním
+## Co je potřeba nastavit (a co funguje hned)
 
-| Co | Proč | Kde |
-|---|---|---|
-| **Originální logo** | Původní web nebyl během vývoje z prostředí dostupný, logo se nepodařilo stáhnout. Žádné náhradní logo nebylo vytvořeno – do nahrání se zobrazuje jen název písmem. | Administrace → Nastavení → Logo (SVG/PNG se uloží beze změny), nebo soubor do `public/brand/` + `NEXT_PUBLIC_LOGO_PATH` |
-| Favicon z loga | `src/app/icon.svg` je dočasná neutrální ikona. | nahradit souborem vytvořeným z originálního loga |
-| Fotografie | Na web nebyly použity cizí ani ilustrační fotky. Bez fotek web používá barevné pozadí. | Administrace → Fotografie, Nastavení → Úvodní fotografie |
-| Otevírací doba, ceny, kapacity prostor | Neověřené údaje se nevymýšlely. Prázdná pole se na webu nezobrazují. | Administrace |
-| Údaje provozovatele (IČO) | doplnit do stránky Ochrana osobních údajů | `src/app/(site)/ochrana-udaju/page.tsx` |
-| Přístupy k Supabase a Resend | viz níže | `.env` |
+| Oblast | Stav |
+|---|---|
+| **Lokální vývojový režim** | Funguje hned po `npm install && npm run dev`. Bez Supabase ukládá data do `.data/homeos.json` a soubory do `.data/files/`. Přihlašování, všechny sekce, OCR, importy i zálohy fungují. |
+| **Supabase** (databáze, přihlášení, úložiště) | **Vyžaduje konfiguraci:** vytvořit projekt, spustit migrace, nastavit 2 proměnné prostředí – viz níže. |
+| **Vercel** | **Vyžaduje konfiguraci:** proměnné prostředí. Bez Supabase se na Vercelu aplikace záměrně nespustí (dočasný disk by data ztratil). |
+| **OCR faktur** | Funguje v prohlížeči. PDF s textovou vrstvou se čtou přímo; fotky a skeny rozpoznává Tesseract (čeština + angličtina), jehož jazyková data se při prvním použití stáhnou z CDN jsDelivr. |
+| **Bankovní synchronizace** | Záměrně **není** implementovaná – je jen připravené místo v Nastavení. Transakce se importují z CSV výpisu. |
 
-Služby (výčep, dva salonky, sál, zahrádka, bezbariérovost, dětský koutek, Wi-Fi,
-jídlo s sebou, sport…) jsou předvyplněné podle zadání; v administraci je lze
-vypnout, pokud už neplatí.
+Aplikace **nikdy nevymýšlí** vaše příjmy, výdaje, zůstatky ani dluhy. Vše zadáváte v úvodním
+nastavení a v jednotlivých sekcích. Ukázková data existují jen v samostatné **DEMO domácnosti**
+(viz [Demo data](#demo-data)).
 
 ---
 
-## Technologie
+## Funkce
+
+- **Přehled** – disponibilní zůstatek, příjmy a výdaje měsíce, odloženo, zbývá do konce měsíce,
+  skutečně volné peníze; 10 karet (stav financí, příjmy vs. výdaje, měsíční rozpočet, domácí
+  výdaje, rozpočet na jídlo, spoření, pracovní příjmy, neuhrazené faktury, nadcházející platby,
+  finanční cíle), graf vývoje zůstatku, měsíční graf, kategorie a doporučení asistenta.
+- **Domácnost** – výdaje podle kategorií, kdo platil, společné vs. osobní, srovnání s minulým
+  měsícem, správa kategorií (vlastní, archivace, označení „jídlo“ a „domácnost“).
+- **Příjmy a výdaje** – všechny pohyby, filtry (měsíc, typ, kategorie, účet, člen, stav, text),
+  převody mezi účty, účtenky v příloze, **storno a obnovení**, import CSV z banky s detekcí
+  duplicit, export CSV.
+- **Práce (Rohlík)** – směny (čas, špička, běžné/expresní trasy, objednávky, spropitné, bonusy,
+  odměny, pronájem vozidla, vybavení, soukromé km, srážky), návrh výdělku podle sazeb,
+  denní/týdenní/měsíční přehled, průměr na den a hodinu, graf, import a export CSV,
+  **výplaty** (očekávání vs. skutečnost, rozdíl, stav).
+- **Faktury** – vystavené/přijaté, nezaplacené, po splatnosti, zaplacené, stornované; PDF i fotky,
+  **OCR s povinným potvrzením**, vyhledávání, filtry, přehled splatností, propojení úhrady
+  s existující platbou (žádné dvojí započtení), export.
+- **Nákupy** – plánuji / kupuji / koupeno, priorita, odkaz, seznam přání, **kontrola, zda si nákup
+  můžete dovolit** (kolik chybí, kolik ušetřit, odkdy si ho lze bezpečně dovolit).
+- **Spoření a plánovač** – cíle s termínem, automaticky spočítaný potřebný měsíční vklad,
+  procento splnění, odhad data; plánovač počítá 5 výstupů (viz níže).
+- **Rozpočty** – inteligentní rozpočet na jídlo (měsíc/týden/den, přepočet, tempo, upozornění),
+  celkový limit, limity kategorií, výjimky pro konkrétní měsíc.
+- **Pravidelné platby** – kalendář, frekvence, splatnosti, zaplacení termínu (každý jen jednou),
+  „zaplaceno mimo evidenci“, přeskočení, dluhy se zbývající částkou, očekávané příjmy.
+- **Finanční asistent** – doporučení z dat a otázky typu „Můžeme si dovolit koupit sedačku
+  za 15 000 Kč?“. Deterministické výpočty, žádný jazykový model; když data chybí, doptá se.
+- **Dokumenty** – soukromý archiv, druhy, štítky, vyhledávání i v rozpoznaném textu.
+- **Nastavení** – členové, účty a hotovost, výchozí zůstatky, pravidelné příjmy, kategorie,
+  rezerva, upozornění, fakturační údaje, práce, pozvánky dalších členů, import banky,
+  export, **záloha a obnova**, změna hesla. Pole se ukládají automaticky.
+- **Rychlé tlačítko +** – příjem, výdaj, faktura, nákup, pracovní směna, spoření.
+
+---
+
+## Přesnost výpočtů
+
+Toto je nejdůležitější technická vlastnost aplikace.
+
+- **Haléře, ne desetinná čísla.** Všechny částky jsou celé haléře (`bigint` v databázi,
+  bezpečná celá čísla v TypeScriptu). Vstupy jako `1 234,50` se převádějí na `123450` bez
+  `parseFloat`; nejednoznačné zápisy (`1,234`) se odmítnou. Dělení má explicitní zaokrouhlení:
+  limity **dolů** (aplikace nikdy nenabídne víc, než je), potřebné vklady **nahoru**.
+  Viz `src/lib/money.ts`.
+- **Rozlišení pojmů** (`src/lib/finance/`):
+  - *aktuální zůstatek* = výchozí zůstatek účtu + platné transakce od data výchozího zůstatku,
+  - *disponibilní peníze* = běžné účty a hotovost − peníze odložené na cíle (spořicí účty se
+    nepočítají),
+  - *očekávané příjmy* (pravidelné příjmy, výplaty, vystavené faktury) se **nikdy** nepočítají
+    jako dostupné – jen informativně,
+  - *budoucí závazky* = nezaplacené termíny pravidelných plateb a přijaté faktury do konce měsíce,
+  - *rezervované peníze* = cíle vyčleněné na běžném účtu + rezerva,
+  - *skutečné úspory* = součet vkladů na cíle.
+- **Nic se nezapočítá dvakrát.** Platba termínu, výplata, faktura, nákup i vklad mají vazbu na
+  transakci s **unikátním indexem** v databázi (jeden zdroj = nejvýše jedna platná transakce).
+  CSV importy mají otisk řádku, opakovaný import nic nezdvojí. Možné duplicity s ručně zadanými
+  výdaji import předem odškrtne. Transakce starší než datum výchozího zůstatku se do zůstatku
+  nepočítají. Převody nejsou příjem ani výdaj.
+- **Storno a úpravy.** Storno transakci ponechá v historii, ale přestane ji započítávat; navázané
+  záznamy (výplata, faktura, nákup, vklad) se vrátí do původního stavu. Všechny přehledy se
+  počítají při každém zobrazení z databáze – po každé změně jsou automaticky správně.
+- **Staré údaje nejsou aktuální.** Neuhrazené termíny starší než 45 dní se do plánu automaticky
+  nepočítají a faktury vystavené před více než 60 dny se uloží jako „mimo plán“ (lze změnit).
+
+### Plánovač (zbytek aktuálního měsíce)
+
+```
+disponibilní        = běžné účty + hotovost − odloženo na cíle (na běžných účtech)
+závazky             = nezaplacené pravidelné platby + přijaté faktury do konce měsíce
+musí zůstat         = odloženo na cíle + závazky + zbytek rozpočtu na jídlo
+                      + zbytek limitů kategorií + bezpečnostní rezerva
+1. musí zůstat na účtu
+2. bezpečně utratit = max(0, disponibilní − (musí zůstat − odloženo) − plán spoření)
+3. máme odložit     = zbývající plán spoření tento měsíc
+4. potřebujeme vydělat = max(0, závazky + rozpočty + rezerva + plán spoření − disponibilní)
+5. můžeme spořit    = max(0, disponibilní − závazky − rozpočty − rezerva)
+```
+
+### Rozpočet na jídlo
+
+Pro měsíc s `D` dny, dnešní den `d`, rozpočet `B` a útratu `S` (včetně dneška):
+denní plán `B/D`, týdenní `7B/D`, zbývá `B − S`, **přepočítaný denní limit** `(B − S)/(D − d + 1)`,
+limit do konce týdne (po–ne, v rámci měsíce), průměr `S/d`, odhad `S + S/d·(D − d)`.
+Upozornění: blížíte se k limitu (výchozí 85 %), překročení, utrácíte rychleji než plán
+(o více než 10 %), při současném tempu peníze nevystačí. Příklad: 12 000 Kč v listopadu →
+400 Kč/den, 2 800 Kč/týden; po útratě 4 000 Kč do 6. 11. zbývá 320 Kč/den.
+
+---
+
+## Technologie a architektura
 
 | Vrstva | Volba |
 |---|---|
-| Frontend + server | **Next.js 16** (App Router, React 19, TypeScript), Tailwind CSS 4 |
-| Databáze | **Supabase Postgres** s Row Level Security |
-| Soubory | **Supabase Storage** (bucket `menus` pro PNG, `media` pro fotky a logo) |
-| Přihlášení | **Supabase Auth** (e-mail + heslo, registrace vypnutá) |
-| E-maily | **Resend** (odesílání pouze ze serveru) |
-| Hosting | doporučeno **Vercel** (funguje i libovolný Node.js hosting) |
-
-Písma (Fraunces, Inter) jsou hostovaná lokálně přes `@fontsource` – žádné volání Google Fonts.
-
-### Architektura denního menu
-
-```
-Prohlížeč majitele                         Server (Next.js)                   Supabase / Resend
-───────────────────                         ────────────────                   ─────────────────
-1. výběr PNG → kontrola signatury,
-   rozměrů a velikosti, náhled
-2. upload do Storage (bucket menus) ─────────────────────────────────────────▶ RLS: jen admin, jen PNG ≤ 15 MB
-3. POST /api/admin/menus ──────────────▶ ověří admina (Auth + admin_users)
-                                         stáhne soubor, znovu ověří PNG,
-                                         spočítá SHA-256
-                                         INSERT daily_menus  ─────────────────▶ historie
-                                         RPC publish_menu (atomicky) ─────────▶ is_current přepnut
-                                         revalidace veřejného webu
-                                         RPC claim_menu_email (zámek) ────────▶ pending → sending
-                                         Resend + PNG příloha (originál) ─────▶ ID zprávy
-                                         stav sent / failed + log ────────────▶ menu_email_log
-4. výsledek: zveřejněno ✓, e-mail ✓/⚠
-```
-
-- **Zveřejnění nikdy nezávisí na e-mailu.** Selže-li Resend, menu je zveřejněné,
-  stav je `failed`, chyba je v logu a v administraci je tlačítko „Zkusit znovu“.
-- **Stav „odesláno“** se zapíše až po vrácení ID zprávy od Resend.
-- **Dvojí odeslání:** funkce `claim_menu_email` menu atomicky zamkne; souběžné
-  požadavky, dvojklik ani obnovení stránky nic znovu nepošlou. Již odeslané menu
-  se pošle znovu jen po výslovném potvrzení (`force`). Každý pokus má vlastní
-  `Idempotency-Key` pro Resend.
-- **Zaseknutý stav** „sending“ (např. pád serveru) se po 5 minutách uvolní.
-- **Historie** se nikdy nemaže automaticky; mazání je jen ruční s potvrzením.
-- **Časové pásmo:** „dnes“, otevírací doba a časy přenosů se počítají v
-  `Europe/Prague` (server na Vercelu běží v UTC). Veřejná stránka si „dnešek“
-  ověří i v prohlížeči, protože HTML může pocházet z cache.
-- **Automatická aktualizace:** po zveřejnění se veřejné stránky revalidují; otevřená
-  stránka se navíc sama obnoví (kontrola `/api/menu/current` každou minutu).
-
-### Struktura
+| Aplikace | Next.js 16 (App Router, Server Components, Server Actions), React 19, TypeScript |
+| Vzhled | Tailwind CSS 4, Framer Motion, Lucide ikony, Recharts (ověřená barevná paleta grafů) |
+| Data | Supabase PostgreSQL s Row Level Security |
+| Přihlášení | Supabase Auth (e-mail + heslo, potvrzení e-mailu, obnova hesla) |
+| Soubory | Supabase Storage, soukromý bucket `documents` |
+| OCR | `unpdf` (textová vrstva PDF) + `tesseract.js` (fotky a skeny) – v prohlížeči |
+| Testy | Vitest (výpočty), PostgreSQL (migrace + RLS), Playwright (end-to-end) |
 
 ```
 src/
-  app/
-    (site)/            veřejné stránky (úvod, denni-menu, jidelni-listek, …)
-    (print)/           /denni-menu/tisk – samostatná stránka pro tisk
-    admin/             administrace (prihlaseni, obnova-hesla, (panel)/…)
-      actions.ts       server actions (nastavení, lístek, prostory, sport, galerie)
-    api/
-      admin/menus/     zveřejnění, e-mail, znovuzveřejnění, mazání menu
-      menu/current     veřejný stav aktuálního menu
-      inquiry          veřejný formulář rezervace / poptávky
-    auth/confirm       ověření odkazu pro obnovu hesla
-    sitemap.ts, robots.ts, icon.svg
-  components/          komponenty webu a administrace
-  lib/                 data, e-mail, validace PNG, čas (Europe/Prague), Supabase klienti
-  proxy.ts             obnovení relace a ochrana /admin (Next.js 16 „proxy“)
-supabase/
-  migrations/          SQL schéma, RLS, storage, výchozí obsah
-  tests/               testy RLS proti PostgreSQL
-tests/
-  unit/                Vitest
-  e2e/                 Playwright + lokální mock Supabase/Resend
-docs/NAVOD-PRO-MAJITELE.md
+  app/(auth)/        přihlášení, registrace, obnova hesla
+  app/uvod/          úvodní nastavení (průvodce), pozvánka, demo
+  app/(app)/         všechny sekce aplikace (serverové stránky)
+  app/api/           soubory, exporty CSV, záloha JSON
+  components/        UI (glass karty, formuláře, grafy, navigace, rychlé +)
+  lib/money.ts       peněžní aritmetika v haléřích
+  lib/dates.ts       data YYYY-MM-DD, časová zóna Europe/Prague
+  lib/finance/       zůstatky, období, jídlo, cíle, plánovač, závazky, práce, dostupnost nákupu
+  lib/assistant.ts   doporučení a odpovědi asistenta
+  lib/actions/       serverové akce (validace zod, kontrola vlastnictví)
+  lib/db/            jednotné rozhraní k datům: Supabase / lokální JSON
+supabase/migrations/ schéma, RLS, úložiště
+supabase/tests/      testy RLS
+tests/               unit a end-to-end testy
 ```
+
+**Datová vrstva.** Všechny stránky a akce pracují přes rozhraní `Store`
+(`src/lib/db/store.ts`). V produkci jej implementuje Supabase klient **s relací uživatele**
+(všechny dotazy procházejí RLS), v lokálním režimu JSON soubor, který napodobuje stejná pravidla:
+unikátní klíče, vazby mezi tabulkami a přístup jen k vlastní domácnosti.
+
+### Bezpečnost
+
+- Žádný tajný klíč v aplikaci ani v prohlížeči. Používá se jen veřejný `anon` klíč; service-role
+  klíč aplikace nepotřebuje.
+- **Row Level Security** na všech tabulkách: uživatel vidí jen domácnosti, jichž je členem.
+  Složené cizí klíče `(household_id, id)` znemožní odkaz na data jiné domácnosti.
+- Úložiště: cesta souboru začíná `household_id`, politiky pouštějí jen členy domácnosti.
+  Soubory se stahují přes `/api/files/[id]` po kontrole přístupu, s `nosniff` a sandbox CSP.
+- Každá serverová akce znovu ověří přihlášení a vlastnictví všech odkazovaných záznamů
+  a validuje vstupy (zod). Pozvánky do domácnosti přijímá bezpečná SQL funkce.
+- Hlavičky: HSTS, `X-Frame-Options: DENY`, `noindex`, `Cache-Control: private, no-store`.
 
 ---
 
-## Instalace a spuštění
+## Lokální spuštění
 
-### 1. Supabase
-
-1. Vytvořte projekt na <https://supabase.com> (region EU, např. Frankfurt).
-2. Spusťte migrace – buď v **SQL Editoru** postupně vložte soubory
-   `supabase/migrations/*.sql` (v pořadí podle názvu), nebo přes CLI:
-   ```bash
-   npx supabase login
-   npx supabase link --project-ref <ref-projektu>
-   npx supabase db push
-   ```
-   Migrace vytvoří tabulky, RLS pravidla, funkce `publish_menu` a
-   `claim_menu_email`, buckety `menus` a `media` s pravidly a výchozí obsah.
-3. **Vypněte registraci:** Authentication → Sign In / Providers → Email →
-   vypnout „Allow new users to sign up“.
-4. **Vytvořte účet majitele:** Authentication → Users → *Add user* (e-mail + silné
-   heslo, „Auto confirm“). Potom v SQL Editoru:
-   ```sql
-   insert into public.admin_users (user_id, note)
-   select id, 'majitel' from auth.users where email = 'majitel@example.cz';
-   ```
-   Bez tohoto záznamu se uživatel sice přihlásí, ale nemá žádná práva.
-5. **URL pro obnovu hesla:** Authentication → URL Configuration → Site URL
-   `https://www.rybnickarestaurace.cz`, Redirect URLs přidat
-   `https://www.rybnickarestaurace.cz/auth/confirm`.
-   V Authentication → Email Templates → *Reset password* použijte odkaz:
-   ```
-   {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/admin/obnova-hesla
-   ```
-6. Klíče najdete v Project Settings → API: URL, `anon`/publishable klíč a
-   `service_role`/secret klíč.
-
-### 2. Resend
-
-1. Účet na <https://resend.com>, **Domains → Add domain** `rybnickarestaurace.cz`
-   a u správce DNS doplňte zobrazené záznamy (SPF, DKIM). Počkejte na „Verified“.
-2. **API Keys → Create** (Sending access) → `RESEND_API_KEY`.
-3. `EMAIL_FROM`, např. `Restaurace Rybníky <menu@rybnickarestaurace.cz>`.
-
-Bez nastaveného Resend web i zveřejňování menu fungují, e-mail se jen označí jako
-neodeslaný s vysvětlením.
-
-### 3. Lokální vývoj
+Požadavky: Node.js 20.9+.
 
 ```bash
-cp .env.example .env.local   # a vyplnit
 npm install
-npm run dev                  # http://localhost:3000, administrace na /admin
+npm run dev          # http://localhost:3000
 ```
 
-### 4. Nasazení na Vercel
+Bez proměnných Supabase běží **lokální režim**: zaregistrujte se, projděte úvodní nastavení
+(nebo zvolte „Vyzkoušet s ukázkovými daty“). Data jsou ve složce `.data/` (není v gitu).
+Zapomenuté heslo v lokálním režimu: smažte `.data/homeos.json` (smaže i data) nebo se
+přihlaste a heslo změňte v Nastavení.
 
-1. Repozitář importujte ve Vercelu (framework se rozpozná automaticky).
-2. V Settings → Environment Variables nastavte proměnné z `.env.example`
-   (`SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `IP_HASH_SALT` jsou tajné).
-3. Deploy, poté v Settings → Domains připojte `www.rybnickarestaurace.cz`.
-4. Po nasazení: přihlásit se na `/admin`, nahrát logo, vyplnit otevírací dobu
-   a nahrát první menu.
+### S vlastním Supabase
 
-Endpointy pro zveřejnění mají `maxDuration = 60 s` (odeslání přílohy).
-PNG se nahrává z prohlížeče přímo do Supabase Storage, takže limit velikosti
-těla požadavku na Vercelu (4,5 MB) se na menu nevztahuje (limit menu je 15 MB).
+1. Vytvořte projekt na [supabase.com](https://supabase.com) (region EU, např. Frankfurt).
+2. Spusťte migrace – buď v **SQL Editoru** postupně obsah souborů
+   `supabase/migrations/20261106000100_schema.sql`, `…0200_security.sql`, `…0300_storage.sql`,
+   nebo přes CLI:
+   ```bash
+   npx supabase link --project-ref <ref>
+   npx supabase db push
+   ```
+3. **Authentication → URL Configuration:** Site URL = adresa aplikace,
+   Redirect URLs = `https://<vase-domena>/auth/confirm` (a `http://localhost:3000/auth/confirm`).
+4. Do `.env.local` zkopírujte `.env.example` a vyplňte
+   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (Project Settings → API)
+   a `NEXT_PUBLIC_SITE_URL`.
+5. `npm run dev`, zaregistrujte se a potvrďte e-mail.
 
 ---
 
-## Bezpečnost
+## Nasazení na Vercel (produkce)
 
-- **Tři vrstvy ochrany administrace:** `proxy.ts` (přesměrování bez relace),
-  `requireAdmin()` v každé stránce, akci a API (ověření přes Supabase Auth +
-  tabulka `admin_users`) a **RLS v databázi i ve Storage**.
-- Veřejnost čte jen viditelný obsah a **pouze aktuální menu**; nemůže nic vkládat,
-  měnit ani mazat (ani přes přímé volání Supabase API s veřejným klíčem).
-- Funkce `publish_menu` a `claim_menu_email` jsou `security definer` a samy
-  kontrolují roli admina.
-- PNG se ověřuje třikrát: v prohlížeči, pravidly bucketu (MIME + 15 MB) a na
-  serveru podle skutečného obsahu (signatura, IHDR, rozměry). Neplatný soubor se
-  z úložiště smaže.
-- Tajné klíče (`SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`) jsou pouze na
-  serveru (`server-only`). Service role se používá jen pro uložení veřejné poptávky.
-- API administrace kontroluje `Origin` (CSRF), formulář poptávky má honeypot a
-  limit 5 poptávek za hodinu z jedné (hashované) IP adresy.
-- Hlavičky: HSTS, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `noindex` pro `/admin`.
-- Mapa Google se načte až po kliknutí (žádné cookies třetích stran předem).
+1. Na Vercelu **Add New → Project**, vyberte tento repozitář.
+2. Root Directory nechte výchozí (kořen repozitáře). Framework se rozpozná jako Next.js;
+   `vercel.json` nastavuje region `fra1`.
+3. **Environment Variables** (Production i Preview):
+   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`.
+4. Deploy. V Supabase doplňte produkční adresu do Site URL a Redirect URLs (viz výše).
+5. Kontrola po nasazení: registrace → potvrzovací e-mail → úvodní nastavení → přidat výdaj
+   → nahrát účtenku → stáhnout zálohu v Nastavení.
+
+Doporučení pro produkci: v Supabase zapněte zálohy databáze (Point-in-Time Recovery na placeném
+plánu), nastavte vlastní SMTP pro e-maily (Auth → SMTP) a pravidelně stahujte zálohu
+z Nastavení → Export a záloha. Na Vercelu má jeden požadavek limit 4,5 MB – soubory se proto
+v produkci nahrávají z prohlížeče **přímo do Supabase Storage**; obnova zálohy včetně dokumentů
+přes 4,5 MB je možná jen při vlastním hostingu nebo lokálně.
+
+---
+
+## Zálohování a obnova
+
+- **Nastavení → Export a záloha → Záloha (JSON)** – kompletní data domácnosti; varianta
+  „vč. dokumentů“ přibalí soubory (base64).
+- **Obnova** (jen vlastník) nahradí data aktuální domácnosti obsahem zálohy. Identifikátory se
+  přegenerují (lze obnovit i do jiné domácnosti), vazby se přemapují; při chybě se vrátí původní
+  stav. Pro potvrzení je nutné napsat `OBNOVIT`.
+- **CSV exporty** – transakce, faktury, směny, výplaty (UTF-8, středník – otevře se v Excelu).
+
+## Import CSV
+
+- **Banka** (Příjmy a výdaje → Import CSV z banky): kódování UTF-8 i Windows-1250 a oddělovač se
+  rozpoznají automaticky; sloupce se namapují podle názvů (lze změnit), podporována je jedna
+  částka se znaménkem i dva sloupce příjem/výdaj. Kategorie se navrhnou podle obchodníka.
+- **Směny** (Práce → Import CSV): šablonu lze stáhnout přímo v dialogu importu.
+
+## Demo data
+
+Tlačítko „Vyzkoušet s ukázkovými daty“ (úvod) nebo „Vytvořit demo domácnost“ (Nastavení)
+vytvoří **samostatnou domácnost** s příznakem `is_demo`, všechny názvy mají příponu „(demo)“
+a celá aplikace v ní zobrazuje výrazný pruh DEMO. Se skutečnými financemi se nikdy nemíchá;
+mezi domácnostmi se přepíná v levém panelu a demo lze kdykoli smazat.
 
 ---
 
 ## Testy
 
 ```bash
-npm run lint && npm run typecheck
-npm test              # jednotkové testy (Vitest): PNG, čas Europe/Prague, e-mail, validace
-npm run test:db       # migrace + RLS proti dočasnému PostgreSQL (initdb, bez Dockeru)
-npm run test:e2e      # build + Playwright proti lokálnímu mocku Supabase a Resend
+npm run check      # typecheck + lint + unit testy
+npm test           # unit testy finančních výpočtů (money, data, jídlo, plánovač, cíle,
+                   # snapshot bez dvojího započtení, OCR parser, CSV, asistent)
+npm run test:db    # migrace + RLS na dočasném PostgreSQL (vyžaduje initdb/pg_ctl/psql)
+npm run test:e2e   # production build + Chromium: registrace, průvodce, výdaj, storno,
+                   # zaplacení platby, cíl, plánovač, nákup, asistent, faktura,
+                   # OCR z PDF s povinným potvrzením, směna, výplata, exporty, záloha
+                   # a obnova, všechny stránky, mobilní zobrazení, demo, izolace uživatelů
 ```
 
-`test:e2e` (34 kontrol) projde v Chromiu celý tok: ochranu `/admin` a API,
-odmítnutí neplatného PNG, nahrání → zveřejnění → e-mail s originálním PNG
-(porovnání bajt po bajtu), neodeslání při obnovení stránky, výpadek e-mailové
-služby (menu zůstane zveřejněné, stav „selhalo“), opakované odeslání, historii,
-znovuzveřejnění, mazání, změnu příjemce, otevírací dobu, lístek, sport, poptávku,
-mobilní zobrazení a funkčnost interních odkazů. Snímky obrazovky ukládá do `test-results/`.
+End-to-end test běží v lokálním režimu (bez Supabase) v dočasné složce; Chromium hledá v
+`/opt/pw-browsers/chromium`, jinak nastavte `CHROMIUM_PATH`.
 
-> Mock v `tests/e2e/mock-backend.mjs` napodobuje Supabase jen zjednodušeně.
-> Skutečná RLS pravidla ověřuje `npm run test:db` proti PostgreSQL. Ostrý provoz
-> s Supabase a Resend je potřeba po nasazení ověřit nahráním prvního menu.
+## Budoucí rozšíření
 
----
-
-## SEO
-
-- Titulky a popisy pro každou stránku (restaurace Rybníky Dobříš, denní menu
-  Rybníky, pronájem sálu Rybníky, …), kanonické URL, Open Graph (`public/og-image.png`,
-  případně úvodní fotografie).
-- `sitemap.xml`, `robots.txt` (administrace a API vyloučeny).
-- Strukturovaná data `schema.org/Restaurant` – jen skutečně vyplněné údaje
-  (otevírací doba se doplní po zadání v administraci).
-- Statické generování s revalidací (ISR 5 min + okamžitá revalidace po každé změně),
-  optimalizace fotek přes `next/image` (AVIF/WebP), fotky se před nahráním zmenšují.
-- Konkrétní pozice ve vyhledávačích nelze zaručit; doporučujeme založit / převzít
-  profil Firmy.cz a Google Business se stejnými údaji.
+- Bankovní synchronizace přes PSD2 API (místo je připravené v Nastavení → Banka).
+- Push/e-mailová upozornění (nyní se upozornění zobrazují v aplikaci).
+- Vystavování faktur do PDF z fakturačních údajů.

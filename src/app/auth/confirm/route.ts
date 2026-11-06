@@ -1,26 +1,20 @@
-import type { EmailOtpType } from "@supabase/supabase-js";
+import { type EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { createSessionClient } from "@/lib/supabase/server";
+import { appMode } from "@/lib/env";
 
-/** Ověření odkazu z e-mailu Supabase (obnova hesla, pozvánka). */
+/** Potvrzení e-mailu / obnova hesla z odkazu Supabase. */
 export async function GET(request: NextRequest) {
-  const { searchParams } = request.nextUrl;
-  const tokenHash = searchParams.get("token_hash");
-  const type = searchParams.get("type") as EmailOtpType | null;
-  const code = searchParams.get("code");
-  const nextParam = searchParams.get("next") ?? "/admin";
-  // jen relativní cesty v rámci /admin – ochrana proti open redirect
-  const next = nextParam.startsWith("/admin") ? nextParam : "/admin";
-
+  const url = request.nextUrl;
+  const next = url.searchParams.get("next");
+  const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  if (appMode() !== "supabase") return NextResponse.redirect(new URL("/prihlaseni", url));
   const supabase = await createSessionClient();
+  const code = url.searchParams.get("code");
+  const tokenHash = url.searchParams.get("token_hash");
+  const type = url.searchParams.get("type") as EmailOtpType | null;
   let ok = false;
-  if (tokenHash && type) {
-    ok = !(await supabase.auth.verifyOtp({ type, token_hash: tokenHash })).error;
-  } else if (code) {
-    ok = !(await supabase.auth.exchangeCodeForSession(code)).error;
-  }
-  const url = request.nextUrl.clone();
-  url.search = "";
-  url.pathname = ok ? next : "/admin/prihlaseni";
-  return NextResponse.redirect(url);
+  if (code) ok = !(await supabase.auth.exchangeCodeForSession(code)).error;
+  else if (tokenHash && type) ok = !(await supabase.auth.verifyOtp({ token_hash: tokenHash, type })).error;
+  return NextResponse.redirect(new URL(ok ? safeNext : "/prihlaseni?chyba=odkaz", url));
 }
