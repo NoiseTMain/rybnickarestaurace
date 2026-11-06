@@ -26,7 +26,7 @@ function isActive(path: string, href: string) {
 function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2.5">
-      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-gold-bright to-gold-deep text-[15px] font-bold text-[#1b1407] shadow-[0_6px_20px_-6px_rgba(212,180,131,0.7)]">H</span>
+      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-gold-bright to-gold-deep text-[15px] font-bold text-[#1b1407] shadow-[0_6px_20px_-6px_rgb(var(--accent-rgb)/0.7)]">H</span>
       <span className="font-[family-name:var(--font-display)] text-lg font-semibold tracking-tight">Home<span className="gold-text">OS</span></span>
     </Link>
   );

@@ -2,6 +2,7 @@ import "server-only";
 import { createHmac, randomUUID, scrypt as scryptCb, timingSafeEqual, randomBytes } from "node:crypto";
 import { promisify } from "node:util";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { appMode } from "@/lib/env";
 import { createSessionClient } from "@/lib/supabase/server";
 
@@ -73,10 +74,16 @@ async function localUser(): Promise<AppUser | null> {
   }
 }
 
-/** Přihlášený uživatel (ověřený na serveru), nebo null. */
-export async function getUser(): Promise<AppUser | null> {
+/**
+ * Přihlášený uživatel, nebo null. Token se ověřuje kryptograficky (podpis JWT
+ * přes veřejné klíče projektu, které se ukládají do mezipaměti) – bez dalšího
+ * dotazu na Auth server při každém kliknutí. Data stejně chrání RLS v databázi.
+ */
+export const getUser = cache(async (): Promise<AppUser | null> => {
   if (appMode() === "local") return localUser();
   const supabase = await createSessionClient();
-  const { data } = await supabase.auth.getUser();
-  return data.user ? { id: data.user.id, email: data.user.email ?? "" } : null;
-}
+  const { data, error } = await supabase.auth.getClaims();
+  const claims = data?.claims;
+  if (error || !claims?.sub) return null;
+  return { id: claims.sub, email: typeof claims.email === "string" ? claims.email : "" };
+});

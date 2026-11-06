@@ -17,6 +17,7 @@ const nextConfig: NextConfig = {
   turbopack: { root: fileURLToPath(new URL(".", import.meta.url)) },
   outputFileTracingRoot: fileURLToPath(new URL(".", import.meta.url)),
   experimental: {
+    staleTimes: { dynamic: 30, static: 300 },
     // obnova zálohy (JSON) přes serverovou akci; na Vercelu platí limit platformy 4,5 MB
     serverActions: { bodySizeLimit: "50mb" },
   },

@@ -243,6 +243,31 @@ for (const p of ["/", "/rozpocty", "/transakce"]) {
 }
 await mobile.close();
 
+step("vzhled: změna barev se projeví hned a vydrží");
+await page.goto(B + "/nastaveni#vzhled");
+await page.getByRole("button", { name: "Smaragd" }).click();
+await toast("Vzhled uložen");
+const accentNow = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--color-gold").trim());
+assert.equal(await accentNow(), "#6fcf97");
+await page.getByRole("button", { name: /Půlnoc/ }).click();
+await page.reload();
+assert.equal(await accentNow(), "#6fcf97");
+assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), "rgb(7, 10, 18)");
+await page.screenshot({ path: `${SHOTS}/vzhled.png`, fullPage: false });
+await page.goto(B + "/");
+await page.screenshot({ path: `${SHOTS}/vzhled-prehled.png`, fullPage: false });
+await page.goto(B + "/nastaveni#vzhled");
+await page.getByRole("button", { name: "Champagne" }).click();
+await page.getByRole("button", { name: /Antracit/ }).click();
+await toast("Vzhled uložen");
+
+step("iPhone: ikona a manifest pro přidání na plochu");
+const head = await page.content();
+assert.match(head, /rel="apple-touch-icon"[^>]*apple-icon/);
+assert.equal((await page.request.get(B + "/apple-icon.png")).headers()["content-type"], "image/png");
+const manifest = await (await page.request.get(B + "/manifest.webmanifest")).json();
+assert.equal(manifest.display, "standalone");
+
 step("demo domácnost je oddělená");
 await page.goto(B + "/nastaveni");
 await page.getByRole("button", { name: "Vytvořit demo domácnost" }).click();

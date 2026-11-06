@@ -33,10 +33,15 @@
   --series-8: #e66767;
   --chart-grid: rgba(244, 239, 230, 0.07);
   --chart-axis: #8e877b;
+  /* barva zvýraznění jako RGB – přepisuje ji zvolený vzhled */
+  --accent-rgb: 212 180 131;
+  --accent-deep-rgb: 169 131 77;
+  --bg-top: #0d0c0b;
 }
 
 html {
   background: var(--color-base);
+  transition: background-color 0.3s;
   -webkit-text-size-adjust: 100%;
 }
 
@@ -56,11 +61,11 @@ body {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(60rem 40rem at 8% -10%, rgba(212, 180, 131, 0.22), transparent 60%),
-    radial-gradient(50rem 40rem at 100% 10%, rgba(169, 131, 77, 0.16), transparent 60%),
-    radial-gradient(70rem 50rem at 60% 110%, rgba(120, 92, 60, 0.22), transparent 60%),
+    radial-gradient(60rem 40rem at 8% -10%, rgb(var(--accent-rgb) / 0.22), transparent 60%),
+    radial-gradient(50rem 40rem at 100% 10%, rgb(var(--accent-deep-rgb) / 0.16), transparent 60%),
+    radial-gradient(70rem 50rem at 60% 110%, rgb(var(--accent-deep-rgb) / 0.14), transparent 60%),
     radial-gradient(40rem 30rem at 30% 60%, rgba(255, 236, 200, 0.05), transparent 70%),
-    linear-gradient(180deg, #0d0c0b 0%, #0a0a0b 100%);
+    linear-gradient(180deg, var(--bg-top) 0%, var(--color-base) 100%);
 }
 .ambient::after {
   content: "";
@@ -97,7 +102,7 @@ body {
     -webkit-backdrop-filter: blur(24px) saturate(150%);
   }
   .gold-text {
-    background: linear-gradient(180deg, #f6e3bd, #c9a46a);
+    background: linear-gradient(180deg, var(--color-gold-bright), var(--color-gold));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -122,9 +127,9 @@ body {
     color: var(--color-ink-3);
   }
   .field:focus {
-    border-color: rgba(212, 180, 131, 0.6);
+    border-color: rgb(var(--accent-rgb) / 0.6);
     background: rgba(255, 255, 255, 0.07);
-    box-shadow: 0 0 0 3px rgba(212, 180, 131, 0.15);
+    box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.15);
   }
   .field[aria-invalid="true"] {
     border-color: rgba(255, 143, 128, 0.7);

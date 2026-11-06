@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import type { AppContext } from "@/lib/context";
 import type { FinanceData } from "@/lib/finance/snapshot";
 import type { DocumentRow, HouseholdSettings, WorkSettings } from "@/lib/db/types";
@@ -13,7 +14,7 @@ export interface FullData extends FinanceData {
 const byName = <T extends { name: string; sort?: number }>(a: T, b: T) => (a.sort ?? 0) - (b.sort ?? 0) || a.name.localeCompare(b.name, "cs");
 
 /** Načte všechna data domácnosti (pro výpočty; osobní data mají řádově tisíce záznamů). */
-export async function loadData(ctx: AppContext): Promise<FullData> {
+export const loadData = cache(async (ctx: AppContext): Promise<FullData> => {
   const s = ctx.store;
   const h = { household_id: ctx.household.id };
   const [settings, members, accounts, categories, transactions, recurring, incomeSources, budgets, goals, contributions, invoices, payouts, shifts, purchases, marks, workSettings, documents] =
@@ -38,10 +39,10 @@ export async function loadData(ctx: AppContext): Promise<FullData> {
     workSettings: workSettings[0] ?? null,
     documents: documents.sort((a, b) => b.created_at.localeCompare(a.created_at)),
   };
-}
+});
 
-export async function loadSnapshot(ctx: AppContext) {
+export const loadSnapshot = cache(async (ctx: AppContext) => {
   const data = await loadData(ctx);
   const today = todayISO();
   return { data, today, snapshot: computeSnapshot(data, today) };
-}
+});

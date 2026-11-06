@@ -5,7 +5,10 @@ import { formatDate } from "@/lib/dates";
 import { ACCOUNT_KIND_LABEL } from "@/lib/defaults";
 import { FREQUENCY_LABEL } from "@/lib/finance/recurrence";
 import { deleteSetupItem } from "@/lib/actions/setup";
+import { cookies } from "next/headers";
 import { Card, PageHeader } from "@/components/ui/Card";
+import { ThemePicker } from "@/components/forms/ThemePicker";
+import { THEME_COOKIE, parseTheme } from "@/lib/theme";
 import { Money } from "@/components/ui/Money";
 import { Badge } from "@/components/ui/Badge";
 import { ActionButton } from "@/components/ui/ActionButton";
@@ -17,12 +20,13 @@ import { AutosaveField, AutosaveToggle, CreateDemoButton, DeleteHouseholdForm, I
 
 export const metadata = { title: "Nastavení" };
 
-const SECTIONS = [["domacnost", "Domácnost"], ["clenove", "Členové"], ["ucty", "Účty"], ["prijmy", "Příjmy"], ["kategorie", "Kategorie"], ["planovani", "Rezerva a upozornění"], ["fakturace", "Fakturační údaje"], ["prace", "Práce"], ["banka", "Banka"], ["zaloha", "Export a záloha"], ["ucet", "Účet"]];
+const SECTIONS = [["vzhled", "Vzhled"], ["domacnost", "Domácnost"], ["clenove", "Členové"], ["ucty", "Účty"], ["prijmy", "Příjmy"], ["kategorie", "Kategorie"], ["planovani", "Rezerva a upozornění"], ["fakturace", "Fakturační údaje"], ["prace", "Práce"], ["banka", "Banka"], ["zaloha", "Export a záloha"], ["ucet", "Účet"]];
 
 export default async function SettingsPage() {
   const ctx = await requireContext();
   const { data, snapshot: s } = await loadSnapshot(ctx);
   const st = data.settings!;
+  const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
   const access = (await ctx.store.select("household_users", { household_id: ctx.household.id })).sort((a, b) => (a.role === "owner" ? -1 : 1) - (b.role === "owner" ? -1 : 1) || a.created_at.localeCompare(b.created_at));
   return (
     <div className="space-y-4">
@@ -32,6 +36,9 @@ export default async function SettingsPage() {
       </nav>
 
       <div className="grid gap-4 xl:grid-cols-2">
+        <Card id="vzhled" title="Vzhled aplikace" subtitle="Platí pro toto zařízení" className="xl:col-span-2">
+          <ThemePicker initialAccent={theme.accent} initialBg={theme.bg} />
+        </Card>
         <Card id="domacnost" title="Domácnost" subtitle={ctx.household.is_demo ? "Ukázková domácnost" : `Vaše role: ${ctx.role === "owner" ? "vlastník" : "člen"}`}>
           <RenameHousehold name={ctx.household.name} />
           <div className="mt-4 space-y-2">

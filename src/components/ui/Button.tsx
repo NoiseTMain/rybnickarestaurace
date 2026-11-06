@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react";
 import { cn } from "./cn";
 
 const variants = {
-  primary: "bg-gradient-to-b from-gold-bright to-gold text-[#1b1407] shadow-[0_8px_24px_-8px_rgba(212,180,131,0.6)] hover:brightness-105",
+  primary: "bg-gradient-to-b from-gold-bright to-gold text-[#1b1407] shadow-[0_8px_24px_-8px_rgb(var(--accent-rgb)/0.6)] hover:brightness-105",
   secondary: "bg-white/[0.07] text-ink border border-white/10 hover:bg-white/[0.11]",
   ghost: "text-ink-2 hover:text-ink hover:bg-white/[0.06]",
   danger: "bg-neg/15 text-neg border border-neg/25 hover:bg-neg/25",

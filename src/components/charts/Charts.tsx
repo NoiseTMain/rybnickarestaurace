@@ -2,8 +2,24 @@
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
+import { useEffect, useState } from "react";
 import { formatMoney } from "@/lib/money";
 import { formatDate, shortMonth } from "@/lib/dates";
+
+/** Aktuální barva zvýraznění (mění se podle zvoleného vzhledu). */
+function useAccent(): { gold: string; bright: string } {
+  const [c, setC] = useState({ gold: "#d4b483", bright: "#ecd3a2" });
+  useEffect(() => {
+    const read = () => {
+      const st = getComputedStyle(document.documentElement);
+      setC({ gold: st.getPropertyValue("--color-gold").trim() || "#d4b483", bright: st.getPropertyValue("--color-gold-bright").trim() || "#ecd3a2" });
+    };
+    read();
+    window.addEventListener("homeos-theme", read);
+    return () => window.removeEventListener("homeos-theme", read);
+  }, []);
+  return c;
+}
 
 const AXIS = { stroke: "var(--chart-axis)", fontSize: 11, tickLine: false, axisLine: false } as const;
 const kc = (c: number) => formatMoney(c, { decimals: "never" });
@@ -44,14 +60,15 @@ function Legend({ items }: { items: { label: string; color: string; dashed?: boo
 
 /** Vývoj zůstatku (jedna řada → bez legendy, název nese karta). */
 export function BalanceChart({ data }: { data: { date: string; total: number; liquid: number }[] }) {
+  const { gold } = useAccent();
   return (
     <div className="h-48 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>
           <defs>
             <linearGradient id="balFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#d4b483" stopOpacity={0.35} />
-              <stop offset="100%" stopColor="#d4b483" stopOpacity={0} />
+              <stop offset="0%" stopColor={gold} stopOpacity={0.35} />
+              <stop offset="100%" stopColor={gold} stopOpacity={0} />
             </linearGradient>
           </defs>
           <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
@@ -60,7 +77,7 @@ export function BalanceChart({ data }: { data: { date: string; total: number; li
           <Tooltip cursor={{ stroke: "rgba(244,239,230,0.3)" }} content={({ active, payload }) => active && payload?.length ? (
             <TooltipBox title={formatDate(payload[0].payload.date)} rows={[{ label: "Celkem", value: payload[0].payload.total }, { label: "Běžné účty", value: payload[0].payload.liquid }]} />
           ) : null} />
-          <Area type="monotone" dataKey="total" stroke="#d4b483" strokeWidth={2} fill="url(#balFill)" dot={false} activeDot={{ r: 4, stroke: "#121214", strokeWidth: 2 }} />
+          <Area type="monotone" dataKey="total" stroke={gold} strokeWidth={2} fill="url(#balFill)" dot={false} activeDot={{ r: 4, stroke: "#121214", strokeWidth: 2 }} />
         </AreaChart>
       </ResponsiveContainer>
     </div>
@@ -139,9 +156,10 @@ export function CategoryDonut({ data }: { data: { name: string; amount: number }
 
 /** Kumulativní útrata na jídlo vs. rovnoměrný plán. */
 export function FoodPaceChart({ data }: { data: { day: number; plan: number; actual: number | null }[] }) {
+  const { gold } = useAccent();
   return (
     <div className="w-full">
-      <Legend items={[{ label: "Skutečnost", color: "#d4b483" }, { label: "Plán", color: "#8e877b", dashed: true }]} />
+      <Legend items={[{ label: "Skutečnost", color: gold }, { label: "Plán", color: "#8e877b", dashed: true }]} />
       <div className="h-44">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
@@ -150,12 +168,12 @@ export function FoodPaceChart({ data }: { data: { day: number; plan: number; act
             <YAxis {...AXIS} width={52} tickFormatter={compact} />
             <Tooltip cursor={{ stroke: "rgba(244,239,230,0.3)" }} content={({ active, payload }) => active && payload?.length ? (
               <TooltipBox title={`${payload[0].payload.day}. den`} rows={[
-                ...(payload[0].payload.actual != null ? [{ label: "Utraceno", value: payload[0].payload.actual as number, color: "#d4b483" }] : []),
+                ...(payload[0].payload.actual != null ? [{ label: "Utraceno", value: payload[0].payload.actual as number, color: gold }] : []),
                 { label: "Plán", value: payload[0].payload.plan, color: "#8e877b" },
               ]} />
             ) : null} />
             <Line type="monotone" dataKey="plan" stroke="#8e877b" strokeWidth={2} strokeDasharray="4 3" dot={false} isAnimationActive={false} />
-            <Line type="monotone" dataKey="actual" stroke="#d4b483" strokeWidth={2} dot={false} connectNulls={false} activeDot={{ r: 4, stroke: "#121214", strokeWidth: 2 }} />
+            <Line type="monotone" dataKey="actual" stroke={gold} strokeWidth={2} dot={false} connectNulls={false} activeDot={{ r: 4, stroke: "#121214", strokeWidth: 2 }} />
           </LineChart>
         </ResponsiveContainer>
       </div>

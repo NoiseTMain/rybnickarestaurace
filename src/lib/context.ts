@@ -39,8 +39,8 @@ export const tryContext = cache(async (): Promise<AppContext | null | "no_househ
   const user = await getUser();
   if (!user) return null;
   const store = await getStore(user);
-  const memberships = await store.select("household_users", { user_id: user.id });
-  const households = (await store.select("households")).filter((h) => memberships.some((m) => m.household_id === h.id));
+  const [memberships, allHouseholds] = await Promise.all([store.select("household_users", { user_id: user.id }), store.select("households")]);
+  const households = allHouseholds.filter((h) => memberships.some((m) => m.household_id === h.id));
   if (!households.length) return "no_household";
   const jar = await cookies();
   const wanted = jar.get(HOUSEHOLD_COOKIE)?.value;

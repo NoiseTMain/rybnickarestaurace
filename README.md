@@ -201,7 +201,7 @@ přihlaste a heslo změňte v Nastavení.
 
 1. Na Vercelu **Add New → Project**, vyberte tento repozitář.
 2. Root Directory nechte výchozí (kořen repozitáře). Framework se rozpozná jako Next.js;
-   `vercel.json` nastavuje region `fra1`.
+   `vercel.json` nastavuje region `lhr1` (Londýn) – stejný jako databáze Supabase (eu-west-2), aby dotazy nečekaly na cestu přes Evropu.
 3. **Environment Variables** (Production i Preview):
    `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`.
 4. Deploy. V Supabase doplňte produkční adresu do Site URL a Redirect URLs (viz výše).
@@ -215,6 +215,12 @@ v produkci nahrávají z prohlížeče **přímo do Supabase Storage**; obnova z
 přes 4,5 MB je možná jen při vlastním hostingu nebo lokálně.
 
 ---
+
+## Aplikace na iPhonu (PWA)
+
+HomeOS lze přidat na plochu iPhonu a používat jako aplikaci (celá obrazovka, vlastní ikona):
+Safari → otevřít adresu aplikace → tlačítko **Sdílet** → **Přidat na plochu** → **Přidat**.
+Ikona (`src/app/apple-icon.png`) a manifest (`src/app/manifest.ts`) jsou připravené.
 
 ## Zálohování a obnova
 

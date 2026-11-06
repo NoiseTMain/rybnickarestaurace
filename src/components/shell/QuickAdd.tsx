@@ -42,7 +42,7 @@ export function QuickAdd({ floating }: { floating?: boolean }) {
         aria-expanded={menu}
         aria-label="Rychle přidat"
         className={cn(
-          "flex items-center justify-center rounded-full bg-gradient-to-b from-gold-bright to-gold text-[#1b1407] shadow-[0_10px_30px_-8px_rgba(212,180,131,0.7)] transition active:scale-95",
+          "flex items-center justify-center rounded-full bg-gradient-to-b from-gold-bright to-gold text-[#1b1407] shadow-[0_10px_30px_-8px_rgb(var(--accent-rgb)/0.7)] transition active:scale-95",
           floating ? "h-14 w-14" : "h-10 gap-2 px-4 text-sm font-semibold",
         )}
       >
