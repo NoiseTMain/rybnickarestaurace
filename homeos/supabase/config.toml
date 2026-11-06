@@ -1,0 +1,13 @@
+# Minimální konfigurace pro Supabase CLI (supabase link / db push).
+project_id = "homeos"
+
+[auth]
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/auth/confirm"]
+enable_signup = true
+
+[auth.email]
+enable_confirmations = true
+
+[storage]
+file_size_limit = "15MiB"
