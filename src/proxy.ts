@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { isSupabaseConfigured, publicEnv } from "@/lib/env";
+import { isSupabaseConfigured, localModeBlocked, publicEnv } from "@/lib/env";
 
 const PUBLIC = ["/prihlaseni", "/registrace", "/obnova-hesla", "/auth/confirm", "/konfigurace"];
 
@@ -10,6 +10,14 @@ const PUBLIC = ["/prihlaseni", "/registrace", "/obnova-hesla", "/auth/confirm", 
  */
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  // Na Vercelu bez Supabase by se data ztrácela → celá aplikace ukáže návod ke konfiguraci
+  if (localModeBlocked() && pathname !== "/konfigurace") {
+    if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Aplikace není nakonfigurovaná" }, { status: 503 });
+    const url = request.nextUrl.clone();
+    url.pathname = "/konfigurace";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
   const isPublic = PUBLIC.some((p) => pathname === p || pathname.startsWith(p + "/"));
   let response = NextResponse.next({ request });
   let loggedIn: boolean;
