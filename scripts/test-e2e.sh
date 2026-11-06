@@ -6,6 +6,7 @@ cd "$ROOT"
 export HOMEOS_DATA_DIR="$(mktemp -d)"
 export HOMEOS_INSECURE_COOKIES=1
 unset NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY
+export NEXT_PUBLIC_HOMEOS_LOCAL_MODE=1
 export SHOTS_DIR="${SHOTS_DIR:-$ROOT/test-results}"
 cleanup() { [ -n "${PID:-}" ] && kill "$PID" 2>/dev/null || true; rm -rf "$HOMEOS_DATA_DIR"; }
 trap cleanup EXIT

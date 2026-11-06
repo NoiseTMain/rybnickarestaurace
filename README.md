@@ -12,9 +12,9 @@ finanční asistent a archiv dokumentů. Tmavý „glassy“ design se zlatými 
 
 | Oblast | Stav |
 |---|---|
-| **Lokální vývojový režim** | Funguje hned po `npm install && npm run dev`. Bez Supabase ukládá data do `.data/homeos.json` a soubory do `.data/files/`. Přihlašování, všechny sekce, OCR, importy i zálohy fungují. |
-| **Supabase** (databáze, přihlášení, úložiště) | **Vyžaduje konfiguraci:** vytvořit projekt, spustit migrace, nastavit 2 proměnné prostředí – viz níže. |
-| **Vercel** | **Vyžaduje konfiguraci:** proměnné prostředí. Bez Supabase se na Vercelu aplikace záměrně nespustí (dočasný disk by data ztratil). |
+| **Lokální vývojový režim** | Jen na vyžádání (`NEXT_PUBLIC_HOMEOS_LOCAL_MODE=1` v `.env.local`) – pro vývoj a testy. Místo Supabase ukládá data do `.data/homeos.json` a soubory do `.data/files/`. Přihlašování, všechny sekce, OCR, importy i zálohy fungují. |
+| **Supabase** (databáze, přihlášení, úložiště) | **Nastaveno:** produkční projekt má spuštěné migrace a jeho veřejná adresa a anon klíč jsou výchozí hodnotou v `src/lib/env.ts`. Pro jiný projekt je přepíšou proměnné prostředí. |
+| **Vercel** | Stačí napojit repozitář; proměnné prostředí jsou volitelné. Lokální režim se na Vercelu nikdy nespustí. |
 | **OCR faktur** | Funguje v prohlížeči. PDF s textovou vrstvou se čtou přímo; fotky a skeny rozpoznává Tesseract (čeština + angličtina), jehož jazyková data se při prvním použití stáhnou z CDN jsDelivr. |
 | **Bankovní synchronizace** | Záměrně **není** implementovaná – je jen připravené místo v Nastavení. Transakce se importují z CSV výpisu. |
 
@@ -172,8 +172,9 @@ npm install
 npm run dev          # http://localhost:3000
 ```
 
-Bez proměnných Supabase běží **lokální režim**: zaregistrujte se, projděte úvodní nastavení
-(nebo zvolte „Vyzkoušet s ukázkovými daty“). Data jsou ve složce `.data/` (není v gitu).
+Aplikace se ve výchozím stavu připojí k produkční databázi Supabase. Pro vývoj bez ní dejte do
+`.env.local` řádek `NEXT_PUBLIC_HOMEOS_LOCAL_MODE=1` – pak běží **lokální režim** s daty ve
+složce `.data/` (není v gitu).
 Zapomenuté heslo v lokálním režimu: smažte `.data/homeos.json` (smaže i data) nebo se
 přihlaste a heslo změňte v Nastavení.
 
