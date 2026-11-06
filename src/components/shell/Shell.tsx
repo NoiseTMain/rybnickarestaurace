@@ -99,7 +99,7 @@ export function Shell({ children, email, household, households, mode }: ShellPro
       </aside>
 
       {/* mobile top bar */}
-      <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-white/[0.06] bg-base/70 px-4 py-3 backdrop-blur-xl lg:hidden">
+      <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-white/[0.06] bg-base/70 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-xl lg:hidden">
         <Logo />
         <button type="button" onClick={() => setDrawer(true)} className="rounded-full border border-white/10 bg-white/[0.05] p-2" aria-label="Otevřít menu"><Menu className="h-5 w-5" /></button>
       </header>

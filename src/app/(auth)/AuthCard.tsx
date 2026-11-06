@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 export function AuthCard({ title, subtitle, children, footer }: { title: string; subtitle?: string; children: ReactNode; footer?: ReactNode }) {
   return (
-    <main className="flex min-h-dvh items-center justify-center px-4 py-10">
+    <main className="flex min-h-dvh items-center justify-center px-4 pb-10 pt-[max(2.5rem,env(safe-area-inset-top))]">
       <div className="w-full max-w-md">
         <div className="mb-8 flex items-center justify-center gap-3">
           <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-gold-bright to-gold-deep text-lg font-bold text-[#1b1407] shadow-[0_8px_30px_-8px_rgba(212,180,131,0.8)]">H</span>
