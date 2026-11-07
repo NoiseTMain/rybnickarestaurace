@@ -253,7 +253,7 @@ assert.equal(await accentNow(), "#6fcf97");
 await page.getByRole("button", { name: /Půlnoc/ }).click();
 await page.reload();
 assert.equal(await accentNow(), "#6fcf97");
-assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), "rgb(7, 10, 18)");
+assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor), "rgb(7, 10, 18)");
 await page.screenshot({ path: `${SHOTS}/vzhled.png`, fullPage: false });
 await page.goto(B + "/");
 await page.screenshot({ path: `${SHOTS}/vzhled-prehled.png`, fullPage: false });
@@ -489,9 +489,15 @@ await page.getByText("Neobvyklé věci").waitFor();
 
 step("vzhled: interiér na pozadí (DEMO)");
 await page.goto(B + "/nastaveni#vzhled");
+const shot = async () => (await page.screenshot({ clip: { x: 1300, y: 940, width: 120, height: 50 } })).toString("base64");
+const before = await shot();
 await page.getByRole("button", { name: /Obývák v teplém světle/ }).click();
 await toast("Vzhled uložen");
 assert.match(await page.locator("#ambient-scene").evaluate((el) => el.style.backgroundImage), /obyvak\.svg/);
+await page.waitForTimeout(600);
+assert.notEqual(await shot(), before, "pozadí s interiérem je opravdu vidět");
+await page.reload();
+assert.notEqual(await shot(), before, "pozadí vydrží po obnovení stránky");
 await page.getByRole("button", { name: /Bez obrázku/ }).click();
 
 step("reset domácnosti s heslem a dvojím potvrzením");

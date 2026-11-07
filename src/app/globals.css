@@ -46,7 +46,9 @@ html {
 }
 
 body {
-  background: var(--color-base);
+  /* průhledné – pod obsahem jsou vrstvy .ambient a .ambient-scene (pevné, z-index -1);
+     barvu pozadí nese <html> */
+  background: transparent;
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-feature-settings: "cv11", "ss01";
