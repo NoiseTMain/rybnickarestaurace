@@ -195,3 +195,65 @@ do $$ begin
   assert (select count(*) from public.shopping_items) = 0, 'odebraný člen vidí nákupní seznam';
 end $$;
 reset role;
+
+\echo '9) Oprávnění člena podle sekcí'
+select pg_temp.as_user(:alice);
+insert into public.household_invites (household_id, code) values ('11111111-0000-0000-0000-000000000001', 'POZVANKA-ABCDEFG');
+reset role;
+select pg_temp.as_user(:bob);
+select public.accept_household_invite('pozvanka-abcdefg', 'Bob');
+do $$ begin
+  assert (select count(*) from public.members where household_id = '11111111-0000-0000-0000-000000000001' and user_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb') = 1, 'připojený člen nemá právě jeden řádek člena';
+end $$;
+-- výchozí plná práva
+insert into public.transactions (household_id, type, amount, date, account_id, description)
+  values ('11111111-0000-0000-0000-000000000001', 'expense', 100, '2026-11-08', '22222222-0000-0000-0000-000000000001', 'bob plná práva');
+do $$
+declare ok boolean;
+begin
+  begin
+    update public.household_users set permissions = '{"finance":"edit","settings":"edit"}' where user_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb' and household_id = '11111111-0000-0000-0000-000000000001';
+    ok := not found;
+  exception when insufficient_privilege then ok := true;
+  end;
+  assert ok, 'člen si změnil oprávnění';
+end $$;
+reset role;
+select pg_temp.as_user(:alice);
+update public.household_users set permissions = '{"finance":"view","settings":"view"}' where user_id = :bob and household_id = '11111111-0000-0000-0000-000000000001';
+reset role;
+select pg_temp.as_user(:bob);
+do $$
+declare ok boolean;
+begin
+  assert (select count(*) from public.transactions where household_id = '11111111-0000-0000-0000-000000000001') > 0, 'člen jen pro čtení nevidí data';
+  begin
+    insert into public.transactions (household_id, type, amount, date, account_id, description)
+      values ('11111111-0000-0000-0000-000000000001', 'expense', 100, '2026-11-08', '22222222-0000-0000-0000-000000000001', 'zakázáno');
+    ok := false;
+  exception when insufficient_privilege then ok := true;
+  end;
+  assert ok, 'člen jen pro čtení zapsal transakci';
+  update public.members set name = 'hack' where household_id = '11111111-0000-0000-0000-000000000001';
+  -- sekce bez omezení zůstává upravitelná
+  insert into public.shopping_lists (household_id, name) values ('11111111-0000-0000-0000-000000000001', 'Bobův seznam');
+end $$;
+reset role;
+do $$ begin
+  assert (select count(*) from public.members where name = 'hack') = 0, 'člen jen pro čtení přejmenoval členy';
+end $$;
+
+\echo '10) IČO lze změnit nejvýše jednou za 30 dní'
+select pg_temp.as_user(:alice);
+insert into public.household_settings (household_id, billing_ico, ico_changed_at) values ('11111111-0000-0000-0000-000000000001', '27082440', now());
+do $$
+declare ok boolean;
+begin
+  begin
+    update public.household_settings set billing_ico = '12345678' where household_id = '11111111-0000-0000-0000-000000000001';
+    ok := false;
+  exception when check_violation then ok := true;
+  end;
+  assert ok, 'IČO změněno dříve než po 30 dnech';
+end $$;
+reset role;

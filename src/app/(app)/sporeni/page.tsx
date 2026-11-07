@@ -1,5 +1,6 @@
 import { Trash2 } from "lucide-react";
 import { requireContext } from "@/lib/context";
+import { ReadOnlyNotice } from "@/components/ui/ReadOnlyNotice";
 import { loadSnapshot } from "@/lib/data";
 import { formatDate, monthName } from "@/lib/dates";
 import { formatMoney, sub } from "@/lib/money";
@@ -29,6 +30,7 @@ export default async function SavingsPage() {
   ];
   return (
     <div className="space-y-4">
+      <ReadOnlyNotice ctx={ctx} section="savings" />
       <PageHeader title="Spoření a plánovač" subtitle="Cíle, pravidelné vklady a chytrý plán na zbytek měsíce" actions={<><ContributionButton label="Vklad" size="md" /><GoalButton label="Nový cíl" variant="primary" size="md" /></>} />
 
       <Card id="planovac" variant="light" title="Chytrý finanční plánovač" subtitle={`Zbytek měsíce ${monthName(today)} · ${s.daysLeftInMonth} dní`}>

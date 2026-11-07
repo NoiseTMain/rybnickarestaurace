@@ -1,4 +1,5 @@
 import { requireContext } from "@/lib/context";
+import { ReadOnlyNotice } from "@/components/ui/ReadOnlyNotice";
 import { loadSnapshot } from "@/lib/data";
 import { formatMoney, sum } from "@/lib/money";
 import { checkAffordability } from "@/lib/finance/affordability";
@@ -27,6 +28,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="space-y-4">
+      <ReadOnlyNotice ctx={ctx} section="purchases" />
       <PageHeader title="Moje nákupy" subtitle="Plánované věci a seznam přání – s kontrolou, zda si je můžete dovolit" actions={<PurchaseButton label="Přidat nákup" variant="primary" size="md" />} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Card className="!p-4"><p className="text-[11px] uppercase tracking-wider text-ink-3">Bezpečně k utracení</p><Money value={s.planner.safeToSpend} decimals="never" className="gold-text text-xl font-semibold" /></Card>

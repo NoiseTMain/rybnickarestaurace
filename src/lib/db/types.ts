@@ -12,11 +12,23 @@ export interface Household {
   created_at: string;
 }
 
+export const PERMISSION_SECTIONS = {
+  finance: "Příjmy, výdaje, účty, rozpočty a platby",
+  invoices: "Faktury",
+  work: "Práce a výplaty",
+  purchases: "Nákupy a plánování",
+  savings: "Spoření a cíle",
+  settings: "Nastavení domácnosti a členové",
+} as const;
+export type PermissionSection = keyof typeof PERMISSION_SECTIONS;
+export type Permissions = Partial<Record<PermissionSection, "edit" | "view">>;
+
 export interface HouseholdUser {
   id: string;
   household_id: string;
   user_id: string;
   role: "owner" | "member";
+  permissions: Permissions;
   created_at: string;
 }
 
@@ -47,7 +59,22 @@ export interface HouseholdSettings {
   billing_bank_account: string | null;
   invoice_number_prefix: string | null;
   onboarded_at: string | null;
+  ico_activated_at: string | null;
+  ico_changed_at: string | null;
+  ico_info: IcoInfo | null;
   updated_at: string;
+}
+
+export interface IcoInfo {
+  ico: string;
+  name: string | null;
+  address: string | null;
+  legalForm: string | null;
+  dic: string | null;
+  established: string | null;
+  verified: boolean;
+  source: "ares" | "manual";
+  checkedAt: string;
 }
 
 export interface Member {
@@ -58,6 +85,8 @@ export interface Member {
   user_id: string | null;
   is_active: boolean;
   sort: number;
+  phone: string | null;
+  avatar_document_id: string | null;
   created_at: string;
 }
 
@@ -334,6 +363,7 @@ export interface ShoppingItem {
   name: string;
   quantity: string | null;
   est_price: Cents | null;
+  store: string | null;
   checked: boolean;
   sort: number;
   created_at: string;
@@ -346,6 +376,28 @@ export interface OccurrenceMark {
   income_source_id: string | null;
   occurrence_date: ISODate;
   state: "paid_untracked" | "skipped";
+  created_at: string;
+}
+
+export interface PriceHistory {
+  id: string;
+  household_id: string;
+  item_key: string;
+  name: string;
+  quantity: string | null;
+  store: string | null;
+  price: Cents;
+  date: ISODate;
+  created_at: string;
+}
+
+export interface PushSubscriptionRow {
+  id: string;
+  user_id: string;
+  household_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
   created_at: string;
 }
 
@@ -372,6 +424,8 @@ export interface Tables {
   occurrence_marks: OccurrenceMark;
   shopping_lists: ShoppingList;
   shopping_items: ShoppingItem;
+  price_history: PriceHistory;
+  push_subscriptions: PushSubscriptionRow;
 }
 
 export type TableName = keyof Tables;
@@ -396,6 +450,7 @@ export const HOUSEHOLD_TABLES = [
   "occurrence_marks",
   "shopping_lists",
   "shopping_items",
+  "price_history",
   "transactions",
 ] as const satisfies readonly TableName[];
 
@@ -417,4 +472,5 @@ export const MONEY_COLUMNS: Partial<Record<TableName, string[]>> = {
   invoices: ["amount"],
   purchases: ["price"],
   shopping_items: ["est_price"],
+  price_history: ["price"],
 };

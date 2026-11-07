@@ -1,7 +1,8 @@
 import { Download, Landmark, Trash2 } from "lucide-react";
-import { requireContext } from "@/lib/context";
+import { canEdit, requireContext } from "@/lib/context";
+import { ReadOnlyNotice } from "@/components/ui/ReadOnlyNotice";
 import { loadSnapshot } from "@/lib/data";
-import { formatDate } from "@/lib/dates";
+import { addDays, formatDate, todayISO } from "@/lib/dates";
 import { ACCOUNT_KIND_LABEL } from "@/lib/defaults";
 import { FREQUENCY_LABEL } from "@/lib/finance/recurrence";
 import { deleteSetupItem } from "@/lib/actions/setup";
@@ -11,6 +12,11 @@ import { ThemePicker } from "@/components/forms/ThemePicker";
 import { THEME_COOKIE, parseTheme } from "@/lib/theme";
 import { Money } from "@/components/ui/Money";
 import { Badge } from "@/components/ui/Badge";
+import { Avatar } from "@/components/ui/Avatar";
+import { PermissionsButton } from "@/components/forms/PermissionsForm";
+import { ResetHouseholdButton } from "@/components/forms/ResetForm";
+import { IcoForm, IcoInfoCard } from "@/components/forms/IcoForm";
+import { PushToggle } from "@/components/forms/PushToggle";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { LinkButton } from "@/components/ui/Button";
 import { SetupButton } from "@/components/forms/SetupForms";
@@ -20,16 +26,20 @@ import { AutosaveField, AutosaveToggle, CreateDemoButton, DeleteHouseholdForm, I
 
 export const metadata = { title: "Nastavení" };
 
-const SECTIONS = [["vzhled", "Vzhled"], ["domacnost", "Domácnost"], ["clenove", "Členové"], ["ucty", "Účty"], ["prijmy", "Příjmy"], ["kategorie", "Kategorie"], ["planovani", "Rezerva a upozornění"], ["fakturace", "Fakturační údaje"], ["prace", "Práce"], ["banka", "Banka"], ["zaloha", "Export a záloha"], ["ucet", "Účet"]];
+const SECTIONS = [["vzhled", "Vzhled"], ["domacnost", "Domácnost"], ["clenove", "Členové"], ["ucty", "Účty"], ["prijmy", "Příjmy"], ["kategorie", "Kategorie"], ["planovani", "Rezerva a upozornění"], ["ico", "IČO"], ["fakturace", "Fakturační údaje"], ["prace", "Práce"], ["banka", "Banka"], ["zaloha", "Export a záloha"], ["ucet", "Účet"]];
 
 export default async function SettingsPage() {
   const ctx = await requireContext();
   const { data, snapshot: s } = await loadSnapshot(ctx);
   const st = data.settings!;
   const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
+  const icoActive = Boolean(st.billing_ico && st.ico_activated_at);
+  const icoNext = st.ico_changed_at ? addDays(st.ico_changed_at.slice(0, 10), 30) : null;
+  const icoNextChange = icoActive && icoNext && icoNext > todayISO() ? icoNext : null;
   const access = (await ctx.store.select("household_users", { household_id: ctx.household.id })).sort((a, b) => (a.role === "owner" ? -1 : 1) - (b.role === "owner" ? -1 : 1) || a.created_at.localeCompare(b.created_at));
   return (
     <div className="space-y-4">
+      <ReadOnlyNotice ctx={ctx} section="settings" />
       <PageHeader title="Nastavení" subtitle="Všechny finanční údaje zadáváte vy. Změny se ukládají automaticky." />
       <nav className="scroll-thin -mx-1 flex gap-1 overflow-x-auto px-1 pb-1" aria-label="Sekce nastavení">
         {SECTIONS.map(([id, l]) => <a key={id} href={`#${id}`} className="whitespace-nowrap rounded-full bg-white/[0.05] px-3 py-1.5 text-sm text-ink-2 hover:bg-white/10 hover:text-ink">{l}</a>)}
@@ -37,7 +47,7 @@ export default async function SettingsPage() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card id="vzhled" title="Vzhled aplikace" subtitle="Platí pro toto zařízení" className="xl:col-span-2">
-          <ThemePicker initialAccent={theme.accent} initialBg={theme.bg} />
+          <ThemePicker initial={theme} />
         </Card>
         <Card id="domacnost" title="Domácnost" subtitle={ctx.household.is_demo ? "Ukázková domácnost" : `Vaše role: ${ctx.role === "owner" ? "vlastník" : "člen"}`}>
           <RenameHousehold name={ctx.household.name} />
@@ -47,6 +57,7 @@ export default async function SettingsPage() {
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
             {!ctx.households.some((h) => h.is_demo) && <CreateDemoButton />}
+            {ctx.role === "owner" && <ResetHouseholdButton householdName={ctx.household.name} />}
             {ctx.role === "owner" && <DeleteHouseholdForm id={ctx.household.id} name={ctx.household.name} isDemo={ctx.household.is_demo} />}
             {ctx.role !== "owner" && <LeaveHouseholdButton />}
           </div>
@@ -56,11 +67,12 @@ export default async function SettingsPage() {
               {access.map((u) => {
                 const m = data.members.find((x) => x.user_id === u.user_id);
                 return (
-                  <li key={u.id} className="flex items-center gap-2 text-sm">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: m?.color ?? "#6b665e" }} />
-                    <span className="flex-1">{m?.name ?? "Člen bez jména"}{u.user_id === ctx.user.id && " (vy)"}</span>
+                  <li key={u.id} className="flex flex-wrap items-center gap-2 text-sm">
+                    <Avatar member={m} size={28} />
+                    <span className="min-w-0 flex-1 truncate">{m?.name ?? "Člen bez jména"}{u.user_id === ctx.user.id && " (vy)"}</span>
                     <Badge tone={u.role === "owner" ? "gold" : "neutral"}>{u.role === "owner" ? "vlastník" : "připojen(a)"}</Badge>
                     <span className="hidden text-[11px] text-ink-3 sm:inline">od {formatDate(u.created_at.slice(0, 10))}</span>
+                    {ctx.role === "owner" && u.user_id !== ctx.user.id && <PermissionsButton userId={u.user_id} name={m?.name ?? "člen"} initial={u.permissions ?? {}} />}
                     {ctx.role === "owner" && u.user_id !== ctx.user.id && <RemoveAccessButton userId={u.user_id} name={m?.name ?? "člena"} />}
                   </li>
                 );
@@ -71,12 +83,13 @@ export default async function SettingsPage() {
           <div className="mt-5 border-t border-white/[0.06] pt-4"><p className="mb-2 text-sm font-medium">Přidat se do jiné domácnosti</p><JoinHouseholdForm /></div>
         </Card>
 
-        <Card id="clenove" title="Členové domácnosti" subtitle="Kdo platí a komu patří příjmy" action={<SetupButton kind="member" label="Přidat" />}>
+        <Card id="clenove" title="Členové domácnosti" subtitle="Kdo platí a komu patří příjmy · fotka a telefon u každého člena" action={<SetupButton kind="member" label="Přidat" />}>
           <ul className="divide-y divide-white/[0.05]">
             {data.members.map((m) => (
               <li key={m.id} className="flex items-center gap-3 py-2">
-                <span className="h-3 w-3 rounded-full" style={{ background: m.color }} />
-                <span className="flex-1 text-sm">{m.name} {m.user_id === ctx.user.id ? <Badge>vy</Badge> : m.user_id ? <Badge tone="gold">připojen(a) účtem</Badge> : null} {!m.is_active && <Badge>neaktivní</Badge>}</span>
+                <Avatar member={m} size={36} />
+                <span className="min-w-0 flex-1 text-sm">{m.name} {m.user_id === ctx.user.id ? <Badge>vy</Badge> : m.user_id ? <Badge tone="gold">připojen(a) účtem</Badge> : null} {!m.is_active && <Badge>neaktivní</Badge>}
+                  {m.phone && <a href={`tel:${m.phone.replace(/\s/g, "")}`} className="block text-xs text-gold hover:underline">{m.phone}</a>}</span>
                 <SetupButton kind="member" initial={m} size="icon" variant="ghost" />
                 <ActionButton action={deleteSetupItem.bind(null, "members", m.id)} confirm="Smazat člena? U záznamů zůstane prázdné pole „kdo“." size="icon" icon={<Trash2 className="h-4 w-4" />} />
               </li>
@@ -139,12 +152,24 @@ export default async function SettingsPage() {
             <AutosaveToggle field="notify_invoices" label="Upozornění na faktury po splatnosti" initial={st.notify_invoices} />
           </div>
           <p className="mt-2 text-xs text-ink-3">Upozornění se zobrazují na přehledu a ve Finančním asistentovi.</p>
+          <div className="mt-4 border-t border-white/[0.06] pt-4">
+            <p className="mb-2 text-sm font-medium">Týdenní souhrn na telefon</p>
+            <PushToggle publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || null} />
+          </div>
+        </Card>
+
+        <Card id="ico" title="Podnikání na IČO" subtitle={icoActive ? "Aktivní – sekce Faktury a Práce jsou zpřístupněné" : "Zpřístupní sekce Faktury a Práce"}>
+          {icoActive && st.ico_info && <IcoInfoCard info={st.ico_info} />}
+          {icoActive && !st.ico_info && <p className="text-sm">IČO {st.billing_ico}</p>}
+          <div className={icoActive ? "mt-4 border-t border-white/[0.06] pt-4" : ""}>
+            {icoActive && <p className="mb-2 text-sm font-medium">Změnit IČO</p>}
+            {canEdit(ctx, "settings") ? <IcoForm current={icoActive ? st.billing_ico : null} nextChange={icoNextChange} /> : <p className="text-sm text-ink-3">IČO může měnit jen člen s oprávněním k nastavení.</p>}
+          </div>
         </Card>
 
         <Card id="fakturace" title="Fakturační údaje" subtitle="Vaše údaje jako osoby samostatně výdělečně činné">
           <div className="grid gap-3 sm:grid-cols-2">
             <AutosaveField field="billing_name" label="Jméno / obchodní firma" initial={st.billing_name} />
-            <AutosaveField field="billing_ico" label="IČO" initial={st.billing_ico} hint="OCR ho pozná a vynechá" />
             <AutosaveField field="billing_dic" label="DIČ" initial={st.billing_dic} />
             <AutosaveField field="billing_bank_account" label="Číslo účtu" initial={st.billing_bank_account} />
             <AutosaveField field="billing_address" label="Adresa" initial={st.billing_address} />

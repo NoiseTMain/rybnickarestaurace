@@ -1,5 +1,6 @@
 import { Trash2 } from "lucide-react";
 import { requireContext } from "@/lib/context";
+import { ReadOnlyNotice } from "@/components/ui/ReadOnlyNotice";
 import { loadData } from "@/lib/data";
 import { addDays, addMonths, daysInMonth, endOfMonth, formatDate, monthName, parts, startOfMonth, todayISO, weekday } from "@/lib/dates";
 import { divRound, formatMoney, sum } from "@/lib/money";
@@ -48,6 +49,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="space-y-4">
+      <ReadOnlyNotice ctx={ctx} section="finance" />
       <PageHeader title="Pravidelné platby a závazky" subtitle="Budoucí závazky se automaticky započítávají do finančního plánu." actions={<RecurringButton label="Nová platba" variant="primary" size="md" />} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

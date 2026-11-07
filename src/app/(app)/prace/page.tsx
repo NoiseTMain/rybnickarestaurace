@@ -1,5 +1,7 @@
 import { Download, RotateCcw, Trash2, XCircle } from "lucide-react";
 import { requireContext } from "@/lib/context";
+import { ReadOnlyNotice } from "@/components/ui/ReadOnlyNotice";
+import { IcoLocked } from "@/components/ui/IcoLocked";
 import { loadData } from "@/lib/data";
 import { addDays, endOfMonth, endOfWeek, formatDate, monthName, shortMonth, startOfMonth, startOfWeek, todayISO } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
@@ -24,6 +26,14 @@ export default async function WorkPage({ searchParams }: { searchParams: Promise
   const sp = await searchParams;
   const ctx = await requireContext();
   const data = await loadData(ctx);
+  if (!(data.settings?.billing_ico && data.settings.ico_activated_at)) {
+    return (
+      <div className="space-y-4">
+        <PageHeader title={"Práce"} subtitle="Pro podnikání na IČO" />
+        <IcoLocked what="Sekce Práce" />
+      </div>
+    );
+  }
   const today = todayISO();
   const tab = sp.tab ?? "";
   const month = /^\d{4}-\d{2}$/.test(sp.mesic ?? "") ? sp.mesic! : today.slice(0, 7);
@@ -46,6 +56,7 @@ export default async function WorkPage({ searchParams }: { searchParams: Promise
 
   return (
     <div className="space-y-4">
+      <ReadOnlyNotice ctx={ctx} section="work" />
       <PageHeader title={`Práce – ${data.workSettings?.company ?? "Rohlík"}`} subtitle="Evidence směn, výdělků, nákladů a výplat (IČO)"
         actions={<><ShiftImportButton /><LinkButton href="/api/export/smeny" size="sm" icon={<Download className="h-4 w-4" />}>Export</LinkButton><ShiftButton label="Nová směna" variant="primary" size="md" /></>} />
       <FilterTabs name="tab" options={[{ value: "", label: "Přehled" }, { value: "smeny", label: "Směny", count: data.shifts.length }, { value: "vyplaty", label: "Výplaty", count: data.payouts.length }, { value: "nastaveni", label: "Nastavení" }]} />

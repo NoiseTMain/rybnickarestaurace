@@ -1,11 +1,14 @@
 "use client";
-import { Check, Copy, Pencil, Plus, RotateCcw, ShoppingCart, Trash2 } from "lucide-react";
-import { useOptimistic, useRef, useTransition } from "react";
+import { Check, Copy, ExternalLink, Pencil, Plus, RotateCcw, ShoppingCart, Sparkles, Tag, Trash2, Truck } from "lucide-react";
+import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
+import { kupiSearchUrl, rohlikSearchUrl, STORES } from "@/lib/shops";
+import { suggestPrice, type PriceSuggestion } from "@/lib/actions/planning";
 import {
   addShoppingItem, completeShoppingList, deleteShoppingItem, deleteShoppingList, duplicateShoppingList, reopenShoppingList, saveShoppingList, toggleShoppingItem,
 } from "@/lib/actions/planning";
 import { formatMoney, toInputValue } from "@/lib/money";
 import { formatDate } from "@/lib/dates";
+import { kupiLeafletUrl } from "@/lib/shops";
 import type { ShoppingItem, ShoppingList } from "@/lib/db/types";
 import { useLookups } from "@/components/Lookups";
 import { FormError, Input, MoneyInput, Select, Textarea } from "@/components/ui/Field";
@@ -38,19 +41,60 @@ export function ShoppingListButton({ initial, label, variant = "primary", size =
 
 function AddItemForm({ listId }: { listId: string }) {
   const ref = useRef<HTMLFormElement>(null);
+  const [name, setName] = useState("");
+  const [qty, setQty] = useState("");
+  const [price, setPrice] = useState("");
+  const [store, setStore] = useState("");
+  const [sugg, setSugg] = useState<PriceSuggestion | null>(null);
+  const [loadingSugg, setLoadingSugg] = useState(false);
   const { state, formAction, pending, fe } = useFormAction(addShoppingItem, () => {
-    ref.current?.reset();
+    setName(""); setQty(""); setPrice(""); setSugg(null);
     ref.current?.querySelector<HTMLInputElement>("input[name=name]")?.focus();
   });
+  // návrh ceny z cenové paměti / AI odhad (s prodlevou po psaní)
+  useEffect(() => {
+    if (name.trim().length < 3) return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      setLoadingSugg(true);
+      const r = await suggestPrice(name, qty || null).catch(() => null);
+      if (!cancelled) { setSugg(r); setLoadingSugg(false); }
+    }, 600);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [name, qty]);
+  const use = (p: number, st: string | null) => { setPrice(toInputValue(p)); if (st) setStore(st); };
   return (
-    <form ref={ref} action={formAction} className="mt-3 grid grid-cols-[1fr_5rem] gap-2 sm:grid-cols-[1fr_6rem_7.5rem_auto] sm:items-end">
+    <form ref={ref} action={formAction} className="mt-3 space-y-2">
       <input type="hidden" name="list_id" value={listId} />
-      <Input name="name" placeholder="Přidat položku…" aria-label="Položka" error={fe("name")} required />
-      <Input name="quantity" placeholder="ks, kg…" aria-label="Množství" />
-      <MoneyInput name="est_price" placeholder="cena" aria-label="Odhad ceny" error={fe("est_price")} />
-      <button type="submit" disabled={pending} className="flex h-[46px] items-center justify-center gap-1 rounded-[0.875rem] bg-gold px-3 text-sm font-medium text-[#1b1407] disabled:opacity-50" aria-label="Přidat položku">
-        <Plus className="h-4 w-4" /><span className="sm:hidden">Přidat</span>
-      </button>
+      <div className="grid grid-cols-[1fr_5rem] gap-2 sm:grid-cols-[1fr_6rem_7.5rem_8rem_auto] sm:items-end">
+        <Input name="name" placeholder="Přidat položku…" aria-label="Položka" value={name} onChange={(e) => setName(e.target.value)} error={fe("name")} required />
+        <Input name="quantity" placeholder="ks, kg…" aria-label="Množství" value={qty} onChange={(e) => setQty(e.target.value)} />
+        <MoneyInput name="est_price" placeholder="cena" aria-label="Odhad ceny" value={price} onChange={(e) => setPrice(e.target.value)} error={fe("est_price")} />
+        <select name="store" aria-label="Obchod" className="field" value={store} onChange={(e) => setStore(e.target.value)}>
+          <option value="">obchod</option>
+          {STORES.map((s) => <option key={s.key} value={s.key}>{s.key}</option>)}
+        </select>
+        <button type="submit" disabled={pending} className="col-span-2 flex h-[46px] items-center justify-center gap-1 rounded-[0.875rem] bg-gold px-3 text-sm font-medium text-[#1b1407] disabled:opacity-50 sm:col-span-1" aria-label="Přidat položku">
+          <Plus className="h-4 w-4" /><span className="sm:hidden">Přidat</span>
+        </button>
+      </div>
+      {name.trim().length >= 3 && (sugg || loadingSugg) && (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          {loadingSugg && <span className="text-ink-3">Hledám cenu…</span>}
+          {sugg?.history.map((h) => (
+            <button key={`${h.store}-${h.date}`} type="button" onClick={() => use(h.price, h.store)} className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 hover:border-gold/50">
+              <Tag className="h-3 w-3 text-gold" />{h.store ?? "dříve"} {formatMoney(h.price)}<span className="text-ink-3">· {formatDate(h.date)}</span>
+            </button>
+          ))}
+          {sugg?.average != null && sugg.history.length > 1 && <span className="text-ink-3">průměr {formatMoney(sugg.average)}</span>}
+          {sugg?.ai && (
+            <button type="button" onClick={() => use(sugg.ai!.typical, null)} className="inline-flex items-center gap-1 rounded-full border border-info/30 bg-info/10 px-2.5 py-1 text-info" title={sugg.ai.note}>
+              <Sparkles className="h-3 w-3" />odhad AI ~{formatMoney(sugg.ai.typical, { decimals: "never" })} ({formatMoney(sugg.ai.low, { decimals: "never" })}–{formatMoney(sugg.ai.high, { decimals: "never" })}) – ověřte
+            </button>
+          )}
+          {name.trim().length >= 3 && <a href={kupiSearchUrl(name)} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-gold hover:underline"><ExternalLink className="h-3 w-3" />akce na kupi.cz</a>}
+        </div>
+      )}
       <FormError error={state.ok ? undefined : state.error} />
     </form>
   );
@@ -66,7 +110,16 @@ function ItemRow({ item, done }: { item: ShoppingItem; done: boolean }) {
         className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition", optimistic ? "border-gold bg-gold text-[#1b1407]" : "border-white/25 hover:border-gold")}>
         {optimistic && <Check className="h-3.5 w-3.5" />}
       </button>
-      <span className={cn("min-w-0 flex-1 truncate text-sm", optimistic && "text-ink-3 line-through")}>{item.name}{item.quantity && <span className="ml-1.5 text-xs text-ink-3">{item.quantity}</span>}</span>
+      <span className={cn("min-w-0 flex-1 text-sm", optimistic && "text-ink-3 line-through")}>
+        <span className="block truncate">{item.name}{item.quantity && <span className="ml-1.5 text-xs text-ink-3">{item.quantity}</span>}</span>
+        {!done && !optimistic && (
+          <span className="flex gap-2 text-[11px]">
+            {item.store && <span className="text-ink-3">{item.store}</span>}
+            <a href={kupiSearchUrl(item.name)} target="_blank" rel="noreferrer noopener" className="text-gold/80 hover:underline">akce</a>
+            <a href={rohlikSearchUrl(item.name)} target="_blank" rel="noreferrer noopener" className="text-gold/80 hover:underline">Rohlík</a>
+          </span>
+        )}
+      </span>
       {item.est_price != null && <span className="num text-sm text-ink-2">{formatMoney(item.est_price)}</span>}
       {!done && <ActionButton action={() => deleteShoppingItem(item.id)} size="icon" icon={<Trash2 className="h-3.5 w-3.5" />} className="opacity-60 group-hover:opacity-100" />}
     </li>
@@ -131,6 +184,32 @@ export function ShoppingListCard({ list, items, weekLimit, remaining, spent }: {
         {done ? <Badge tone="positive">nakoupeno</Badge> : (
           <ModalButton label="Nakoupeno" variant="primary" size="sm" icon={<Check className="h-4 w-4" />} title={`Nakoupeno: ${list.name}`} render={(close) => <CompleteForm list={list} estimate={estimate} onDone={close} />} />
         )}
+      </div>
+    </Card>
+  );
+}
+
+/** Akční letáky vybraných obchodů (kupi.cz) a nákup s doručením (Rohlík.cz). */
+export function LeafletsPanel({ items }: { items: string[] }) {
+  return (
+    <Card title={<span className="flex items-center gap-2"><Tag className="h-4 w-4 text-gold" />Akční letáky a nákup domů</span>} subtitle="Odkazy se otevřou v novém okně">
+      <div className="flex flex-wrap gap-2">
+        {STORES.filter((s) => s.kupi).map((s) => (
+          <a key={s.key} href={kupiLeafletUrl(s.kupi!)} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-sm hover:border-gold/50 hover:text-ink">
+            {s.key}<ExternalLink className="h-3 w-3 text-ink-3" />
+          </a>
+        ))}
+        <a href="https://www.kupi.cz/" target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-gold hover:underline">Všechny letáky na kupi.cz</a>
+      </div>
+      <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3 sm:flex-row sm:items-center">
+        <Truck className="h-6 w-6 shrink-0 text-gold" />
+        <div className="flex-1 text-sm">
+          <p className="font-medium">Ušetřete čas – nakupte s doručením až ke dveřím</p>
+          <p className="text-xs text-ink-3">U každé položky v seznamu je odkaz „Rohlík“, který ji rovnou vyhledá na Rohlík.cz. Košík pak dokončíte tam.</p>
+        </div>
+        <a href={items[0] ? rohlikSearchUrl(items[0]) : "https://www.rohlik.cz/"} target="_blank" rel="noreferrer noopener" className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-gold px-4 text-sm font-medium text-[#1b1407]">
+          Otevřít Rohlík.cz<ExternalLink className="h-4 w-4" />
+        </a>
       </div>
     </Card>
   );

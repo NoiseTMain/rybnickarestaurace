@@ -7,13 +7,21 @@ import type { ActionResult } from "./result";
 
 const color = () => z.preprocess((v) => (v ? v : MEMBER_COLORS[0]), z.string().regex(/^#[0-9a-fA-F]{6}$/, "Neplatná barva"));
 
-const memberSchema = z.object({ id: optionalUuid(), name: text(80), color: color(), is_active: checkbox() });
+const memberSchema = z.object({
+  id: optionalUuid(),
+  name: text(80),
+  color: color(),
+  is_active: checkbox(),
+  phone: z.preprocess((v) => (typeof v === "string" && v.trim() ? v.replace(/[^\d+ ]/g, "").trim() : null), z.union([z.null(), z.string().regex(/^\+?[\d ]{6,20}$/, "Zadejte telefon, např. +420 777 123 456")])),
+  avatar_document_id: optionalUuid(),
+});
 
 export async function saveMember(_: ActionResult, fd: FormData): Promise<ActionResult> {
   return withContext(async (ctx) => {
     const p = parse(memberSchema, fd);
     if (!p.ok) return p.result;
     const { id, ...row } = p.data;
+    await own(ctx, "documents", row.avatar_document_id);
     if (id) {
       await own(ctx, "members", id);
       await ctx.store.update("members", { id, household_id: ctx.household.id }, row);

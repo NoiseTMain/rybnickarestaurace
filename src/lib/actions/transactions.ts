@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { checkbox, date, enumOf, money, optionalUuid, optText, uuid } from "@/lib/validation";
 import { fingerprint } from "@/lib/csv";
+import { CATEGORY_RULES } from "@/lib/categorize";
 import { addDays, isISODate } from "@/lib/dates";
 import type { AppContext } from "@/lib/context";
 import type { Transaction } from "@/lib/db/types";
@@ -116,21 +117,9 @@ export interface ImportAnalysis {
   rows?: { index: number; externalId: string; status: "new" | "imported" | "possible_duplicate" | "before_opening"; categoryId: string | null; matchDescription?: string }[];
 }
 
-const FOOD_SHOPS = /(albert|lidl|billa|tesco|kaufland|penny|globus|rohlik|kosik|coop|norma|potravin|zabka|makro)/i;
 const RULES: [RegExp, string][] = [
-  [FOOD_SHOPS, "Potraviny"],
-  [/(dm drogerie|rossmann|teta drogerie|drogerie)/i, "Drogerie"],
-  [/(cez|pre |e\.on|eon|innogy|elektr)/i, "Elektřina"],
-  [/(plyn|ppas|gas)/i, "Plyn"],
-  [/(vodafone|t-mobile|o2 |telefon)/i, "Telefony"],
-  [/(upc|vodafone internet|internet)/i, "Internet"],
-  [/(shell|omv|benzina|orlen|mol |cerpaci|parkov)/i, "Auto"],
-  [/(dpp|cd\.cz|regiojet|leo express|jizdenk|bolt|uber)/i, "Doprava"],
-  [/(restaur|bistro|kavarn|mcdonald|kfc|wolt|foodora|pizza)/i, "Restaurace"],
-  [/(pojist|kooperativa|allianz|generali|uniqa|cpp)/i, "Pojištění"],
-  [/(najem|najemne)/i, "Nájem"],
-  [/(netflix|spotify|hbo|disney|kino|steam)/i, "Zábava"],
   [/(rohlik.*vyplat|velka pecka|rohlik\.cz.*mzd)/i, "Práce – Rohlík"],
+  ...CATEGORY_RULES,
 ];
 
 function rowIds(accountId: string, rows: { date: string; amount: number; description: string; reference?: string }[]) {

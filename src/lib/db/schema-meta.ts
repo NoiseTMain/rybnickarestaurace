@@ -49,7 +49,16 @@ export interface Ref {
   onDelete: OnDelete;
 }
 
+/** Sekce oprávnění pro zápis do tabulky (stejné jako v SQL migraci 0006). "*" = jakékoli právo k úpravám. */
+export const TABLE_SECTION: Partial<Record<TableName, string>> = {
+  transactions: "finance", accounts: "finance", categories: "finance", recurring_payments: "finance", income_sources: "finance",
+  occurrence_marks: "finance", budgets: "finance", invoices: "invoices", work_shifts: "work", payouts: "work", work_settings: "work",
+  purchases: "purchases", shopping_lists: "purchases", shopping_items: "purchases", price_history: "purchases",
+  savings_goals: "savings", savings_contributions: "savings", household_settings: "settings", members: "settings", documents: "*",
+};
+
 export const REFS: Partial<Record<TableName, Ref[]>> = {
+  members: [{ column: "avatar_document_id", table: "documents", onDelete: "set_null" }],
   accounts: [{ column: "member_id", table: "members", onDelete: "set_null" }],
   recurring_payments: [
     { column: "category_id", table: "categories", onDelete: "set_null" },

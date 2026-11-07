@@ -74,6 +74,7 @@ export async function completeOnboarding(json: string): Promise<ActionResult> {
     if (d.foodBudget != null) await store.insert("budgets", [{ household_id: hid, kind: "food", category_id: null, amount: d.foodBudget, month: null }]);
     await store.update("household_settings", { household_id: hid }, {
       safety_buffer: d.safetyBuffer ?? 0, billing_ico: d.billingIco, onboarded_at: new Date().toISOString(),
+      ...(d.billingIco ? { ico_activated_at: new Date().toISOString(), ico_changed_at: null, ico_info: { ico: d.billingIco, name: null, address: null, legalForm: null, dic: null, established: null, verified: false, source: "manual" as const, checkedAt: new Date().toISOString() } } : {}),
     });
     await setHouseholdCookie(hid);
   } catch (e) {
@@ -142,7 +143,6 @@ const settingsFields = {
   notify_invoices: z.boolean(),
   notify_payments: z.boolean(),
   billing_name: optText(200),
-  billing_ico: ico(),
   billing_dic: optText(20),
   billing_address: optText(300),
   billing_bank_account: optText(60),
@@ -178,15 +178,9 @@ export async function acceptInvite(_: ActionResult, fd: FormData): Promise<Actio
     const { user, store } = await requireUser();
     const code = String(fd.get("code") ?? "").trim().toUpperCase();
     if (code.length < 10) return fail("Zadejte kód pozvánky.", { code: "Neplatný kód" });
-    id = await store.acceptInvite(code);
-    // připojený uživatel se automaticky objeví mezi členy domácnosti (vidí ho i vlastník)
-    const members = await store.select("members", { household_id: id });
-    if (!members.some((m) => m.user_id === user.id)) {
-      const name = String(fd.get("member_name") ?? "").trim().slice(0, 80) || user.email.split("@")[0] || "Nový člen";
-      await store.insert("members", [{
-        household_id: id, name, color: MEMBER_COLORS[members.length % MEMBER_COLORS.length], user_id: user.id, is_active: true, sort: members.length,
-      }]);
-    }
+    // přijetí pozvánky zároveň založí člena s vazbou na účet (vlastník ho hned vidí)
+    id = await store.acceptInvite(code, String(fd.get("member_name") ?? "").trim().slice(0, 80) || null);
+    void user;
     await setHouseholdCookie(id);
   } catch (e) {
     return errorToResult(e);
@@ -232,4 +226,19 @@ export async function checkHouseholdAccess(householdId: string): Promise<boolean
   const { tryContext } = await import("@/lib/context");
   const ctx = await tryContext();
   return ctx !== null && ctx !== "no_household" && ctx.household.id === householdId;
+}
+
+const PERM_SECTIONS = ["finance", "invoices", "work", "purchases", "savings", "settings"] as const;
+
+/** Vlastník nastaví, které sekce může připojený člen upravovat (ostatní jen čte). */
+export async function setMemberPermissions(userId: string, perms: Record<string, "edit" | "view">): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    if (ctx.role !== "owner") return fail("Oprávnění nastavuje jen vlastník domácnosti.");
+    if (userId === ctx.user.id) return fail("Vlastník má vždy plná práva.");
+    const clean: Record<string, "edit" | "view"> = {};
+    for (const s of PERM_SECTIONS) clean[s] = perms[s] === "view" ? "view" : "edit";
+    const updated = await ctx.store.update("household_users", { household_id: ctx.household.id, user_id: userId }, { permissions: clean });
+    if (!updated.length) return fail("Uživatel nemá k domácnosti přístup.");
+    return done("Oprávnění uložena");
+  });
 }

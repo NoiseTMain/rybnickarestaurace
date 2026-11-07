@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, type ReactNode } from "react";
-import type { Account, Category, Member, SavingsGoal, WorkSettings } from "@/lib/db/types";
+import type { Account, Category, Member, Permissions, SavingsGoal, WorkSettings } from "@/lib/db/types";
 
 export interface Lookups {
   mode: "supabase" | "local";
@@ -13,6 +13,9 @@ export interface Lookups {
   members: Member[];
   goals: SavingsGoal[];
   workSettings: WorkSettings | null;
+  role: "owner" | "member";
+  permissions: Permissions;
+  icoActive: boolean;
 }
 
 const Ctx = createContext<Lookups | null>(null);

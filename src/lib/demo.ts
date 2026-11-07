@@ -157,5 +157,8 @@ export async function seedDemo(store: Store, user: AppUser, hid: string, today: 
     ["Mléko 2×", "2 ks", 4_980], ["Chléb", "1 ks", 4_490], ["Kuřecí prsa", "1 kg", 18_990], ["Zelenina na salát", null, 8_900], ["Těstoviny", "2 bal.", 5_980], ["Káva", "1 ks", null],
   ].map(([name, quantity, est_price], i) => ({ household_id: hid, list_id: list.id, name: name as string, quantity: quantity as string | null, est_price: est_price as number | null, checked: i < 2, sort: i })));
 
-  await store.update("household_settings", { household_id: hid }, { safety_buffer: 500_000, onboarded_at: new Date().toISOString() });
+  await store.update("household_settings", { household_id: hid }, {
+    safety_buffer: 500_000, onboarded_at: new Date().toISOString(), billing_ico: "00000027", ico_activated_at: new Date().toISOString(), ico_changed_at: null,
+    ico_info: { ico: "00000027", name: "Ukázkový podnikatel (demo)", address: "Ukázková 1, Praha", legalForm: "Fyzická osoba podnikající (živnostník)", dic: null, established: null, verified: false, source: "manual", checkedAt: new Date().toISOString() },
+  });
 }

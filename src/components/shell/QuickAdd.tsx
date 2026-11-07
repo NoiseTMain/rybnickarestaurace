@@ -9,6 +9,17 @@ import { PurchaseForm } from "@/components/forms/PurchaseForms";
 import { ShiftForm } from "@/components/forms/WorkForms";
 import { ContributionForm } from "@/components/forms/SavingsForms";
 import { cn } from "@/components/ui/cn";
+import { useLookups } from "@/components/Lookups";
+import Link from "next/link";
+
+function NeedIco({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="space-y-3 text-sm text-ink-2">
+      <p>Faktury a pracovní směny jsou pro podnikání na IČO. Nejdřív aktivujte IČO v Nastavení.</p>
+      <Link href="/nastaveni#ico" onClick={onClose} className="inline-flex h-10 items-center rounded-full bg-gold px-4 font-medium text-[#1b1407]">Aktivovat IČO</Link>
+    </div>
+  );
+}
 
 const ITEMS = [
   { key: "income", label: "Přidat příjem", icon: ArrowDownLeft },
@@ -28,6 +39,7 @@ export function QuickAdd({ floating }: { floating?: boolean }) {
   const [form, setForm] = useState<Key | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setForm(null), []);
+  const { icoActive } = useLookups();
   useEffect(() => {
     if (!menu) return;
     const h = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setMenu(false); };
@@ -70,9 +82,9 @@ export function QuickAdd({ floating }: { floating?: boolean }) {
       <Modal open={form != null} onClose={close} title={form ? TITLES[form] : ""}>
         {form === "income" && <TransactionForm defaultType="income" onDone={close} />}
         {form === "expense" && <TransactionForm defaultType="expense" onDone={close} />}
-        {form === "invoice" && <InvoiceForm onDone={close} />}
+        {form === "invoice" && (icoActive ? <InvoiceForm onDone={close} /> : <NeedIco onClose={close} />)}
         {form === "purchase" && <PurchaseForm onDone={close} />}
-        {form === "shift" && <ShiftForm onDone={close} />}
+        {form === "shift" && (icoActive ? <ShiftForm onDone={close} /> : <NeedIco onClose={close} />)}
         {form === "saving" && <ContributionForm onDone={close} />}
       </Modal>
     </div>

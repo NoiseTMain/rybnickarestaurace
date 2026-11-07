@@ -1,7 +1,9 @@
-import { abs, divFloor, formatMoney as fm, parseMoney, sub, type Cents } from "@/lib/money";
+import { abs, divFloor, divRound, formatMoney as fm, parseMoney, sub, type Cents } from "@/lib/money";
 import { diffDays, endOfMonth, endOfWeek, formatDate, minDate, monthName } from "@/lib/dates";
 import type { FinanceData, Snapshot } from "@/lib/finance/snapshot";
 import { checkAffordability } from "@/lib/finance/affordability";
+import { anomalies, findCategory, findMerchant, forecast, parsePeriod, savingsTips, spendIn, weeklySummary, whatIf, workInsights, type ScenarioKind } from "@/lib/finance/insights";
+import { guessCategoryName } from "@/lib/categorize";
 
 /**
  * Finanční asistent – deterministická analýza nad skutečnými daty.
@@ -118,12 +120,38 @@ export function buildInsights(s: Snapshot, d: FinanceData): Insight[] {
 // ---------------------------------------------------------------------------
 // Otázky
 
+export interface AssistantContext {
+  intent: string;
+  amount?: number | null;
+  category?: string | null;
+  merchant?: string | null;
+  months?: number | null;
+  scenario?: string | null;
+  installments?: number | null;
+}
+
+export interface ExpenseDraft {
+  amount: Cents;
+  description: string;
+  categoryId: string | null;
+  paymentMethod: "card" | "cash" | "transfer" | "other";
+  date: string;
+}
+
 export interface AssistantAnswer {
   text: string;
   lines?: string[];
   tone: InsightTone;
   /** Asistent potřebuje doplnit údaj. */
   needs?: { message: string; href?: string };
+  /** Kontext pro navazující otázky („A za 20 000?“). */
+  context?: AssistantContext;
+  /** Návrh výdaje k potvrzení. */
+  draft?: ExpenseDraft;
+  /** Tabulka (např. výhled na 3 měsíce). */
+  table?: { head: string[]; rows: string[][] };
+  /** Odpověď vznikla z dotazu interpretovaného AI (čísla stále počítá aplikace). */
+  viaAi?: boolean;
 }
 
 function norm(q: string) {
@@ -142,7 +170,7 @@ export function extractAmount(question: string): Cents | null {
   return base == null ? null : base * mult;
 }
 
-export function answer(question: string, s: Snapshot, d: FinanceData): AssistantAnswer {
+function baseAnswer(question: string, s: Snapshot, d: FinanceData): AssistantAnswer {
   const q = norm(question.trim());
   if (!q) return { text: "Zeptejte se třeba: „Můžeme si dovolit koupit sedačku za 15 000 Kč?“", tone: "neutral" };
 
@@ -177,7 +205,7 @@ export function answer(question: string, s: Snapshot, d: FinanceData): Assistant
     const withIncome = s.planner.safeToSpendIfIncomeArrives >= price && s.expectedIncomeTotal > 0
       ? " Pokud dorazí očekávané příjmy, nákup by se do rozpočtu vešel."
       : "";
-    return { text: `Teď ne. Chybí vám ${fmt(r.shortfall)} – tolik je potřeba ušetřit.${when}${withIncome}`, lines, tone: "warning" };
+    return { text: `Nákup za ${fmt(price)} teď ne. Chybí vám ${fmt(r.shortfall)} – tolik je potřeba ušetřit.${when}${withIncome}`, lines, tone: "warning" };
   }
 
   // 2) Jídlo
@@ -256,7 +284,7 @@ export function answer(question: string, s: Snapshot, d: FinanceData): Assistant
   }
 
   // 7) Práce / výdělek
-  if (/(prac|vydel|smen|rohlik|vyplat|hodin)/.test(q)) {
+  if (WORK_RE.test(q)) {
     const m = s.work.month;
     if (!d.shifts.length) return { text: "Zatím nemáte zadané žádné směny.", tone: "neutral", needs: { message: "Přidejte směnu nebo importujte CSV.", href: "/prace" } };
     return {
@@ -311,8 +339,202 @@ export function answer(question: string, s: Snapshot, d: FinanceData): Assistant
       "Kolik musíme odkládat na cíle?",
       "Kolik jsem tento měsíc vydělal?",
       "Jaké platby nás čekají?",
+      "Kolik jsme za poslední 3 měsíce utratili v restauracích?",
+      "Co když koupíme sedačku za 15 000 Kč na 10 splátek?",
+      "Jaký je výhled na 3 měsíce?",
+      "Je v našich výdajích něco neobvyklého?",
+      "Kde můžeme ušetřit?",
+      "250 Albert (zapíše výdaj)",
     ],
     tone: "neutral",
+    context: { intent: "unknown" },
   };
 }
 
+
+// ---------------------------------------------------------------------------
+// Rozšířené dotazy: kategorie a obchody, co kdyby, výhled, neobvyklé věci, tipy,
+// práce, zadání výdaje, týdenní souhrn, navazující otázky.
+
+const czk = (c: Cents) => fm(c, { decimals: "never" });
+/** Práce – ne „pračka“: celé tvary slova práce, výdělek, směny, výplaty… */
+const WORK_RE = /(\bprac(e|i|uji|ovat|oval)\b|vydel|smen|rohlik|vyplat|hodinov)/;
+
+/** „250 Albert“, „tankování 1 400 kartou“, „zapiš výdaj 89 kafe“ → návrh výdaje. */
+export function parseExpenseDraft(question: string, d: FinanceData, today: string): ExpenseDraft | null {
+  const q = question.trim();
+  const qn = norm(q);
+  const explicit = /^(zapis|pridej|pridat|zaznamenej|vydaj|utratil[a]?|zaplatil[a]?)\b/.test(qn);
+  const shortForm = /^\d[\d\s,.]*\s*(kc)?\s+\p{L}/u.test(qn) || /^\p{L}[\p{L}\s]{1,30}\s\d[\d\s,.]*\s*(kc)?(\s+(kartou|hotove|hotovosti|prevodem))?$/u.test(qn);
+  if (!explicit && !shortForm) return null;
+  if (/\?$/.test(q) || /(dovolit|kolik|muzeme|co kdyz|kdyby)/.test(qn)) return null;
+  const amount = extractAmount(q);
+  if (amount == null || amount <= 0) return null;
+  const paymentMethod = /hotov/.test(qn) ? "cash" : /prevod/.test(qn) ? "transfer" : /kart/.test(qn) ? "card" : "card";
+  const description = q
+    .replace(/\d[\d\s\u00a0]*(?:[,.]\d+)?\s*(tis\.?|k\b)?\s*(kč|kc|korun|czk)?/gi, " ")
+    .replace(/\b(zapiš|zapis|přidej|pridej|přidat|zaznamenej|výdaj|vydaj|kartou|hotově|hotove|hotovostí|převodem|prevodem|za)\b/gi, " ")
+    .replace(/\s+/g, " ").trim().slice(0, 120) || "Výdaj";
+  const catName = guessCategoryName(description);
+  const categoryId = catName ? d.categories.find((c) => c.kind === "expense" && c.name === catName)?.id ?? null : null;
+  return { amount, description: description.charAt(0).toUpperCase() + description.slice(1), categoryId, paymentMethod, date: today };
+}
+
+function categoryAnswer(question: string, s: Snapshot, d: FinanceData, ctx: Partial<AssistantContext>): AssistantAnswer | null {
+  const category = findCategory(question, d, ctx.category);
+  const merchant = category ? null : findMerchant(question, d, ctx.merchant);
+  if (!category && !merchant) return null;
+  const period = parsePeriod(question, s.today, ctx.months);
+  const filter = category ? (t: { category_id: string | null }) => t.category_id === category.id : (t: { description: string; note: string | null }) => norm(`${t.description} ${t.note ?? ""}`).includes(merchant!);
+  const r = spendIn(d, period, filter as never);
+  const label = category ? `v kategorii „${category.name}“` : `u „${merchant}“`;
+  const lines: string[] = [];
+  if (period.months >= 2) lines.push(`Průměrně ${czk(divRound(r.total, Math.max(1, Math.round(period.months))))} měsíčně`);
+  if (r.count) lines.push(`${r.count} ${r.count === 1 ? "platba" : r.count < 5 ? "platby" : "plateb"}, průměrně ${czk(divRound(r.total, r.count))} za nákup`);
+  const top = [...r.list].sort((a, b) => b.amount - a.amount).slice(0, 3);
+  for (const t of top) lines.push(`${formatDate(t.date)} – ${t.description || "bez popisu"}: ${czk(t.amount)}`);
+  if (category) {
+    const b = s.categoryBudgets.find((x) => x.budget.category_id === category.id);
+    if (b && period.label === "tento měsíc") lines.push(`Limit ${czk(b.budget.amount)}, zbývá ${czk(b.remaining)}`);
+  }
+  return {
+    text: r.count ? `${period.label.charAt(0).toUpperCase() + period.label.slice(1)} jste ${label} utratili ${czk(r.total)}.` : `${period.label.charAt(0).toUpperCase() + period.label.slice(1)} jste ${label} nic neutratili.`,
+    lines, tone: "neutral",
+    context: { intent: "category_spend", category: category?.name ?? null, merchant, months: period.months >= 1 ? Math.round(period.months) : null },
+  };
+}
+
+function whatIfAnswer(question: string, s: Snapshot, d: FinanceData, ctx: Partial<AssistantContext>): AssistantAnswer {
+  const qn = norm(question);
+  const amount = ctx.amount ?? extractAmount(question);
+  const inst = ctx.installments ?? Number(/(\d{1,3})\s*(splat|mesicnich splat|x)/.exec(qn)?.[1] ?? 0);
+  let kind: ScenarioKind = (ctx.scenario as ScenarioKind) ?? "purchase";
+  if (!ctx.scenario) {
+    if (/splat/.test(qn)) kind = "installments";
+    else if (/najem/.test(qn)) kind = "rent_change";
+    else if (/jidl|potravin/.test(qn)) kind = "food_change";
+    else if (/prijem|vyplat|plat |mzd|vydelav/.test(qn)) kind = "income_change";
+  }
+  if (amount == null) return { text: "O jakou částku jde? Napište např. „Co když zdraží nájem o 1 500 Kč?“", tone: "neutral", needs: { message: "Chybí částka." }, context: { intent: "what_if", scenario: kind } };
+  let signed = amount;
+  if ((kind === "food_change" && /usetr|min|snizi|mene/.test(qn)) || (kind === "rent_change" && /zlevn|nizsi|mene/.test(qn)) || (kind === "income_change" && /nizsi|mene|klesne|prijdu/.test(qn))) signed = -amount;
+  const r = whatIf(s, d, kind, signed, inst || 10);
+  const goalLines = r.goals.map((g) => `${g.name}: ${g.before ? monthName(g.before) : "termín nelze odhadnout"} → ${g.after ? monthName(g.after) : "termín nelze odhadnout"}`);
+  return {
+    text: r.title,
+    lines: [...r.lines, ...goalLines],
+    tone: r.monthlyAfter != null && r.monthlyAfter < 0 ? "danger" : r.safeAfter < r.safeBefore ? "warning" : "positive",
+    context: { intent: "what_if", amount, scenario: kind, installments: inst || null },
+  };
+}
+
+function forecastAnswer(s: Snapshot, d: FinanceData): AssistantAnswer {
+  if (!d.accounts.length) return { text: "Pro výhled potřebuji znát účty a zůstatky.", tone: "neutral", needs: { message: "Doplňte účty.", href: "/nastaveni#ucty" } };
+  const f = forecast(s, d, 3);
+  const t = f.tightest;
+  const tight = t && t.endBalance < 0
+    ? `Nejtěsněji bude v měsíci ${t.label}: chybět bude asi ${czk(-t.endBalance)}. Začněte si odkládat už teď.`
+    : t ? `Nejtěsněji bude v měsíci ${t.label}, ale i tak by vám mělo zbýt asi ${czk(t.endBalance)}.` : "";
+  return {
+    text: `Výhled na 3 měsíce (s očekávanými příjmy). ${tight}`,
+    table: {
+      head: ["Měsíc", "Příjmy", "Pevné platby", "Běžné výdaje", "Spoření", "Na konci"],
+      rows: f.months.map((m) => [m.label, czk(m.income), czk(m.fixed), czk(m.variable), czk(m.savings), czk(m.endBalance)]),
+    },
+    lines: [
+      `Výchozí stav: odhad konce tohoto měsíce ${czk(s.projectedEndOfMonth)}; ${f.basis}.`,
+      f.months.some((m) => m.endBalanceWithoutIncome < 0) ? "Bez očekávaných příjmů by se rozpočet dostal do mínusu – výplaty jsou pro vás klíčové." : "I bez očekávaných příjmů by peníze vystačily.",
+      "Výhled je odhad – čtvrtletní a roční platby jsou započtené podle splatností.",
+    ],
+    tone: t && t.endBalance < 0 ? "danger" : "neutral",
+    context: { intent: "forecast" },
+  };
+}
+
+function anomaliesAnswer(s: Snapshot, d: FinanceData): AssistantAnswer {
+  const a = anomalies(s, d);
+  return {
+    text: a.length ? `Našel jsem ${a.length} ${a.length === 1 ? "věc, která stojí" : "věci, které stojí"} za kontrolu:` : "Nic neobvyklého jsem v posledních výdajích nenašel.",
+    lines: a.map((x) => x.title + (x.detail ? ` – ${x.detail}` : "")),
+    tone: a.some((x) => x.tone === "danger") ? "danger" : a.length ? "warning" : "positive",
+    context: { intent: "anomalies" },
+  };
+}
+
+function tipsAnswer(s: Snapshot, d: FinanceData): AssistantAnswer {
+  const t = savingsTips(s, d);
+  const total = t.reduce((a, x) => a + x.saving, 0);
+  return {
+    text: t.length ? `Kde můžete ušetřit – dohromady až ${czk(total)} měsíčně:` : "Zatím nevidím výrazné rezervy – výdaje jsou v kategoriích blízko vašemu průměru.",
+    lines: t.map((x) => x.title),
+    tone: t.length ? "neutral" : "positive",
+    context: { intent: "savings_tips" },
+  };
+}
+
+function detectIntent(q: string): string | null {
+  if (/(co kdyz|co kdyby|kdyby|kdybychom|na splatky|splatk)/.test(q)) return "what_if";
+  if (/(vyhled|pristi (mesic|mesice)|dopredu|nejtesnej|3 mesice dopredu|tri mesice)/.test(q)) return "forecast";
+  if (/(neobvykl|divn|podezrel|duplic|dvakrat|zapomenut|predplatn)/.test(q)) return "anomalies";
+  if (/(usetrit|uspor|tip|kde.*setrit|jak.*setrit)/.test(q)) return "savings_tips";
+  if (/(souhrn|shrnuti|v kostce|prehled tydne)/.test(q)) return "weekly_summary";
+  if (/(kolik|utratil|utratili|stalo|dali|platili).*(za|v|u|na)\s/.test(q) && !/(dovolit|jidlo|potravin)/.test(q)) return "category_spend";
+  return null;
+}
+
+/**
+ * Hlavní odpověď asistenta. `prev` = kontext minulé odpovědi pro navazující
+ * otázky („A za 20 000?“, „A minulý měsíc?“).
+ */
+export function answer(question: string, s: Snapshot, d: FinanceData, prev?: AssistantContext | null, forced?: Partial<AssistantContext> | null): AssistantAnswer {
+  const q = norm(question.trim());
+  const draft = forced?.intent === "add_expense" || !forced ? parseExpenseDraft(question, d, s.today) : null;
+  if (draft) {
+    return {
+      text: `Mám zapsat výdaj ${czk(draft.amount)} – „${draft.description}“? Zkontrolujte a potvrďte.`,
+      tone: "neutral", draft, context: { intent: "add_expense" },
+    };
+  }
+  // navazující otázka: krátká, začíná „a …“, nebo jen částka/období
+  const followUp = prev && prev.intent !== "unknown" && (/^(a|a co|a kdyz|a za|a pri|a minul|a letos|a za posledni)\b/.test(q) || q.split(" ").length <= 4);
+  let intent = forced?.intent ?? detectIntent(q);
+  const ctx: Partial<AssistantContext> = { ...(forced ?? {}) };
+  if (!intent && followUp && prev) {
+    intent = prev.intent;
+    const amt = extractAmount(question);
+    Object.assign(ctx, { category: prev.category, merchant: prev.merchant, scenario: prev.scenario, installments: prev.installments, months: prev.months });
+    if (amt != null) ctx.amount = amt;
+    if (/minul|poslednich|letos|tyden|mesic/.test(q)) ctx.months = null; // období vezmeme z nové otázky
+    if (intent === "afford" && amt != null) return baseAnswer(`Můžeme si dovolit koupit za ${amt / 100} Kč?`, s, d);
+    if (["food", "week", "end_of_month", "invoices", "goals", "work", "payments", "balance", "compare"].includes(intent)) intent = null;
+  }
+  switch (intent) {
+    case "what_if": return whatIfAnswer(question, s, d, ctx);
+    case "forecast": return forecastAnswer(s, d);
+    case "anomalies": return anomaliesAnswer(s, d);
+    case "savings_tips": return tipsAnswer(s, d);
+    case "weekly_summary": {
+      const w = weeklySummary(s, d);
+      return { text: w.title, lines: w.lines, tone: "neutral", context: { intent: "weekly_summary" } };
+    }
+    case "category_spend":
+    case "merchant_spend": {
+      const r = categoryAnswer(question, s, d, ctx);
+      if (r) return r;
+      break;
+    }
+  }
+  const base = baseAnswer(question, s, d);
+  if (/(dovolit|koupit|koupime)/.test(q)) return { ...base, context: { intent: "afford", amount: extractAmount(question) } };
+  // práce: doplnit postřehy
+  if (WORK_RE.test(q) && !base.needs) {
+    const extra = workInsights(d, s.today);
+    return { ...base, lines: [...(base.lines ?? []), ...extra], context: { intent: "work" } };
+  }
+  // ještě zkusíme kategorii/obchod u obecných dotazů „kolik … “
+  if (base.context?.intent === "unknown" && /kolik/.test(q)) {
+    const r = categoryAnswer(question, s, d, ctx);
+    if (r) return r;
+  }
+  return base;
+}

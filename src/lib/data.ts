@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import type { AppContext } from "@/lib/context";
+import type { Store } from "@/lib/db/store";
 import type { FinanceData } from "@/lib/finance/snapshot";
 import type { DocumentRow, HouseholdSettings, WorkSettings } from "@/lib/db/types";
 import { computeSnapshot } from "@/lib/finance/snapshot";
@@ -14,9 +15,11 @@ export interface FullData extends FinanceData {
 const byName = <T extends { name: string; sort?: number }>(a: T, b: T) => (a.sort ?? 0) - (b.sort ?? 0) || a.name.localeCompare(b.name, "cs");
 
 /** Načte všechna data domácnosti (pro výpočty; osobní data mají řádově tisíce záznamů). */
-export const loadData = cache(async (ctx: AppContext): Promise<FullData> => {
-  const s = ctx.store;
-  const h = { household_id: ctx.household.id };
+export const loadData = cache(async (ctx: AppContext): Promise<FullData> => loadHouseholdData(ctx.store, ctx.household.id));
+
+/** Načtení dat libovolné domácnosti přes zadané úložiště (např. pro plánované souhrny). */
+export async function loadHouseholdData(s: Store, householdId: string): Promise<FullData> {
+  const h = { household_id: householdId };
   const [settings, members, accounts, categories, transactions, recurring, incomeSources, budgets, goals, contributions, invoices, payouts, shifts, purchases, marks, workSettings, documents] =
     await Promise.all([
       s.select("household_settings", h), s.select("members", h), s.select("accounts", h), s.select("categories", h),
@@ -39,7 +42,7 @@ export const loadData = cache(async (ctx: AppContext): Promise<FullData> => {
     workSettings: workSettings[0] ?? null,
     documents: documents.sort((a, b) => b.created_at.localeCompare(a.created_at)),
   };
-});
+}
 
 export const loadSnapshot = cache(async (ctx: AppContext) => {
   const data = await loadData(ctx);

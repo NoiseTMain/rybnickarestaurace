@@ -7,7 +7,7 @@ import { DEFAULT_CATEGORIES } from "@/lib/defaults";
 /** Založí domácnost s vlastníkem, výchozím nastavením a kategoriemi. Nevytváří žádné finanční údaje. */
 export async function createHousehold(store: Store, user: AppUser, name: string, isDemo = false): Promise<Household> {
   const [household] = await store.insert("households", [{ name, is_demo: isDemo, created_by: user.id }]);
-  await store.insert("household_users", [{ household_id: household.id, user_id: user.id, role: "owner" }]);
+  await store.insert("household_users", [{ household_id: household.id, user_id: user.id, role: "owner", permissions: {} }]);
   await store.insert("household_settings", [{
     household_id: household.id, safety_buffer: 0, food_warn_percent: 85, pace_tolerance_percent: 10, notify_due_days: 5,
     notify_food: true, notify_invoices: true, notify_payments: true, billing_name: null, billing_ico: null, billing_dic: null,

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DbError, type FileStore, type Filter, type NewRow, type Row, type Store } from "./store";
-import { REFS, TABLES_WITH_UPDATED_AT, UNIQUE } from "./schema-meta";
+import { REFS, TABLE_SECTION, TABLES_WITH_UPDATED_AT, UNIQUE } from "./schema-meta";
 import type { TableName, Tables } from "./types";
 
 /**
@@ -102,6 +102,7 @@ function canSee(data: LocalData, userId: string, table: TableName, row: Record<s
   const members = memberHouseholds(data, userId);
   if (table === "households") return members.has(row.id as string) || row.created_by === userId;
   if (table === "household_invites") return ownerHouseholds(data, userId).has(row.household_id as string);
+  if (table === "push_subscriptions") return row.user_id === userId;
   return members.has(row.household_id as string);
 }
 
@@ -116,10 +117,40 @@ function canWrite(data: LocalData, userId: string, table: TableName, row: Record
       return row.user_id === userId && row.role === "owner" && hh?.created_by === userId;
     }
     if (op === "delete") return ownerHouseholds(data, userId).has(row.household_id as string) || row.user_id === userId;
-    return false;
+    return ownerHouseholds(data, userId).has(row.household_id as string); // změna oprávnění jen vlastník
   }
   if (table === "household_invites") return ownerHouseholds(data, userId).has(row.household_id as string);
-  return memberHouseholds(data, userId).has(row.household_id as string);
+  if (table === "push_subscriptions") return row.user_id === userId && memberHouseholds(data, userId).has(row.household_id as string);
+  const hid = row.household_id as string;
+  if (!memberHouseholds(data, userId).has(hid)) return false;
+  const section = TABLE_SECTION[table];
+  return section ? hasPerm(data, userId, hid, section) : true;
+}
+
+const SECTIONS = ["finance", "invoices", "work", "purchases", "savings", "settings"];
+
+/** Napodobení has_household_perm / has_any_household_edit z SQL. */
+function hasPerm(data: LocalData, userId: string, hid: string, section: string): boolean {
+  const hu = rows(data, "household_users").find((u) => u.household_id === hid && u.user_id === userId);
+  if (!hu) return false;
+  if (hu.role === "owner") return true;
+  const perms = (hu.permissions ?? {}) as Record<string, string>;
+  if (section === "*") return SECTIONS.some((s) => (perms[s] ?? "edit") === "edit");
+  return (perms[section] ?? "edit") === "edit";
+}
+
+function ensureMember(data: LocalData, userId: string, hid: string, memberName?: string | null): string {
+  const members = rows(data, "members").filter((m) => m.household_id === hid);
+  const own = members.find((m) => m.user_id === userId);
+  if (own) return own.id;
+  const colors = ["#d4b483", "#9ccc65", "#7fb3d5", "#f48fb1", "#ffab91", "#ce93d8"];
+  const email = data.users.find((u) => u.id === userId)?.email ?? "";
+  const id = randomUUID();
+  rows(data, "members").push({
+    id, household_id: hid, name: (memberName?.trim() || email.split("@")[0] || "Nový člen").slice(0, 80), color: colors[members.length % 6],
+    user_id: userId, is_active: true, sort: members.length, phone: null, avatar_document_id: null, created_at: new Date().toISOString(),
+  });
+  return id;
 }
 
 function checkUnique(data: LocalData, table: TableName, row: Record<string, unknown>, ignoreId?: string) {
@@ -219,7 +250,7 @@ export function createLocalStore(userId: string): Store {
           const row = { id: randomUUID(), created_at: now(), ...nr } as unknown as Record<string, unknown>;
           if (TABLES_WITH_UPDATED_AT.includes(table)) row.updated_at = now();
           if (table === "households" && !row.created_by) row.created_by = userId;
-          if (!canWrite(data, userId, table, row, "insert")) throw new DbError("forbidden", "K této domácnosti nemáte přístup.");
+          if (!canWrite(data, userId, table, row, "insert")) throw new DbError("forbidden", "Nemáte oprávnění k této úpravě. Oprávnění nastavuje vlastník domácnosti.");
           if (rows(data, table).some((r) => (r as unknown as Record<string, unknown>).id === row.id)) throw new DbError("unique", "Záznam už existuje.");
           checkUnique(data, table, row);
           checkRefs(data, table, row);
@@ -237,7 +268,7 @@ export function createLocalStore(userId: string): Store {
         for (const r of targets) {
           const next = { ...r, ...patch, id: r.id, household_id: r.household_id } as Record<string, unknown>;
           if (TABLES_WITH_UPDATED_AT.includes(table)) next.updated_at = now();
-          if (!canWrite(data, userId, table, next, "update")) throw new DbError("forbidden", "K této domácnosti nemáte přístup.");
+          if (!canWrite(data, userId, table, next, "update")) throw new DbError("forbidden", "Nemáte oprávnění k této úpravě. Oprávnění nastavuje vlastník domácnosti.");
           checkUnique(data, table, next, r.id as string);
           checkRefs(data, table, next);
           Object.assign(r, next);
@@ -251,7 +282,7 @@ export function createLocalStore(userId: string): Store {
         const list = rows(data, table) as unknown as Record<string, unknown>[];
         const targets = list.filter((r) => canSee(data, userId, table, r) && matches(r, filter as Record<string, unknown>));
         for (const r of targets) {
-          if (!canWrite(data, userId, table, r, "delete")) throw new DbError("forbidden", "K této domácnosti nemáte přístup.");
+          if (!canWrite(data, userId, table, r, "delete")) throw new DbError("forbidden", "Nemáte oprávnění k této úpravě. Oprávnění nastavuje vlastník domácnosti.");
           if (table === "households") deleteHouseholdData(data, r.id as string);
           else cascadeDelete(data, table, r.id as string);
         }
@@ -260,15 +291,22 @@ export function createLocalStore(userId: string): Store {
         return targets.length;
       });
     },
-    acceptInvite(code: string) {
+    acceptInvite(code: string, memberName?: string | null) {
       return writeLocal((data) => {
-        const inv = rows(data, "household_invites").find((i) => i.code === code && !i.used_by && i.expires_at > now());
+        const inv = rows(data, "household_invites").find((i) => i.code.toUpperCase() === code.toUpperCase() && !i.used_by && i.expires_at > now());
         if (!inv) throw new DbError("not_found", "Pozvánka neexistuje nebo vypršela.");
         if (!memberHouseholds(data, userId).has(inv.household_id)) {
-          rows(data, "household_users").push({ id: randomUUID(), household_id: inv.household_id, user_id: userId, role: "member", created_at: now() });
+          rows(data, "household_users").push({ id: randomUUID(), household_id: inv.household_id, user_id: userId, role: "member", permissions: {}, created_at: now() });
         }
         inv.used_by = userId;
+        ensureMember(data, userId, inv.household_id, memberName);
         return inv.household_id;
+      });
+    },
+    ensureOwnMember(householdId: string, memberName?: string | null) {
+      return writeLocal((data) => {
+        if (!memberHouseholds(data, userId).has(householdId)) throw new DbError("forbidden", "Nejste členem domácnosti.");
+        return ensureMember(data, userId, householdId, memberName);
       });
     },
     files: localFiles(),

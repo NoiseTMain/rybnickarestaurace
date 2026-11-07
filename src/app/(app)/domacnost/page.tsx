@@ -1,10 +1,12 @@
 import { requireContext } from "@/lib/context";
+import { ReadOnlyNotice } from "@/components/ui/ReadOnlyNotice";
 import { loadData } from "@/lib/data";
 import { endOfMonth, monthName, todayISO, addMonths } from "@/lib/dates";
 import { percent, sum } from "@/lib/money";
 import { Card, EmptyState, PageHeader } from "@/components/ui/Card";
 import { Money } from "@/components/ui/Money";
 import { Badge } from "@/components/ui/Badge";
+import { Avatar } from "@/components/ui/Avatar";
 import { Progress } from "@/components/ui/Progress";
 import { MonthPicker } from "@/components/lists/Filters";
 import { TxRow } from "@/components/lists/TxRow";
@@ -35,7 +37,7 @@ export default async function HouseholdPage({ searchParams }: { searchParams: Pr
     c, amount: sum(household.filter((t) => t.category_id === c.id), (t) => t.amount), prev: sum(prevHousehold.filter((t) => t.category_id === c.id), (t) => t.amount),
   })).filter((x) => x.amount > 0 || x.prev > 0).sort((a, b) => b.amount - a.amount);
 
-  const byMember = [...data.members.map((m) => ({ id: m.id as string | null, name: m.name, color: m.color })), { id: null, name: "Nezadáno", color: "#6b665e" }].map((m) => {
+  const byMember = [...data.members.map((m) => ({ id: m.id as string | null, name: m.name, color: m.color, avatar_document_id: m.avatar_document_id, phone: m.phone })), { id: null, name: "Nezadáno", color: "#6b665e", avatar_document_id: null, phone: null }].map((m) => {
     const mine = expenses.filter((t) => t.member_id === m.id);
     return { ...m, shared: sum(mine.filter((t) => t.scope === "shared"), (t) => t.amount), personal: sum(mine.filter((t) => t.scope === "personal"), (t) => t.amount),
       income: sum(data.transactions.filter((t) => t.status === "posted" && t.type === "income" && t.member_id === m.id && t.date >= from && t.date <= to), (t) => t.amount) };
@@ -43,6 +45,7 @@ export default async function HouseholdPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="space-y-4">
+      <ReadOnlyNotice ctx={ctx} section="finance" />
       <PageHeader title="Domácnost" subtitle={`Rodinný rozpočet · ${monthName(from)}`} actions={<><MonthPicker value={month} /><TransactionButton defaultType="expense" label="Přidat výdaj" variant="primary" /></>} />
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -65,7 +68,7 @@ export default async function HouseholdPage({ searchParams }: { searchParams: Pr
           <ul className="space-y-3">
             {byMember.map((m) => (
               <li key={m.id ?? "none"} className="rounded-2xl bg-white/[0.04] p-3">
-                <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ background: m.color }} /><span className="flex-1 text-sm">{m.name}</span><Money value={m.shared + m.personal} decimals="never" className="text-sm font-semibold" /></div>
+                <div className="flex items-center gap-2"><Avatar member={m} size={28} /><span className="flex-1 text-sm">{m.name}{m.phone && <a href={`tel:${m.phone.replace(/\s/g, "")}`} className="ml-2 text-xs text-gold">{m.phone}</a>}</span><Money value={m.shared + m.personal} decimals="never" className="text-sm font-semibold" /></div>
                 <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-ink-3"><span>společné <Money value={m.shared} decimals="never" /></span><span>osobní <Money value={m.personal} decimals="never" /></span><span>příjmy <Money value={m.income} decimals="never" /></span></div>
               </li>
             ))}

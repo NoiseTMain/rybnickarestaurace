@@ -18,7 +18,8 @@ function mapError(e: { code?: string; message?: string } | null): DbError {
   if (code === "23505") return new DbError("unique", "Záznam už existuje (duplicitní údaj).");
   if (code === "23503") return new DbError("reference", "Záznam nelze uložit nebo smazat kvůli vazbě na jiná data (např. účet s transakcemi).");
   if (code === "23514" || code === "23502" || code === "22P02") return new DbError("check", "Údaje nesplňují pravidla databáze.");
-  if (code === "42501") return new DbError("forbidden", "K těmto datům nemáte přístup.");
+  if (code === "42501") return new DbError("forbidden", "Nemáte oprávnění k této úpravě. Oprávnění nastavuje vlastník domácnosti.");
+  if (code === "23514" && e?.message?.includes("IČO")) return new DbError("check", "IČO lze měnit nejvýše jednou za 30 dní.");
   return new DbError("unknown", e?.message ?? "Chyba databáze.");
 }
 
@@ -70,9 +71,14 @@ export function createSupabaseStore(client: SupabaseClient): Store {
       if (error) throw mapError(error);
       return count ?? 0;
     },
-    async acceptInvite(code: string) {
-      const { data, error } = await client.rpc("accept_household_invite", { invite_code: code });
+    async acceptInvite(code: string, memberName?: string | null) {
+      const { data, error } = await client.rpc("accept_household_invite", { invite_code: code, member_name: memberName ?? null });
       if (error) throw new DbError("not_found", "Pozvánka neexistuje nebo vypršela.");
+      return data as string;
+    },
+    async ensureOwnMember(householdId: string, memberName?: string | null) {
+      const { data, error } = await client.rpc("ensure_own_member", { hid: householdId, member_name: memberName ?? null });
+      if (error) throw mapError(error);
       return data as string;
     },
     files: {

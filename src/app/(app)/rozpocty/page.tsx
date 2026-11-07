@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle2, Trash2 } from "lucide-react";
 import { requireContext } from "@/lib/context";
+import { ReadOnlyNotice } from "@/components/ui/ReadOnlyNotice";
 import { loadSnapshot } from "@/lib/data";
 import { addDays, daysInMonth, formatDate, monthName, parts } from "@/lib/dates";
 import { divRound, formatMoney, percent } from "@/lib/money";
@@ -39,6 +40,7 @@ export default async function BudgetsPage() {
 
   return (
     <div className="space-y-4">
+      <ReadOnlyNotice ctx={ctx} section="finance" />
       <PageHeader title="Rozpočty" subtitle={`${monthName(today)} · limity se přepočítávají podle skutečných výdajů`} />
 
       <Card variant="light" title="Inteligentní rozpočet na jídlo" subtitle={`Kategorie: ${data.categories.filter((c) => c.is_food).map((c) => c.name).join(", ") || "žádná – označte v kategoriích"}`}

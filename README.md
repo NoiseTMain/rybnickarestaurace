@@ -151,8 +151,10 @@ unikátní klíče, vazby mezi tabulkami a přístup jen k vlastní domácnosti.
 
 ### Bezpečnost
 
-- Žádný tajný klíč v aplikaci ani v prohlížeči. Používá se jen veřejný `anon` klíč; service-role
-  klíč aplikace nepotřebuje.
+- Žádný tajný klíč v prohlížeči. Aplikace používá veřejný `anon` klíč; service-role klíč je
+  potřeba jen volitelně pro plánovaný týdenní souhrn (`/api/cron/weekly`, chráněno `CRON_SECRET`).
+- **Oprávnění členů** se vynucují v databázi (RLS): připojený člen vidí vše, upravovat smí jen
+  sekce, které mu vlastník povolí (výchozí plná práva).
 - **Row Level Security** na všech tabulkách: uživatel vidí jen domácnosti, jichž je členem.
   Složené cizí klíče `(household_id, id)` znemožní odkaz na data jiné domácnosti.
 - Úložiště: cesta souboru začíná `household_id`, politiky pouštějí jen členy domácnosti.
@@ -263,7 +265,21 @@ npm run test:e2e   # production build + Chromium: registrace, průvodce, výdaj,
 End-to-end test běží v lokálním režimu (bez Supabase) v dočasné složce; Chromium hledá v
 `/opt/pw-browsers/chromium`, jinak nastavte `CHROMIUM_PATH`.
 
+## Volitelné funkce (proměnné prostředí)
+
+| Funkce | Proměnné | Bez nich |
+|---|---|---|
+| AI porozumění volně položeným otázkám, AI odhad ceny potravin | `ANTHROPIC_API_KEY` | asistent odpovídá na rozpoznané typy otázek, ceny jen z vaší cenové paměti |
+| Týdenní souhrn jako oznámení na telefon | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET` | týdenní souhrn je vidět v sekci Finanční asistent |
+
+AI nikdy nepočítá peníze: jen převede otázku na strukturovaný dotaz, čísla spočítá aplikace z
+databáze. Odhad ceny potraviny je vždy označený „odhad AI – ověřte“. Ceny z kupi.cz se
+automaticky nestahují – aplikace odkazuje na aktuální akce a pamatuje si ceny, které jste
+skutečně zaplatili.
+
 ## Budoucí rozšíření
+
+- Historie až 6 měsíců zpětně s podrobným logem změn (kdo co zadal nebo upravil).
 
 - Bankovní synchronizace přes PSD2 API (místo je připravené v Nastavení → Banka).
 - Push/e-mailová upozornění (nyní se upozornění zobrazují v aplikaci).

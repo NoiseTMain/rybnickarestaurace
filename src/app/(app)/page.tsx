@@ -31,6 +31,7 @@ export default async function DashboardPage() {
   const hour = Number(new Intl.DateTimeFormat("cs-CZ", { hour: "numeric", timeZone: "Europe/Prague" }).format(new Date()));
   const greeting = hour < 10 ? "Dobré ráno" : hour < 18 ? "Dobrý den" : "Dobrý večer";
   const householdCats = s.household.byCategory.slice(0, 6);
+  const icoActive = Boolean(data.settings?.billing_ico && data.settings.ico_activated_at);
   const spentPct = s.month.income > 0 ? Math.round(percent(s.month.expense, s.month.income)) : null;
 
   return (
@@ -138,7 +139,7 @@ export default async function DashboardPage() {
         </Card>
 
         {/* 2. Příjmy vs výdaje */}
-        <Card title="Příjmy vs. výdaje" subtitle="Posledních 6 měsíců" action={<CardLink href="/transakce" />} className="md:col-span-2">
+        <Card title="Příjmy vs. výdaje" subtitle="Posledních 6 měsíců" action={<CardLink href="/transakce?zobrazeni=mesice" label="Historie měsíců" />} className="md:col-span-2">
           <IncomeExpenseChart data={months} />
         </Card>
 
@@ -174,6 +175,7 @@ export default async function DashboardPage() {
 
         {/* 7. Pracovní příjmy */}
         <Card title="Pracovní příjmy" subtitle={data.workSettings?.company ?? "Práce"} action={<CardLink href="/prace" />}>
+          {!icoActive ? <p className="text-sm text-ink-3">Pro podnikání na IČO. <Link href="/nastaveni#ico" className="text-gold underline">Aktivovat IČO</Link></p> : <>
           <div className="num text-2xl font-semibold">{formatMoney(s.work.month.net, { decimals: "never" })}</div>
           <p className="text-xs text-ink-3">čistý výsledek tento měsíc · {s.work.month.days} dní</p>
           <div className="mt-3 space-y-0.5">
@@ -182,10 +184,12 @@ export default async function DashboardPage() {
             <KV k="Minulý měsíc" v={<Money value={s.work.lastMonth.net} decimals="never" />} />
             <KV k="Očekávané výplaty" v={<Money value={s.work.expectedPayoutTotal} decimals="never" />} />
           </div>
+          </>}
         </Card>
 
         {/* 8. Neuhrazené faktury */}
         <Card title="Neuhrazené faktury" action={<CardLink href="/faktury" />}>
+          {!icoActive ? <p className="text-sm text-ink-3">Pro podnikání na IČO. <Link href="/nastaveni#ico" className="text-gold underline">Aktivovat IČO</Link></p> : <>
           <div className="grid grid-cols-2 gap-3">
             <div><p className="text-[11px] uppercase tracking-wider text-ink-3">Dostanu</p><Money value={s.invoices.unpaidIssuedTotal} decimals="never" className="text-lg font-semibold" /><p className="text-xs text-ink-3">{s.invoices.unpaidIssued.length} faktur</p></div>
             <div><p className="text-[11px] uppercase tracking-wider text-ink-3">Zaplatím</p><Money value={s.invoices.unpaidReceivedTotal} decimals="never" className="text-lg font-semibold" /><p className="text-xs text-ink-3">{s.invoices.unpaidReceived.length} faktur</p></div>
@@ -200,6 +204,7 @@ export default async function DashboardPage() {
               ))}
             </ul>
           )}
+          </>}
         </Card>
 
         {/* 6. Spoření */}

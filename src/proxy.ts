@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isSupabaseConfigured, localModeBlocked, publicEnv } from "@/lib/env";
 
-const PUBLIC = ["/prihlaseni", "/registrace", "/obnova-hesla", "/auth/confirm", "/konfigurace"];
+const PUBLIC = ["/prihlaseni", "/registrace", "/obnova-hesla", "/auth/confirm", "/konfigurace", "/api/cron"];
 
 /**
  * První vrstva ochrany: obnovení relace Supabase a přesměrování nepřihlášených.
@@ -51,5 +51,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|icon.svg|favicon.ico|manifest.webmanifest|.*\\.(?:png|jpg|svg|webp)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|icon.svg|favicon.ico|manifest.webmanifest|sw.js|.*\\.(?:png|jpg|svg|webp)$).*)"],
 };

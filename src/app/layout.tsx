@@ -4,7 +4,7 @@ import "@fontsource-variable/inter";
 import "@fontsource-variable/manrope";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
-import { BACKGROUNDS, THEME_COOKIE, parseTheme, themeVars } from "@/lib/theme";
+import { BACKGROUNDS, THEME_COOKIE, parseTheme, rootFontSize, sceneUrl, themeVars } from "@/lib/theme";
 
 export const metadata: Metadata = {
   title: { default: "HomeOS", template: "%s · HomeOS" },
@@ -19,11 +19,20 @@ export async function generateViewport(): Promise<Viewport> {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const { accent, bg } = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
+  const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
+  const scene = sceneUrl(theme);
   return (
-    <html lang="cs" data-accent={accent} data-bg={bg} style={themeVars(accent, bg) as React.CSSProperties}>
+    <html
+      lang="cs"
+      data-accent={theme.accent}
+      data-bg={theme.bg}
+      data-privacy={theme.privacy ? "1" : "0"}
+      data-motion={theme.motion ? "on" : "off"}
+      style={{ ...(themeVars(theme) as React.CSSProperties), fontSize: rootFontSize(theme) }}
+    >
       <body>
         <div className="ambient" aria-hidden />
+        <div id="ambient-scene" className="ambient-scene" aria-hidden style={scene ? { backgroundImage: `url("${scene}")` } : { display: "none" }} />
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>

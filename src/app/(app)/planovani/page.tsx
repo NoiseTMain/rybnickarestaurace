@@ -1,4 +1,5 @@
 import { requireContext } from "@/lib/context";
+import { ReadOnlyNotice } from "@/components/ui/ReadOnlyNotice";
 import { loadSnapshot } from "@/lib/data";
 import { formatMoney, sum } from "@/lib/money";
 import { checkAffordability } from "@/lib/finance/affordability";
@@ -8,7 +9,7 @@ import { Money } from "@/components/ui/Money";
 import { FilterTabs } from "@/components/lists/Filters";
 import { PurchaseCard } from "@/components/lists/PurchaseCard";
 import { PurchaseButton } from "@/components/forms/PurchaseForms";
-import { ShoppingListButton, ShoppingListCard } from "@/components/forms/ShoppingForms";
+import { LeafletsPanel, ShoppingListButton, ShoppingListCard } from "@/components/forms/ShoppingForms";
 
 export const metadata = { title: "Plánování" };
 
@@ -32,7 +33,8 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
     };
     return (
       <div className="space-y-4">
-        <PageHeader title="Plánování" subtitle="Nábytek a vybavení domácnosti – s fotkou, odkazem a kontrolou, zda si to můžete dovolit" actions={<PurchaseButton kind="home" label="Přidat věc" variant="primary" size="md" />} />
+        <ReadOnlyNotice ctx={ctx} section="purchases" />
+      <PageHeader title="Plánování" subtitle="Nábytek a vybavení domácnosti – s fotkou, odkazem a kontrolou, zda si to můžete dovolit" actions={<PurchaseButton kind="home" label="Přidat věc" variant="primary" size="md" />} />
         <FilterTabs name="tab" options={[{ value: "", label: "Nákup jídla" }, { value: "domov", label: "Nábytek a vybavení", count: home.filter((p) => p.status !== "bought").length }]} />
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <Card className="!p-4"><p className="text-[11px] uppercase tracking-wider text-ink-3">Plánováno celkem</p><Money value={sum(home.filter((p) => p.status !== "bought"), (p) => p.price)} decimals="never" className="text-xl font-semibold" /></Card>
@@ -65,6 +67,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="space-y-4">
+      <ReadOnlyNotice ctx={ctx} section="purchases" />
       <PageHeader title="Plánování" subtitle="Nákupní seznamy jídla napojené na rozpočet" actions={<ShoppingListButton label="Nový seznam" />} />
       <FilterTabs name="tab" options={[{ value: "", label: "Nákup jídla", count: open.length }, { value: "domov", label: "Nábytek a vybavení", count: data.purchases.filter((p) => p.kind === "home" && p.status !== "bought").length }]} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -80,6 +83,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
       ) : (
         <Card><EmptyState title="Žádný otevřený nákupní seznam" action={<ShoppingListButton label="Vytvořit seznam" />}>Sepište, co koupit, odhadněte ceny a uvidíte, jestli se nákup vejde do rozpočtu na jídlo. Po nákupu stačí zadat částku z účtenky.</EmptyState></Card>
       )}
+      <LeafletsPanel items={open.flatMap((l) => itemsOf(l.id).filter((i) => !i.checked).map((i) => i.name))} />
       {done.length > 0 && (
         <div>
           <h2 className="mb-2 text-sm font-medium text-ink-2">Nedávno nakoupeno</h2>

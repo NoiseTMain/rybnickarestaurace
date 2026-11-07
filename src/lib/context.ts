@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { appMode } from "@/lib/env";
 import { getUser, type AppUser } from "@/lib/auth";
 import type { Store } from "@/lib/db/store";
-import type { Household } from "@/lib/db/types";
+import type { Household, PermissionSection, Permissions } from "@/lib/db/types";
 
 export const HOUSEHOLD_COOKIE = "homeos_household";
 
@@ -15,6 +15,12 @@ export interface AppContext {
   households: Household[];
   household: Household;
   role: "owner" | "member";
+  permissions: Permissions;
+}
+
+/** Může uživatel upravovat danou sekci? Vlastník vždy; připojený člen podle oprávnění (výchozí plná). */
+export function canEdit(ctx: Pick<AppContext, "role" | "permissions">, section: PermissionSection): boolean {
+  return ctx.role === "owner" || (ctx.permissions[section] ?? "edit") === "edit";
 }
 
 export const getStore = cache(async (user: AppUser): Promise<Store> => {
@@ -46,8 +52,9 @@ export const tryContext = cache(async (): Promise<AppContext | null | "no_househ
   const wanted = jar.get(HOUSEHOLD_COOKIE)?.value;
   households.sort((a, b) => Number(a.is_demo) - Number(b.is_demo) || a.created_at.localeCompare(b.created_at));
   const household = households.find((h) => h.id === wanted) ?? households[0];
-  const role = memberships.find((m) => m.household_id === household.id)?.role ?? "member";
-  return { user, store, households, household, role };
+  const membership = memberships.find((m) => m.household_id === household.id);
+  const role = membership?.role ?? "member";
+  return { user, store, households, household, role, permissions: (membership?.permissions ?? {}) as Permissions };
 });
 
 /** Kontext s aktuální domácností. Bez přihlášení → přihlášení, bez domácnosti → úvodní nastavení. */

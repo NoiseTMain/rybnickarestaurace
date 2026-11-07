@@ -29,6 +29,8 @@ export interface Store {
   insert<T extends TableName>(table: T, rows: NewRow<T>[]): Promise<Row<T>[]>;
   update<T extends TableName>(table: T, filter: Filter<T> & { id?: string }, patch: NewRow<T>): Promise<Row<T>[]>;
   remove<T extends TableName>(table: T, filter: Filter<T>): Promise<number>;
-  acceptInvite(code: string): Promise<string>;
+  acceptInvite(code: string, memberName?: string | null): Promise<string>;
+  /** Zajistí, že přihlášený uživatel má v domácnosti svého člena (vrací jeho id). */
+  ensureOwnMember(householdId: string, memberName?: string | null): Promise<string>;
   files: FileStore;
 }

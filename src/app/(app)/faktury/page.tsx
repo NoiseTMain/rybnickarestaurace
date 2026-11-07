@@ -1,5 +1,7 @@
 import { Ban, CalendarClock, Download, Paperclip, RotateCcw, Trash2 } from "lucide-react";
 import { requireContext } from "@/lib/context";
+import { ReadOnlyNotice } from "@/components/ui/ReadOnlyNotice";
+import { IcoLocked } from "@/components/ui/IcoLocked";
 import { loadData } from "@/lib/data";
 import { addDays, diffDays, formatDate, todayISO } from "@/lib/dates";
 import { sum } from "@/lib/money";
@@ -19,6 +21,14 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const ctx = await requireContext();
   const data = await loadData(ctx);
+  if (!(data.settings?.billing_ico && data.settings.ico_activated_at)) {
+    return (
+      <div className="space-y-4">
+        <PageHeader title={"Faktury"} subtitle="Pro podnikání na IČO" />
+        <IcoLocked what="Sekce Faktury" />
+      </div>
+    );
+  }
   const today = todayISO();
   const q = (sp.q ?? "").toLowerCase();
   const stav = sp.stav ?? "";
@@ -37,6 +47,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="space-y-4">
+      <ReadOnlyNotice ctx={ctx} section="invoices" />
       <PageHeader title="Faktury" subtitle="Vystavené i přijaté faktury s archivem dokumentů. OCR údaje se ukládají až po vašem potvrzení."
         actions={<><LinkButton href="/api/export/faktury" icon={<Download className="h-4 w-4" />}>Export CSV</LinkButton><InvoiceButton label="Nová faktura" variant="primary" size="md" /></>} />
 

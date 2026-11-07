@@ -1,5 +1,7 @@
 "use client";
-import { Pencil, Plus } from "lucide-react";
+import { Camera, Loader2, Pencil, Plus } from "lucide-react";
+import { uploadDocument } from "@/lib/upload-client";
+import { Avatar } from "@/components/ui/Avatar";
 import { saveAccount, saveCategory, saveIncomeSource, saveMember } from "@/lib/actions/setup";
 import { toInputValue } from "@/lib/money";
 import type { Account, Category, IncomeSource, Member } from "@/lib/db/types";
@@ -26,12 +28,44 @@ function ColorPicker({ name, initial }: { name: string; initial?: string }) {
   );
 }
 
+function AvatarPicker({ initial, name, color }: { initial: string | null; name: string; color: string }) {
+  const lk = useLookups();
+  const [docId, setDocId] = useState<string | null>(initial);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="flex items-center gap-4">
+      <input type="hidden" name="avatar_document_id" value={docId ?? ""} />
+      <Avatar member={{ name: name || "?", color, avatar_document_id: docId }} size={64} />
+      <div className="space-y-1">
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-sm hover:bg-white/10">
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}{docId ? "Změnit fotku" : "Přidat profilovou fotku"}
+          <input type="file" accept="image/*" className="sr-only" disabled={busy} onChange={async (e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            setBusy(true);
+            setError(null);
+            try { setDocId(await uploadDocument(f, "other", lk, `Profilová fotka – ${name}`)); } catch (err) { setError(err instanceof Error ? err.message : "Nahrání selhalo"); }
+            setBusy(false);
+            e.target.value = "";
+          }} />
+        </label>
+        {docId && <button type="button" className="block text-xs text-ink-3 hover:text-neg" onClick={() => setDocId(null)}>Odebrat fotku</button>}
+        {error && <p className="text-xs text-neg">{error}</p>}
+      </div>
+    </div>
+  );
+}
+
 export function MemberForm({ initial, onDone }: { initial?: Member; onDone?: () => void }) {
   const { state, formAction, pending, fe } = useFormAction(saveMember, onDone);
+  const [name, setName] = useState(initial?.name ?? "");
   return (
     <form action={formAction} className="space-y-4">
       {initial && <input type="hidden" name="id" value={initial.id} />}
-      <Input name="name" label="Jméno" defaultValue={initial?.name} error={fe("name")} required autoFocus />
+      <AvatarPicker initial={initial?.avatar_document_id ?? null} name={name} color={initial?.color ?? MEMBER_COLORS[0]} />
+      <Input name="name" label="Jméno" value={name} onChange={(e) => setName(e.target.value)} error={fe("name")} required autoFocus />
+      <Input name="phone" type="tel" label="Telefon" placeholder="+420 777 123 456" defaultValue={initial?.phone ?? ""} error={fe("phone")} autoComplete="tel" />
       <ColorPicker name="color" initial={initial?.color} />
       <Toggle name="is_active" label="Aktivní člen" defaultChecked={initial?.is_active ?? true} />
       <FormError error={state.ok ? undefined : state.error} />
