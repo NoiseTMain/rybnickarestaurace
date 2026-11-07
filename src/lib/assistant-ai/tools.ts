@@ -9,6 +9,8 @@ import { aggregate, inPeriod, shiftNet } from "@/lib/finance/work";
 import { invoiceStatusLabel } from "@/lib/finance/obligations";
 import { buildInsights, type ExpenseDraft } from "@/lib/assistant";
 import { guessCategoryName } from "@/lib/categorize";
+import type { TravelData } from "@/lib/travel-data";
+import { effectiveExpenses, KIND_LABEL, MODE_LABEL, summarizeTrip } from "@/lib/finance/travel";
 
 /**
  * Nástroje, kterými AI asistent čte data domácnosti. Všechny počítá aplikace
@@ -24,6 +26,8 @@ export interface ToolEnv {
   data: FullData;
   snapshot: Snapshot;
   today: string;
+  /** Cesty (načtené jen pro AI chat). */
+  travel?: TravelData;
   /** Návrhy transakcí čekající na potvrzení uživatelem. */
   drafts: (ExpenseDraft & { type: "expense" | "income" })[];
 }
@@ -104,10 +108,10 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "list_records",
-    description: "Seznam záznamů z aplikace: pravidelné platby, pravidelné příjmy, spořicí cíle, faktury, výplaty, pracovní směny, nákupy (vč. nábytku), nákupní seznamy, rozpočty, účty, členové, kategorie, dokumenty.",
+    description: "Seznam záznamů z aplikace: pravidelné platby, pravidelné příjmy, spořicí cíle, faktury, výplaty, pracovní směny, nákupy (vč. nábytku), nákupní seznamy, rozpočty, účty, členové, kategorie, dokumenty, cesty (trasa, doprava, dopravci, rozpočet, kolik lze utratit na den, výdaje podle druhu, dnů a míst).",
     input_schema: {
       type: "object", additionalProperties: false, required: ["what"],
-      properties: { what: { type: "string", enum: ["recurring_payments", "income_sources", "goals", "invoices", "payouts", "work_shifts", "purchases", "budgets", "accounts", "members", "categories", "documents"] } },
+      properties: { what: { type: "string", enum: ["recurring_payments", "income_sources", "goals", "invoices", "payouts", "work_shifts", "purchases", "budgets", "accounts", "members", "categories", "documents", "trips"] } },
     },
     strict: true,
   },
@@ -144,7 +148,7 @@ const schemas = {
   what_if: z.object({ kind: z.enum(["purchase", "installments", "rent_change", "food_change", "income_change"]), amount_czk: z.number(), installments: z.number().int().nullable() }),
   forecast: z.object({ months: z.number().int() }),
   insights: z.object({}),
-  list_records: z.object({ what: z.enum(["recurring_payments", "income_sources", "goals", "invoices", "payouts", "work_shifts", "purchases", "budgets", "accounts", "members", "categories", "documents"]) }),
+  list_records: z.object({ what: z.enum(["recurring_payments", "income_sources", "goals", "invoices", "payouts", "work_shifts", "purchases", "budgets", "accounts", "members", "categories", "documents", "trips"]) }),
   propose_transaction: z.object({
     type: z.enum(["expense", "income"]), amount_czk: z.number().positive().max(100_000_000), description: z.string().min(1).max(200),
     category: z.string().nullable(), date: date.nullable(), payment_method: z.enum(["card", "cash", "transfer", "other"]),
@@ -279,7 +283,8 @@ function overview({ data: d, snapshot: s, today }: ToolEnv) {
   };
 }
 
-function listRecords(what: string, { data: d, snapshot: s, today }: ToolEnv, n: { catName: (id: string | null) => string | null; accName: (id: string | null) => string | null; memName: (id: string | null) => string | null }) {
+function listRecords(what: string, env: ToolEnv, n: { catName: (id: string | null) => string | null; accName: (id: string | null) => string | null; memName: (id: string | null) => string | null }) {
+  const { data: d, snapshot: s, today } = env;
   switch (what) {
     case "recurring_payments": return d.recurring.map((r) => ({ name: r.name, amount_czk: kc(r.amount), frequency: r.frequency, first_due: r.start_date, end: r.end_date, category: n.catName(r.category_id), active: r.is_active, debt_remaining_czk: kc(r.debt_remaining) }));
     case "income_sources": return d.incomeSources.map((r) => ({ name: r.name, amount_czk: kc(r.amount), frequency: r.frequency, next: r.start_date, member: n.memName(r.member_id), active: r.is_active }));
@@ -297,6 +302,24 @@ function listRecords(what: string, { data: d, snapshot: s, today }: ToolEnv, n: 
     case "accounts": return d.accounts.map((a) => ({ name: a.name, kind: a.kind, opening_balance_czk: kc(a.opening_balance), opening_date: a.opening_date, current_czk: kc(s.balance.byAccount[a.id] ?? 0), active: a.is_active }));
     case "members": return d.members.map((m) => ({ name: m.name, has_account: Boolean(m.user_id), active: m.is_active }));
     case "categories": return d.categories.filter((c) => !c.is_archived).map((c) => ({ name: c.name, kind: c.kind, food: c.is_food, household: c.is_household }));
+    case "trips": {
+      const tr = env.travel;
+      if (!tr) return [];
+      return tr.trips.map((t) => {
+        const legs = tr.legs.filter((l) => l.trip_id === t.id);
+        const ex = effectiveExpenses(tr.expenses.filter((e) => e.trip_id === t.id), d.transactions);
+        const x = summarizeTrip(t, legs, ex, today);
+        return {
+          name: t.name, destination: t.destination, country: t.country, start: t.start_date, end: t.end_date, days: x.days, status: x.status, travelers: t.travelers,
+          budget_czk: kc(t.budget), paid_czk: kc(x.paid), still_to_pay_czk: kc(x.plannedExpenses + x.unpaidLegs), spending_money_left_czk: kc(x.spendingMoney), per_day_allowance_czk: kc(x.perDayAllowance),
+          per_day_actual_czk: kc(x.perDayActual), monthly_saving_needed_czk: kc(x.monthlySaving),
+          route: legs.map((l) => ({ mode: MODE_LABEL[l.mode], carrier: l.carrier, from: l.from_place, to: l.to_place, depart: [l.depart_date, l.depart_time].filter(Boolean).join(" ") || null, price_czk: kc(l.price), km: l.distance_km })),
+          spent_by_kind: x.byKind.map((k) => ({ kind: k.label, czk: kc(k.amount) })),
+          spent_by_place: x.byPlace.slice(0, 10).map((p) => ({ place: p.place, czk: kc(p.amount) })),
+          expenses: ex.slice(0, 60).map((e) => ({ date: e.date, status: e.status, kind: KIND_LABEL[e.kind], description: e.description, place: e.place, czk: kc(e.value), original: e.currency !== "CZK" && e.amount_original != null ? `${e.amount_original / 100} ${e.currency}` : null })),
+        };
+      });
+    }
     case "documents": return d.documents.slice(0, 50).map((x) => ({ title: x.title, kind: x.kind, uploaded: x.created_at.slice(0, 10), tags: x.tags }));
   }
   return [];

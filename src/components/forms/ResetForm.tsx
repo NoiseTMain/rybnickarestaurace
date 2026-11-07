@@ -16,6 +16,7 @@ const PARTS: { key: string; label: string; detail: string }[] = [
   { key: "budgets", label: "Rozpočty", detail: "rozpočet na jídlo, limity kategorií" },
   { key: "savings", label: "Spoření", detail: "cíle a všechny vklady" },
   { key: "planning", label: "Nákupy a plánování", detail: "nákupy, nábytek, nákupní seznamy, cenová paměť" },
+  { key: "travel", label: "Cestování", detail: "cesty, trasy a výdaje na cestách (výdaje v transakcích zůstanou)" },
   { key: "work", label: "Práce", detail: "směny a výplaty" },
   { key: "invoices", label: "Faktury", detail: "všechny faktury" },
   { key: "documents", label: "Dokumenty", detail: "soubory, účtenky, fotky" },

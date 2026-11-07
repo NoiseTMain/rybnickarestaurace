@@ -18,6 +18,7 @@ export const PERMISSION_SECTIONS = {
   work: "Práce a výplaty",
   purchases: "Nákupy a plánování",
   savings: "Spoření a cíle",
+  travel: "Cestování",
   settings: "Nastavení domácnosti a členové",
 } as const;
 export type PermissionSection = keyof typeof PERMISSION_SECTIONS;
@@ -126,7 +127,7 @@ export type TxType = "income" | "expense" | "transfer";
 export type TxStatus = "posted" | "cancelled";
 export type PaymentMethod = "card" | "cash" | "transfer" | "direct_debit" | "other";
 export type TxScope = "shared" | "personal";
-export type TxSource = "manual" | "csv" | "payout" | "recurring" | "invoice" | "purchase" | "income_source" | "savings" | "shopping";
+export type TxSource = "manual" | "csv" | "payout" | "recurring" | "invoice" | "purchase" | "income_source" | "savings" | "shopping" | "trip";
 
 export interface Transaction {
   id: string;
@@ -391,6 +392,71 @@ export interface PriceHistory {
   created_at: string;
 }
 
+export type TripLegMode = "train" | "bus" | "car" | "plane" | "ferry" | "transit" | "bike" | "other";
+export type TripExpenseKind = "transport" | "accommodation" | "food" | "activities" | "shopping" | "other";
+
+export interface Trip {
+  id: string;
+  household_id: string;
+  name: string;
+  destination: string;
+  country: string | null;
+  start_date: ISODate | null;
+  end_date: ISODate | null;
+  travelers: number;
+  budget: Cents | null;
+  currency: string;
+  lat: number | null;
+  lon: number | null;
+  note: string | null;
+  created_at: string;
+}
+
+export interface TripLeg {
+  id: string;
+  household_id: string;
+  trip_id: string;
+  mode: TripLegMode;
+  carrier: string | null;
+  from_place: string;
+  to_place: string;
+  depart_date: ISODate | null;
+  depart_time: string | null;
+  arrive_date: ISODate | null;
+  arrive_time: string | null;
+  price: Cents | null;
+  distance_km: number | null;
+  booking_ref: string | null;
+  url: string | null;
+  note: string | null;
+  from_lat: number | null;
+  from_lon: number | null;
+  to_lat: number | null;
+  to_lon: number | null;
+  sort: number;
+  created_at: string;
+}
+
+export interface TripExpense {
+  id: string;
+  household_id: string;
+  trip_id: string;
+  leg_id: string | null;
+  transaction_id: string | null;
+  status: "planned" | "paid";
+  kind: TripExpenseKind;
+  description: string;
+  place: string | null;
+  date: ISODate | null;
+  /** Částka v Kč (haléře) – přepočtená kurzem, pokud se platilo v cizí měně. */
+  amount: Cents;
+  currency: string;
+  /** Původní částka v cizí měně (v setinách měny). */
+  amount_original: number | null;
+  rate: number | null;
+  created_at: string;
+}
+
 export interface PushSubscriptionRow {
   id: string;
   user_id: string;
@@ -425,6 +491,9 @@ export interface Tables {
   shopping_lists: ShoppingList;
   shopping_items: ShoppingItem;
   price_history: PriceHistory;
+  trips: Trip;
+  trip_legs: TripLeg;
+  trip_expenses: TripExpense;
   push_subscriptions: PushSubscriptionRow;
 }
 
@@ -451,7 +520,10 @@ export const HOUSEHOLD_TABLES = [
   "shopping_lists",
   "shopping_items",
   "price_history",
+  "trips",
+  "trip_legs",
   "transactions",
+  "trip_expenses",
 ] as const satisfies readonly TableName[];
 
 export type HouseholdTable = (typeof HOUSEHOLD_TABLES)[number];
@@ -473,4 +545,7 @@ export const MONEY_COLUMNS: Partial<Record<TableName, string[]>> = {
   purchases: ["price"],
   shopping_items: ["est_price"],
   price_history: ["price"],
+  trips: ["budget"],
+  trip_legs: ["price"],
+  trip_expenses: ["amount", "amount_original", "rate"],
 };

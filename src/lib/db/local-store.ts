@@ -127,7 +127,7 @@ function canWrite(data: LocalData, userId: string, table: TableName, row: Record
   return section ? hasPerm(data, userId, hid, section) : true;
 }
 
-const SECTIONS = ["finance", "invoices", "work", "purchases", "savings", "settings"];
+const SECTIONS = ["finance", "invoices", "work", "purchases", "savings", "settings", "travel"];
 
 /** Napodobení has_household_perm / has_any_household_edit z SQL. */
 function hasPerm(data: LocalData, userId: string, hid: string, section: string): boolean {

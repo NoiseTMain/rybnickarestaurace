@@ -16,6 +16,7 @@ export const DEFAULT_CATEGORIES: CatDef[] = [
   { name: "Doprava", kind: "expense", icon: "bus", color: "#90a4ae", is_food: false, is_household: false },
   { name: "Auto", kind: "expense", icon: "car", color: "#78909c", is_food: false, is_household: false },
   { name: "Pojištění", kind: "expense", icon: "shield", color: "#80cbc4", is_food: false, is_household: true },
+  { name: "Cestování", kind: "expense", icon: "plane", color: "#4fc3f7", is_food: false, is_household: false },
   { name: "Zábava", kind: "expense", icon: "party-popper", color: "#f48fb1", is_food: false, is_household: false },
   { name: "Restaurace", kind: "expense", icon: "utensils", color: "#ffab91", is_food: false, is_household: false },
   { name: "Ostatní", kind: "expense", icon: "circle", color: "#b0bec5", is_food: false, is_household: false },

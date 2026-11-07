@@ -44,6 +44,10 @@ nastavení a v jednotlivých sekcích. Ukázková data existují jen v samostatn
   s existující platbou (žádné dvojí započtení), export.
 - **Nákupy** – plánuji / kupuji / koupeno, priorita, odkaz, seznam přání, **kontrola, zda si nákup
   můžete dovolit** (kolik chybí, kolik ušetřit, odkdy si ho lze bezpečně dovolit).
+- **Cestování** – cesty (kam, kdy, kolik osob, rozpočet), trasa po úsecích (vlak, autobus, auto,
+  letadlo, trajekt… s dopravcem, časy, cenou, kalkulačkou paliva) na mapě (OpenStreetMap) s odkazy
+  na IDOS a mapy, výdaje i v cizí měně s kurzem ČNB, kolik lze utratit na místě za den, a po návratu
+  souhrn s grafy – za co, po dnech, kde, podle měny, doprava – a přehled navštívených destinací.
 - **Spoření a plánovač** – cíle s termínem, automaticky spočítaný potřebný měsíční vklad,
   procento splnění, odhad data; plánovač počítá 5 výstupů (viz níže).
 - **Rozpočty** – inteligentní rozpočet na jídlo (měsíc/týden/den, přepočet, tempo, upozornění),

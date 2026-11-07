@@ -157,6 +157,33 @@ export async function seedDemo(store: Store, user: AppUser, hid: string, today: 
     ["Mléko 2×", "2 ks", 4_980], ["Chléb", "1 ks", 4_490], ["Kuřecí prsa", "1 kg", 18_990], ["Zelenina na salát", null, 8_900], ["Těstoviny", "2 bal.", 5_980], ["Káva", "1 ks", null],
   ].map(([name, quantity, est_price], i) => ({ household_id: hid, list_id: list.id, name: name as string, quantity: quantity as string | null, est_price: est_price as number | null, checked: i < 2, sort: i })));
 
+  // cestování: proběhlá cesta (s výdaji) a chystaná cesta (s trasou)
+  const pastStart = addDays(today, -40);
+  const nextStart = addDays(today, 35);
+  const [past, next] = await store.insert("trips", [
+    { household_id: hid, name: "Víkend ve Vídni (demo)", destination: "Vídeň", country: "Rakousko", start_date: pastStart, end_date: addDays(pastStart, 2), travelers: 2, budget: 900_000, currency: "EUR", lat: 48.2083, lon: 16.3725, note: null },
+    { household_id: hid, name: "Léto v Chorvatsku (demo)", destination: "Split", country: "Chorvatsko", start_date: nextStart, end_date: addDays(nextStart, 7), travelers: 2, budget: 3_500_000, currency: "EUR", lat: 43.5081, lon: 16.4402, note: "Apartmán 5 min od pláže" },
+  ]);
+  const [pastLeg1, pastLeg2] = await store.insert("trip_legs", [
+    { household_id: hid, trip_id: past.id, mode: "train", carrier: "RegioJet", from_place: "Praha", to_place: "Vídeň", depart_date: pastStart, depart_time: "07:04", arrive_date: pastStart, arrive_time: "11:02", price: 79_800, distance_km: 330, booking_ref: null, url: null, note: null, from_lat: 50.0755, from_lon: 14.4378, to_lat: 48.2083, to_lon: 16.3725, sort: 0 },
+    { household_id: hid, trip_id: past.id, mode: "bus", carrier: "FlixBus", from_place: "Vídeň", to_place: "Praha", depart_date: addDays(pastStart, 2), depart_time: "17:30", arrive_date: addDays(pastStart, 2), arrive_time: "21:45", price: 49_800, distance_km: 330, booking_ref: null, url: null, note: null, from_lat: 48.2083, from_lon: 16.3725, to_lat: 50.0755, to_lon: 14.4378, sort: 1 },
+    { household_id: hid, trip_id: next.id, mode: "car", carrier: "Vlastní auto", from_place: "Praha", to_place: "Split", depart_date: nextStart, depart_time: "05:00", arrive_date: nextStart, arrive_time: "17:00", price: 420_000, distance_km: 1050, booking_ref: null, url: null, note: "dálniční známky AT, SI + mýto HR", from_lat: 50.0755, from_lon: 14.4378, to_lat: 43.5081, to_lon: 16.4402, sort: 0 },
+    { household_id: hid, trip_id: next.id, mode: "ferry", carrier: "Jadrolinija", from_place: "Split", to_place: "Hvar", depart_date: addDays(nextStart, 3), depart_time: "09:15", arrive_date: null, arrive_time: null, price: 60_000, distance_km: null, booking_ref: null, url: null, note: null, from_lat: 43.5081, from_lon: 16.4402, to_lat: 43.1729, to_lon: 16.4411, sort: 1 },
+  ]);
+  const eur = (cents: number, rate = 25.2) => ({ currency: "EUR", amount_original: cents, rate, amount: Math.round(cents * rate) });
+  await store.insert("trip_expenses", [
+    { trip_id: past.id, leg_id: pastLeg1.id, status: "paid", kind: "transport", description: "Vlak Praha → Vídeň", place: "Praha", date: pastStart, amount: 79_800, currency: "CZK", amount_original: null, rate: null },
+    { trip_id: past.id, leg_id: pastLeg2.id, status: "paid", kind: "transport", description: "Bus Vídeň → Praha", place: "Vídeň", date: addDays(pastStart, 2), amount: 49_800, currency: "CZK", amount_original: null, rate: null },
+    { trip_id: past.id, leg_id: null, status: "paid", kind: "accommodation", description: "Hotel 2 noci", place: "Vídeň", date: pastStart, ...eur(18_000) },
+    { trip_id: past.id, leg_id: null, status: "paid", kind: "food", description: "Řízek a pivo", place: "Figlmüller", date: pastStart, ...eur(4_640) },
+    { trip_id: past.id, leg_id: null, status: "paid", kind: "activities", description: "Schönbrunn – vstupné", place: "Schönbrunn", date: addDays(pastStart, 1), ...eur(4_400) },
+    { trip_id: past.id, leg_id: null, status: "paid", kind: "food", description: "Kafe a dort", place: "Café Sacher", date: addDays(pastStart, 1), ...eur(2_380) },
+    { trip_id: past.id, leg_id: null, status: "paid", kind: "shopping", description: "Suvenýry", place: "Naschmarkt", date: addDays(pastStart, 2), ...eur(1_950) },
+    { trip_id: past.id, leg_id: null, status: "paid", kind: "transport", description: "MHD 72h jízdenka", place: "Vídeň", date: pastStart, ...eur(3_400) },
+    { trip_id: next.id, leg_id: null, status: "paid", kind: "accommodation", description: "Apartmán – záloha", place: "Split", date: addDays(today, -10), ...eur(30_000, 25.1) },
+    { trip_id: next.id, leg_id: null, status: "planned", kind: "accommodation", description: "Apartmán – doplatek", place: "Split", date: nextStart, ...eur(42_000, 25.1) },
+  ].map((e) => ({ household_id: hid, transaction_id: null, ...e } as never)));
+
   await store.update("household_settings", { household_id: hid }, {
     safety_buffer: 500_000, onboarded_at: new Date().toISOString(), billing_ico: "00000027", ico_activated_at: new Date().toISOString(), ico_changed_at: null,
     ico_info: { ico: "00000027", name: "Ukázkový podnikatel (demo)", address: "Ukázková 1, Praha", legalForm: "Fyzická osoba podnikající (živnostník)", dic: null, established: null, verified: false, source: "manual", checkedAt: new Date().toISOString() },

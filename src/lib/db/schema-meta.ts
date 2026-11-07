@@ -39,6 +39,10 @@ export const UNIQUE: Partial<Record<TableName, UniqueConstraint[]>> = {
     { columns: ["contribution_id"], where: posted("contribution_id"), message: "Vklad už je zaznamenán." },
     { columns: ["shopping_list_id"], where: posted("shopping_list_id"), message: "Nákup podle seznamu už je zaznamenán." },
   ],
+  trip_expenses: [
+    { columns: ["transaction_id"], where: (r) => r.transaction_id != null, message: "Tento výdaj už je u cesty zapsán." },
+    { columns: ["leg_id"], where: (r) => r.leg_id != null, message: "Tento úsek už je zaplacen." },
+  ],
 };
 
 export type OnDelete = "cascade" | "set_null" | "restrict";
@@ -54,7 +58,7 @@ export const TABLE_SECTION: Partial<Record<TableName, string>> = {
   transactions: "finance", accounts: "finance", categories: "finance", recurring_payments: "finance", income_sources: "finance",
   occurrence_marks: "finance", budgets: "finance", invoices: "invoices", work_shifts: "work", payouts: "work", work_settings: "work",
   purchases: "purchases", shopping_lists: "purchases", shopping_items: "purchases", price_history: "purchases",
-  savings_goals: "savings", savings_contributions: "savings", household_settings: "settings", members: "settings", documents: "*",
+  savings_goals: "savings", savings_contributions: "savings", trips: "travel", trip_legs: "travel", trip_expenses: "travel", household_settings: "settings", members: "settings", documents: "*",
 };
 
 export const REFS: Partial<Record<TableName, Ref[]>> = {
@@ -90,6 +94,12 @@ export const REFS: Partial<Record<TableName, Ref[]>> = {
     { column: "image_document_id", table: "documents", onDelete: "set_null" },
   ],
   shopping_items: [{ column: "list_id", table: "shopping_lists", onDelete: "cascade" }],
+  trip_legs: [{ column: "trip_id", table: "trips", onDelete: "cascade" }],
+  trip_expenses: [
+    { column: "trip_id", table: "trips", onDelete: "cascade" },
+    { column: "leg_id", table: "trip_legs", onDelete: "set_null" },
+    { column: "transaction_id", table: "transactions", onDelete: "set_null" },
+  ],
   transactions: [
     { column: "account_id", table: "accounts", onDelete: "restrict" },
     { column: "transfer_account_id", table: "accounts", onDelete: "restrict" },

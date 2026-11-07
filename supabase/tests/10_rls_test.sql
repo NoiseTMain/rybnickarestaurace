@@ -257,3 +257,48 @@ begin
   assert ok, 'IČO změněno dříve než po 30 dnech';
 end $$;
 reset role;
+
+\echo '11) Cestování: oprávnění sekce a vazby'
+select pg_temp.as_user(:alice);
+insert into public.trips (id, household_id, name, destination, budget) values ('77777777-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'Vídeň', 'Vídeň', 900000);
+insert into public.trip_legs (household_id, trip_id, mode, carrier, from_place, to_place, price) values ('11111111-0000-0000-0000-000000000001', '77777777-0000-0000-0000-000000000001', 'train', 'RegioJet', 'Praha', 'Vídeň', 79800);
+insert into public.trip_expenses (household_id, trip_id, kind, description, amount, currency, amount_original, rate) values ('11111111-0000-0000-0000-000000000001', '77777777-0000-0000-0000-000000000001', 'food', 'Řízek', 58464, 'EUR', 2320, 25.2);
+update public.household_users set permissions = '{"travel":"view"}' where user_id = :bob and household_id = '11111111-0000-0000-0000-000000000001';
+do $$
+declare ok boolean;
+begin
+  begin
+    insert into public.trips (household_id, name, destination) values ('11111111-0000-0000-0000-000000000001', 'x', 'y') ;
+    ok := true;
+  end;
+  begin
+    insert into public.trip_expenses (household_id, trip_id, kind, description, amount) values ('11111111-0000-0000-0000-000000000001', '77777777-0000-0000-0000-000000000001', 'food', 'záporná', -5);
+    ok := false;
+  exception when check_violation then ok := true;
+  end;
+  assert ok, 'záporný výdaj na cestě prošel';
+end $$;
+reset role;
+select pg_temp.as_user(:bob);
+do $$
+declare ok boolean;
+begin
+  assert (select count(*) from public.trip_legs where trip_id = '77777777-0000-0000-0000-000000000001') = 1, 'člen nevidí trasu';
+  begin
+    insert into public.trips (household_id, name, destination) values ('11111111-0000-0000-0000-000000000001', 'Bob', 'Řím');
+    ok := false;
+  exception when insufficient_privilege then ok := true;
+  end;
+  assert ok, 'člen jen pro čtení založil cestu';
+  update public.trip_expenses set amount = 1 where trip_id = '77777777-0000-0000-0000-000000000001';
+end $$;
+reset role;
+do $$ begin
+  assert (select amount from public.trip_expenses where description = 'Řízek') = 58464, 'člen jen pro čtení změnil výdaj na cestě';
+end $$;
+-- cizí domácnost nevidí cesty
+select pg_temp.as_user('cccccccc-cccc-cccc-cccc-cccccccccccc');
+do $$ begin
+  assert (select count(*) from public.trips) = 0, 'cizí uživatel vidí cesty';
+end $$;
+reset role;

@@ -1,6 +1,6 @@
 "use client";
 import {
-  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { useEffect, useState } from "react";
 import { formatMoney } from "@/lib/money";
@@ -198,6 +198,32 @@ export function WorkChart({ data }: { data: { label: string; net: number; hours:
           </Bar>
         </BarChart>
       </ResponsiveContainer>
+    </div>
+  );
+}
+
+/** Útrata po dnech cesty, s čarou denního limitu. */
+export function TripDaysChart({ data, limit }: { data: { label: string; amount: number }[]; limit: number | null }) {
+  const { gold } = useAccent();
+  return (
+    <div className="w-full">
+      {limit != null && <Legend items={[{ label: "Utraceno za den", color: gold }, { label: "Denní limit", color: "#8e877b", dashed: true }]} />}
+      <div className="h-48">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={data.map((d) => ({ ...d, limit }))} margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>
+            <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
+            <XAxis dataKey="label" {...AXIS} minTickGap={8} />
+            <YAxis {...AXIS} width={52} tickFormatter={compact} />
+            <Tooltip cursor={{ fill: "rgba(255,255,255,0.04)" }} content={({ active, payload }) => active && payload?.length ? (
+              <TooltipBox title={String(payload[0].payload.label)} rows={[{ label: "Utraceno", value: payload[0].payload.amount, color: gold }, ...(limit != null ? [{ label: "Limit", value: limit, color: "#8e877b" }] : [])]} />
+            ) : null} />
+            <Bar dataKey="amount" radius={[4, 4, 0, 0]} maxBarSize={32}>
+              {data.map((d, i) => <Cell key={i} fill={limit != null && d.amount > limit ? "#e66767" : gold} />)}
+            </Bar>
+            {limit != null && <Line type="monotone" dataKey="limit" stroke="#8e877b" strokeDasharray="4 3" dot={false} isAnimationActive={false} />}
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

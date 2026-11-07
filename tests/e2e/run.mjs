@@ -488,6 +488,63 @@ await page.getByText("Za poslední 3 měsíce zatím nemám žádná data").firs
 await page.getByText("Poslední 3 měsíce", { exact: true }).first().waitFor();
 await page.getByText("Neobvyklé věci").waitFor();
 
+step("cestování: cesta, úsek vlakem, platba, výdaj v eurech, souhrn");
+{
+  const iso = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague" }).format(d);
+  const t0 = iso(new Date());
+  const t2 = iso(new Date(Date.now() + 2 * 86400000));
+  await page.goto(B + "/cestovani");
+  await page.getByText("Žádná naplánovaná cesta").waitFor();
+  await page.getByRole("button", { name: "Nová cesta" }).click();
+  const dlg = page.locator("[role=dialog]");
+  await dlg.getByLabel("Název cesty").fill("Test Vídeň");
+  await dlg.getByLabel("Kam").fill("Vídeň");
+  await dlg.getByLabel("Země").fill("Rakousko");
+  await dlg.getByLabel("Odjezd").fill(t0);
+  await dlg.getByLabel("Návrat").fill(t2);
+  await dlg.getByLabel("Rozpočet celkem").fill("10 000");
+  await dlg.getByLabel("Osob").fill("2");
+  await modalSubmit("Vytvořit cestu");
+  await page.waitForURL(/\/cestovani\/[0-9a-f-]{36}$/, { timeout: 20000 });
+  await page.getByText("Právě jste na cestě").waitFor();
+  await page.getByRole("button", { name: "Přidat úsek" }).click();
+  await dlg.getByLabel("Odkud").fill("Praha");
+  await dlg.getByLabel("Kam").fill("Vídeň");
+  await dlg.getByLabel("Dopravce").fill("RegioJet");
+  await dlg.getByLabel("Cena (Kč)").fill("798");
+  await modalSubmit("Přidat úsek");
+  await toast("Úsek přidán");
+  await page.getByText("RegioJet").first().waitFor();
+  await page.getByRole("link", { name: /IDOS/ }).waitFor();
+  await page.getByText("nezaplaceno").waitFor();
+  await page.getByRole("button", { name: "Zaplaceno" }).click();
+  await modalSubmit("Zapsat výdaj");
+  await toast("Výdaj zapsán k cestě i do výdajů domácnosti");
+  await page.getByText("zaplaceno", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Výdaj", exact: true }).click();
+  await dlg.getByLabel("Za co").fill("Řízek");
+  await dlg.getByLabel("Částka (EUR)").fill("23,20");
+  const rate = dlg.getByLabel(/Kurz/);
+  await page.waitForFunction(() => /kurz ČNB/.test(document.querySelector("[role=dialog]")?.textContent ?? ""), null, { timeout: 15000 });
+  await rate.fill("25,2");
+  await dlg.getByText(/584,64/).waitFor();
+  await modalSubmit("Zapsat výdaj");
+  await toast("Výdaj zapsán");
+  await page.getByText("Zatím utraceno").waitFor();
+  await page.getByText(/23,2 EUR/).first().waitFor();
+  const body = await page.locator("main").innerText();
+  assert.match(body, /1\s383\s*Kč/, "zaplaceno celkem 798 + 584,64 Kč");
+  await page.screenshot({ path: `${SHOTS}/30-cesta.png`, fullPage: true });
+  await page.goto(B + "/transakce");
+  await page.getByText("Test Vídeň: Řízek").first().waitFor();
+  await page.goBack();
+  page.once("dialog", (d) => d.accept());
+  await page.locator("li", { hasText: "Řízek" }).getByRole("button").last().click();
+  await toast("Výdaj smazán a platba stornována");
+  await page.goto(B + "/cestovani?tab=navstivene");
+  await page.getByText("Zatím žádná dokončená cesta").waitFor();
+}
+
 step("vzhled: interiér na pozadí (DEMO)");
 await page.goto(B + "/nastaveni#vzhled");
 const shot = async () => (await page.screenshot({ clip: { x: 1300, y: 940, width: 120, height: 50 } })).toString("base64");
@@ -542,7 +599,7 @@ await op.locator("[role=status]", { hasText: "Tovární reset dokončen" }).firs
 const after = await (await op.request.get(`${B}/api/zaloha`)).json();
 assert.equal(after.tables.transactions.length, 0);
 assert.equal(after.tables.accounts.length, 0);
-assert.equal(after.tables.categories.length, 18, "výchozí kategorie");
+assert.equal(after.tables.categories.length, 19, "výchozí kategorie");
 assert.equal(after.tables.household_settings[0].billing_ico, "27082440", "IČO zůstalo");
 
 assert.deepEqual(errors, [], "chyby v konzoli prohlížeče");
