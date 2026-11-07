@@ -473,7 +473,7 @@ await page.goto(B + "/transakce?zobrazeni=mesice");
 await page.getByText("Předminulý měsíc").waitFor();
 await page.getByText(/až 6 měsíců zpětně/).waitFor();
 
-step("asistent: zápis výdaje, navazující otázka, výhled");
+step("asistent: zápis výdaje, navazující otázka, poslední 3 měsíce");
 await page.goto(B + "/asistent");
 const ask = async (t) => { await page.getByPlaceholder(/Můžeme si dovolit pračku/).fill(t); await page.getByRole("button", { name: "Odeslat" }).click(); };
 await ask("89 kafe");
@@ -483,8 +483,9 @@ await ask("Můžeme si dovolit pračku za 9 000 Kč?");
 await page.getByText(/9\s000\s*Kč/).first().waitFor();
 await ask("A za 900 000?");
 await page.getByText(/Nákup za 900\s000\s*Kč teď ne/).waitFor();
-await ask("Jaký je výhled na 3 měsíce?");
-await page.locator("table").getByText("Pevné platby").first().waitFor();
+await ask("Jak jsme na tom za poslední 3 měsíce?");
+await page.getByText("Za poslední 3 měsíce zatím nemám žádná data").first().waitFor(); // evidence začala dnes
+await page.getByText("Poslední 3 měsíce", { exact: true }).first().waitFor();
 await page.getByText("Neobvyklé věci").waitFor();
 
 step("vzhled: interiér na pozadí (DEMO)");

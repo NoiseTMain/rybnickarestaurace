@@ -1,7 +1,7 @@
 import { requireContext } from "@/lib/context";
 import { loadSnapshot } from "@/lib/data";
 import { buildInsights } from "@/lib/assistant";
-import { anomalies, forecast, savingsTips, weeklySummary, workInsights } from "@/lib/finance/insights";
+import { anomalies, lookback, savingsTips, weeklySummary, workInsights } from "@/lib/finance/insights";
 import { aiEnabled } from "@/lib/ai";
 import { formatMoney } from "@/lib/money";
 import { Card, PageHeader } from "@/components/ui/Card";
@@ -17,7 +17,7 @@ export default async function AssistantPage() {
   const weekly = weeklySummary(s, data);
   const odd = anomalies(s, data);
   const tips = savingsTips(s, data);
-  const fc = data.accounts.length ? forecast(s, data, 3) : null;
+  const lb = lookback(s, data, 3);
   const work = workInsights(data, s.today);
   const fm = (c: number) => formatMoney(c, { decimals: "never" });
   return (
@@ -38,25 +38,35 @@ export default async function AssistantPage() {
         </div>
       </div>
 
-      {fc && (
-        <Card title="Výhled na 3 měsíce" subtitle={`Včetně očekávaných příjmů · ${fc.basis}`}>
-          <div className="-mx-4 overflow-x-auto sm:-mx-5">
-            <table className="w-full min-w-[640px] text-sm">
-              <thead className="text-left text-[11px] uppercase tracking-wider text-ink-3"><tr><th className="px-4 py-2 font-medium sm:px-5">Měsíc</th><th className="text-right font-medium">Příjmy</th><th className="text-right font-medium">Pevné platby</th><th className="text-right font-medium">Běžné výdaje</th><th className="text-right font-medium">Spoření</th><th className="px-4 text-right font-medium sm:px-5">Na konci</th></tr></thead>
-              <tbody className="divide-y divide-white/[0.05]">
-                {fc.months.map((m) => (
-                  <tr key={m.start} className={fc.tightest?.start === m.start ? "bg-white/[0.03]" : ""}>
-                    <td className="px-4 py-2 sm:px-5">{m.label}{fc.tightest?.start === m.start && <span className="ml-2 text-[10px] text-warn">nejtěsnější</span>}</td>
-                    <td className="num text-right text-pos">{fm(m.income)}</td><td className="num text-right">{fm(m.fixed)}</td><td className="num text-right">{fm(m.variable)}</td><td className="num text-right">{fm(m.savings)}</td>
-                    <td className={`num px-4 text-right font-medium sm:px-5 ${m.endBalance < 0 ? "text-neg" : ""}`}>{fm(m.endBalance)}</td>
+      <Card title="Poslední 3 měsíce" subtitle="Skutečné příjmy, výdaje a odložené peníze za uplynulé měsíce">
+        {lb.average ? (
+          <>
+            <div className="-mx-4 overflow-x-auto sm:-mx-5">
+              <table className="w-full min-w-[720px] text-sm">
+                <thead className="text-left text-[11px] uppercase tracking-wider text-ink-3"><tr><th className="px-4 py-2 font-medium sm:px-5">Měsíc</th><th className="text-right font-medium">Příjmy</th><th className="text-right font-medium">Pevné platby</th><th className="text-right font-medium">Běžné výdaje</th><th className="text-right font-medium">Odloženo</th><th className="text-right font-medium">Bilance</th><th className="px-4 text-right font-medium sm:px-5">Zůstatek na konci</th></tr></thead>
+                <tbody className="divide-y divide-white/[0.05]">
+                  {lb.months.map((m) => (
+                    <tr key={m.start}>
+                      <td className="px-4 py-2 sm:px-5">{m.label}</td>
+                      {m.hasData ? <>
+                        <td className="num text-right text-pos">{fm(m.income)}</td><td className="num text-right">{fm(m.fixed)}</td><td className="num text-right">{fm(m.variable)}</td><td className="num text-right">{fm(m.saved)}</td>
+                        <td className={`num text-right font-medium ${m.net < 0 ? "text-neg" : "text-pos"}`}>{m.net > 0 ? "+" : ""}{fm(m.net)}</td>
+                        <td className="num px-4 text-right sm:px-5">{m.endBalance != null ? fm(m.endBalance) : "—"}</td>
+                      </> : <td colSpan={6} className="px-4 text-right text-xs text-ink-3 sm:px-5">bez evidence</td>}
+                    </tr>
+                  ))}
+                  <tr className="bg-white/[0.03] text-ink-2">
+                    <td className="px-4 py-2 text-xs uppercase tracking-wider sm:px-5">Průměr / měsíc</td>
+                    <td className="num text-right">{fm(lb.average.income)}</td><td className="num text-right">{fm(lb.average.fixed)}</td><td className="num text-right">{fm(lb.average.variable)}</td><td className="num text-right">{fm(lb.average.saved)}</td>
+                    <td className="num text-right font-medium">{lb.average.net > 0 ? "+" : ""}{fm(lb.average.net)}</td><td />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="mt-2 text-xs text-ink-3">Odhad. Výchozí stav = předpokládaný zůstatek na konci tohoto měsíce ({fm(s.projectedEndOfMonth)}). Očekávané příjmy se do „bezpečně k utracení“ dál nepočítají.</p>
-        </Card>
-      )}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-2 text-xs text-ink-3">Pevné platby = pravidelné platby a faktury, běžné výdaje = vše ostatní. Podrobnosti po kategoriích najdete v Příjmy a výdaje → Historie měsíců.</p>
+          </>
+        ) : <p className="text-sm text-ink-3">Za uplynulé 3 měsíce zatím nejsou žádná data – evidence začala teprve tento měsíc.</p>}
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card title="Neobvyklé věci" subtitle="Duplicity, výkyvy, předplatné, energie, výplaty">

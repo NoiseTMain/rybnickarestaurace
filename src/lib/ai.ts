@@ -86,7 +86,7 @@ export async function estimateGroceryPrice(name: string, quantity: string | null
 
 export const INTENTS = [
   "afford", "category_spend", "merchant_spend", "what_if", "forecast", "anomalies", "savings_tips", "work", "week", "food",
-  "end_of_month", "invoices", "goals", "payments", "balance", "compare", "add_expense", "weekly_summary", "unknown",
+  "end_of_month", "invoices", "goals", "payments", "balance", "compare", "add_expense", "weekly_summary", "lookback", "unknown",
 ] as const;
 
 const intentSchema = z.object({

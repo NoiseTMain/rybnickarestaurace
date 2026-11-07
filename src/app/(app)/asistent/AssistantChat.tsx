@@ -18,7 +18,7 @@ const SUGGESTIONS = [
   "Můžeme si dovolit koupit sedačku za 15 000 Kč?",
   "Kolik jsme za poslední 3 měsíce utratili v restauracích?",
   "Co když koupíme sedačku za 15 000 Kč na 10 splátek?",
-  "Jaký je výhled na 3 měsíce?",
+  "Jak jsme na tom za poslední 3 měsíce?",
   "Je v našich výdajích něco neobvyklého?",
   "Kde můžeme ušetřit?",
   "Kolik nám zbývá na jídlo?",

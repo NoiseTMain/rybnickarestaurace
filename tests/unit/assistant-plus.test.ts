@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { computeSnapshot, type FinanceData } from "@/lib/finance/snapshot";
 import { answer, parseExpenseDraft } from "@/lib/assistant";
-import { anomalies, forecast, parsePeriod, savingsTips, whatIf } from "@/lib/finance/insights";
+import { anomalies, forecast, lookback, parsePeriod, savingsTips, whatIf } from "@/lib/finance/insights";
 import type { Account, Category, IncomeSource, RecurringPayment, Transaction } from "@/lib/db/types";
 
 const H = "h";
@@ -78,7 +78,22 @@ describe("co kdyby, výhled, anomálie, tipy", () => {
     expect(f.months).toHaveLength(3);
     expect(f.months[0].income).toBe(3_500_000);
     expect(f.months[0].fixed).toBe(1_500_000);
-    expect(answer("Jaký je výhled na 3 měsíce?", s, data).table?.rows).toHaveLength(3);
+    expect(answer("Jaký je výhled na příští 3 měsíce dopředu?", s, data).text).toMatch(/Výhled na 3 měsíce/);
+  });
+  it("poslední 3 měsíce zpětně", () => {
+    const r = lookback(s, data, 3);
+    expect(r.months.map((m) => m.label)).toEqual(["srpen 2026", "září 2026", "říjen 2026"]);
+    const oct = r.months[2];
+    expect(oct.income).toBe(3_500_000);
+    expect(oct.fixed).toBe(1_500_000);
+    expect(oct.variable).toBe(80_000 + 50_000 + 29_900 + 250_000);
+    expect(oct.net).toBe(3_500_000 - 1_500_000 - 409_900);
+    // zůstatek na konci září: 30 000 + 3 × (35 000 − 15 000 − 1 599)
+    expect(r.months[1].endBalance).toBe(3_000_000 + 3 * (3_500_000 - 1_500_000 - 159_900));
+    const a = answer("Jak jsme na tom za poslední 3 měsíce?", s, data);
+    expect(a.table?.rows).toHaveLength(3);
+    expect(a.context?.intent).toBe("lookback");
+    expect(answer("Jaký je výhled na 3 měsíce?", s, data).context?.intent).toBe("lookback");
   });
   it("anomálie: duplicita a neevidované předplatné", () => {
     const a = anomalies(s, data);

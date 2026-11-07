@@ -7,6 +7,7 @@ import type { FinanceData, Snapshot } from "./snapshot";
 import { occurrences, FREQUENCY_PER_MONTH } from "./recurrence";
 
 import { shiftNet } from "./work";
+import { balances } from "./balances";
 
 const posted = (t: Transaction) => t.status === "posted";
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -334,3 +335,39 @@ export function weeklySummary(s: Snapshot, d: FinanceData): { title: string; lin
   return { title: "Týdenní souhrn", lines };
 }
 
+
+// ---------------------------------------------------------------------------
+// Zpětný přehled za poslední celé měsíce
+
+export interface LookbackMonth {
+  start: ISODate;
+  label: string;
+  income: Cents;
+  fixed: Cents;
+  variable: Cents;
+  saved: Cents;
+  net: Cents;
+  endBalance: Cents | null;
+  hasData: boolean;
+}
+
+export function lookback(s: Snapshot, d: FinanceData, months = 3): { months: LookbackMonth[]; average: Omit<LookbackMonth, "start" | "label" | "endBalance" | "hasData"> | null } {
+  const ms = startOfMonth(s.today);
+  const firstOpening = d.accounts.reduce<ISODate | null>((m, a) => (m == null || a.opening_date < m ? a.opening_date : m), null);
+  const out: LookbackMonth[] = [];
+  for (let i = months; i >= 1; i--) {
+    const f = addMonths(ms, -i);
+    const t = endOfMonth(f);
+    const list = d.transactions.filter((x) => posted(x) && x.date >= f && x.date <= t);
+    const income = sum(list.filter((x) => x.type === "income"), (x) => x.amount);
+    const expenses = list.filter((x) => x.type === "expense");
+    const fixed = sum(expenses.filter((x) => x.recurring_payment_id || x.invoice_id), (x) => x.amount);
+    const variable = sum(expenses, (x) => x.amount) - fixed;
+    const saved = sum(d.contributions.filter((c) => c.date >= f && c.date <= t), (c) => c.amount);
+    const endBalance = firstOpening && firstOpening <= t ? balances(d.accounts, d.transactions, t).total : null;
+    out.push({ start: f, label: monthName(f), income, fixed, variable, saved, net: income - fixed - variable, endBalance, hasData: list.length > 0 || endBalance != null });
+  }
+  const withData = out.filter((m) => m.hasData);
+  const avg = (k: "income" | "fixed" | "variable" | "saved" | "net") => divRound(sum(withData, (m) => m[k]), Math.max(1, withData.length));
+  return { months: out, average: withData.length ? { income: avg("income"), fixed: avg("fixed"), variable: avg("variable"), saved: avg("saved"), net: avg("net") } : null };
+}

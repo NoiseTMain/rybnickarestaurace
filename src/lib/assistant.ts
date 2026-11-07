@@ -2,7 +2,7 @@ import { abs, divFloor, divRound, formatMoney as fm, parseMoney, sub, type Cents
 import { diffDays, endOfMonth, endOfWeek, formatDate, minDate, monthName } from "@/lib/dates";
 import type { FinanceData, Snapshot } from "@/lib/finance/snapshot";
 import { checkAffordability } from "@/lib/finance/affordability";
-import { anomalies, findCategory, findMerchant, forecast, parsePeriod, savingsTips, spendIn, weeklySummary, whatIf, workInsights, type ScenarioKind } from "@/lib/finance/insights";
+import { anomalies, findCategory, findMerchant, forecast, lookback, parsePeriod, savingsTips, spendIn, weeklySummary, whatIf, workInsights, type ScenarioKind } from "@/lib/finance/insights";
 import { guessCategoryName } from "@/lib/categorize";
 
 /**
@@ -341,7 +341,8 @@ function baseAnswer(question: string, s: Snapshot, d: FinanceData): AssistantAns
       "Jaké platby nás čekají?",
       "Kolik jsme za poslední 3 měsíce utratili v restauracích?",
       "Co když koupíme sedačku za 15 000 Kč na 10 splátek?",
-      "Jaký je výhled na 3 měsíce?",
+      "Jak jsme na tom za poslední 3 měsíce?",
+      "Jaký je výhled na příští 3 měsíce dopředu?",
       "Je v našich výdajích něco neobvyklého?",
       "Kde můžeme ušetřit?",
       "250 Albert (zapíše výdaj)",
@@ -428,6 +429,23 @@ function whatIfAnswer(question: string, s: Snapshot, d: FinanceData, ctx: Partia
   };
 }
 
+function lookbackAnswer(s: Snapshot, d: FinanceData): AssistantAnswer {
+  const r = lookback(s, d, 3);
+  if (!r.average) return { text: "Za poslední 3 měsíce zatím nemám žádná data – evidence začala teprve tento měsíc.", tone: "neutral", context: { intent: "lookback" } };
+  const best = [...r.months].filter((m) => m.hasData).sort((a, b) => b.net - a.net)[0];
+  const worst = [...r.months].filter((m) => m.hasData).sort((a, b) => a.net - b.net)[0];
+  return {
+    text: `Za poslední 3 měsíce jste průměrně měsíčně získali ${czk(r.average.income)} a utratili ${czk(r.average.fixed + r.average.variable)} – bilance ${r.average.net >= 0 ? "+" : "−"}${czk(Math.abs(r.average.net))} měsíčně.`,
+    table: {
+      head: ["Měsíc", "Příjmy", "Pevné platby", "Běžné výdaje", "Odloženo", "Bilance", "Zůstatek"],
+      rows: r.months.map((m) => m.hasData ? [m.label, czk(m.income), czk(m.fixed), czk(m.variable), czk(m.saved), czk(m.net), m.endBalance != null ? czk(m.endBalance) : "—"] : [m.label, "—", "—", "—", "—", "—", "—"]),
+    },
+    lines: best && worst && best !== worst ? [`Nejlépe: ${best.label} (${czk(best.net)}), nejhůř: ${worst.label} (${czk(worst.net)}).`] : undefined,
+    tone: r.average.net >= 0 ? "positive" : "warning",
+    context: { intent: "lookback" },
+  };
+}
+
 function forecastAnswer(s: Snapshot, d: FinanceData): AssistantAnswer {
   if (!d.accounts.length) return { text: "Pro výhled potřebuji znát účty a zůstatky.", tone: "neutral", needs: { message: "Doplňte účty.", href: "/nastaveni#ucty" } };
   const f = forecast(s, d, 3);
@@ -474,7 +492,8 @@ function tipsAnswer(s: Snapshot, d: FinanceData): AssistantAnswer {
 
 function detectIntent(q: string): string | null {
   if (/(co kdyz|co kdyby|kdyby|kdybychom|na splatky|splatk)/.test(q)) return "what_if";
-  if (/(vyhled|pristi (mesic|mesice)|dopredu|nejtesnej|3 mesice dopredu|tri mesice)/.test(q)) return "forecast";
+  if (/(dopredu|pristi (mesic|mesice)|nasledujici|nejtesnej|predpoved)/.test(q)) return "forecast";
+  if (/(zpet|zpetne|dozadu|poslednich (3|tri) mesic|poslednich mesic|za posledni (3|tri) mesice|vyhled|jak jsme na tom)/.test(q) && !/(utratil|dali|stalo)/.test(q)) return "lookback";
   if (/(neobvykl|divn|podezrel|duplic|dvakrat|zapomenut|predplatn)/.test(q)) return "anomalies";
   if (/(usetrit|uspor|tip|kde.*setrit|jak.*setrit)/.test(q)) return "savings_tips";
   if (/(souhrn|shrnuti|v kostce|prehled tydne)/.test(q)) return "weekly_summary";
@@ -511,6 +530,7 @@ export function answer(question: string, s: Snapshot, d: FinanceData, prev?: Ass
   switch (intent) {
     case "what_if": return whatIfAnswer(question, s, d, ctx);
     case "forecast": return forecastAnswer(s, d);
+    case "lookback": return lookbackAnswer(s, d);
     case "anomalies": return anomaliesAnswer(s, d);
     case "savings_tips": return tipsAnswer(s, d);
     case "weekly_summary": {
