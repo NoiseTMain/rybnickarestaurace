@@ -543,6 +543,10 @@ step("cestování: cesta, úsek vlakem, platba, výdaj v eurech, souhrn");
   await toast("Výdaj smazán a platba stornována");
   await page.goto(B + "/cestovani?tab=navstivene");
   await page.getByText("Zatím žádná dokončená cesta").waitFor();
+  await page.goto(B + "/");
+  await page.getByText("Dnes můžete utratit").waitFor();
+  await page.getByText(/Test Vídeň – 1\. den z 3/).waitFor();
+  await page.getByRole("heading", { name: "Cestování" }).waitFor();
 }
 
 step("vzhled: interiér na pozadí (DEMO)");

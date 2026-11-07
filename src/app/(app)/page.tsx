@@ -15,12 +15,20 @@ import { LinkButton } from "@/components/ui/Button";
 import { BalanceChart, CategoryDonut, IncomeExpenseChart } from "@/components/charts/Charts";
 import { CardLink, InsightItem, KV, Stat } from "@/components/dashboard/bits";
 import { PayOccurrenceButton } from "@/components/forms/PaymentForms";
+import { loadTravel } from "@/lib/travel-data";
+import { effectiveExpenses, summarizeTrip } from "@/lib/finance/travel";
+import { OngoingTripBanner, TravelCard } from "@/components/dashboard/TravelCard";
 
 export const metadata = { title: "Přehled" };
 
 export default async function DashboardPage() {
   const ctx = await requireContext();
-  const { data, snapshot: s, today } = await loadSnapshot(ctx);
+  const [{ data, snapshot: s, today }, travel] = await Promise.all([loadSnapshot(ctx), loadTravel(ctx).catch(() => null)]);
+  const trips = (travel?.trips ?? []).map((trip) => {
+    const legs = travel!.legs.filter((l) => l.trip_id === trip.id);
+    return { trip, legs, s: summarizeTrip(trip, legs, effectiveExpenses(travel!.expenses.filter((e) => e.trip_id === trip.id), data.transactions), today) };
+  });
+  const ongoing = trips.find((t) => t.s.status === "ongoing");
   const catName = (id: string | null) => data.categories.find((c) => c.id === id)?.name ?? "Bez kategorie";
   const firstOpening = data.accounts.reduce((m, a) => (a.opening_date < m ? a.opening_date : m), today);
   const seriesFrom = firstOpening > addDays(today, -89) ? firstOpening : addDays(today, -89);
@@ -47,6 +55,8 @@ export default async function DashboardPage() {
           <Stat big label="Volné k utracení" value={s.planner.safeToSpend} tone="gold" info="Po odečtení závazků do konce měsíce, zbytku rozpočtů, rezervy a plánu spoření." />
         </div>
       </div>
+
+      {ongoing && <OngoingTripBanner item={ongoing} today={today} />}
 
       {s.missing.length > 0 && (
         <Card variant="light">
@@ -219,6 +229,9 @@ export default async function DashboardPage() {
           </div>
         </Card>
 
+        {/* Cestování */}
+        <TravelCard items={trips} today={today} className="md:col-span-2" />
+
         {/* Kategorie */}
         <Card title="Výdaje podle kategorií" subtitle={monthName(today)} className="md:col-span-2">
           <CategoryDonut data={s.month.byCategory.map((c) => ({ name: catName(c.categoryId), amount: c.amount }))} />
@@ -232,9 +245,9 @@ export default async function DashboardPage() {
           </div>
         </Card>
         {/* 10. Finanční cíle */}
-        <Card title="Finanční cíle" action={<CardLink href="/sporeni" />} className="md:col-span-2 xl:col-span-4">
+        <Card title="Finanční cíle" action={<CardLink href="/sporeni" />} className="md:col-span-2">
           {s.goals.progress.length ? (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2">
               {s.goals.progress.slice(0, 4).map((g) => (
                 <div key={g.goal.id} className="rounded-2xl bg-white/[0.04] p-3">
                   <div className="flex items-baseline justify-between gap-2"><span className="truncate text-sm">{g.goal.name}</span><span className="num text-sm text-gold">{g.percent} %</span></div>
