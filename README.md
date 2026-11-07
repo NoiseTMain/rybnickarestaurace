@@ -269,7 +269,7 @@ End-to-end test běží v lokálním režimu (bez Supabase) v dočasné složce;
 
 | Funkce | Proměnné | Bez nich |
 |---|---|---|
-| AI porozumění volně položeným otázkám, AI odhad ceny potravin | `ANTHROPIC_API_KEY` | asistent odpovídá na rozpoznané typy otázek, ceny jen z vaší cenové paměti |
+| AI asistent v chatu (Claude: odpovídá na jakékoli otázky, čísla bere jen z vašich dat přes výpočty aplikace, výdaje zapíše až po potvrzení), AI odhad ceny potravin | `ANTHROPIC_API_KEY` | asistent odpovídá na rozpoznané typy otázek, ceny jen z vaší cenové paměti |
 | Týdenní souhrn jako oznámení na telefon | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET` | týdenní souhrn je vidět v sekci Finanční asistent |
 
 AI nikdy nepočítá peníze: jen převede otázku na strukturovaný dotaz, čísla spočítá aplikace z
