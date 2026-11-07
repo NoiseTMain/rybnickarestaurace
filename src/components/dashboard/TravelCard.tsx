@@ -48,7 +48,8 @@ export function TravelCard({ items, today, className }: { items: TripItem[]; tod
   const finished = items.filter((x) => x.s.status === "finished").sort((a, b) => (b.trip.end_date ?? "").localeCompare(a.trip.end_date ?? ""));
   const spentThisYear = items.filter((x) => (x.trip.start_date ?? "").startsWith(year)).reduce((a, x) => a + x.s.paid, 0);
   const toPay = active.reduce((a, x) => a + x.s.plannedExpenses + x.s.unpaidLegs, 0);
-  const saving = active.reduce((a, x) => a + (x.s.monthlySaving ?? 0), 0);
+  const reserve = active.reduce((a, x) => a + x.s.reserveNow, 0);
+  const saving = active.reduce((a, x) => a + (x.s.monthlyAdd ?? 0), 0);
   const last = finished[0];
   return (
     <Card title="Cestování" subtitle={active.length ? `${active.length} ${active.length === 1 ? "chystaná cesta" : active.length < 5 ? "chystané cesty" : "chystaných cest"}` : "Kam pojedete příště?"} action={<CardLink href="/cestovani" />} className={className}>
@@ -82,7 +83,8 @@ export function TravelCard({ items, today, className }: { items: TripItem[]; tod
           </div>
           <div className="space-y-0.5">
             <KV k="Ještě zaplatit" v={kc(toPay)} />
-            {saving > 0 && <KV k="Odkládat měsíčně" v={<span className="text-gold">{kc(saving)}</span>} />}
+            {reserve > 0 && <KV k="Rezervováno teď" v={kc(reserve)} />}
+            {saving > 0 && <KV k="Přidávat měsíčně" v={<span className="text-gold">{kc(saving)}</span>} />}
             <KV k={`Na cestách v roce ${year}`} v={kc(spentThisYear)} />
             <KV k="Navštíveno" v={`${finished.length} ${finished.length === 1 ? "cesta" : finished.length >= 2 && finished.length < 5 ? "cesty" : "cest"}`} />
             {last && (

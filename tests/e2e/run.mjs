@@ -531,6 +531,7 @@ step("cestování: cesta, úsek vlakem, platba, výdaj v eurech, souhrn");
   await modalSubmit("Zapsat výdaj");
   await toast("Výdaj zapsán");
   await page.getByText("Zatím utraceno").waitFor();
+  await page.getByText(/je teď drženo stranou jako rezerva na cestu/).waitFor();
   await page.getByText(/23,2 EUR/).first().waitFor();
   const body = await page.locator("main").innerText();
   assert.match(body, /1\s383\s*Kč/, "zaplaceno celkem 798 + 584,64 Kč");

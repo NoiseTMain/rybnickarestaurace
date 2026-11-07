@@ -23,6 +23,8 @@ export interface PlannerInput {
   otherBudgetsRemaining: Cents;
   /** Bezpečnostní rezerva na nečekané situace. */
   safetyBuffer: Cents;
+  /** Peníze držené stranou na chystané a probíhající cesty (mimo závazky tohoto měsíce). */
+  tripReserve?: Cents;
   /** Kolik ještě letos v měsíci podle plánu odložit na cíle. */
   savingsPlanRemaining: Cents;
   /** Očekávané příjmy do konce měsíce – pouze informativně. */
@@ -51,7 +53,7 @@ export interface PlannerResult {
 
 export function plan(i: PlannerInput): PlannerResult {
   const available = sub(i.liquidBalance, i.reservedOnLiquid);
-  const commitments = add(i.obligations, i.foodRemaining, i.otherBudgetsRemaining, i.safetyBuffer);
+  const commitments = add(i.obligations, i.foodRemaining, i.otherBudgetsRemaining, i.safetyBuffer, i.tripReserve ?? 0);
   const mustKeep = add(i.reservedOnLiquid, commitments);
   const freeAfterCommitments = sub(available, commitments);
   const safeToSpend = clampZero(sub(freeAfterCommitments, i.savingsPlanRemaining));
@@ -72,6 +74,7 @@ export function plan(i: PlannerInput): PlannerResult {
       { label: "Zbytek rozpočtu na jídlo", amount: i.foodRemaining },
       { label: "Zbytek ostatních rozpočtů", amount: i.otherBudgetsRemaining },
       { label: "Bezpečnostní rezerva", amount: i.safetyBuffer },
+      ...(i.tripReserve ? [{ label: "Rezerva na cesty", amount: i.tripReserve }] : []),
       { label: "Plán spoření tento měsíc", amount: i.savingsPlanRemaining },
     ],
   };

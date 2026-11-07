@@ -8,6 +8,7 @@ import { computeSnapshot } from "@/lib/finance/snapshot";
 import { todayISO } from "@/lib/dates";
 
 export interface FullData extends FinanceData {
+  travel: NonNullable<FinanceData["travel"]>;
   workSettings: WorkSettings | null;
   documents: DocumentRow[];
 }
@@ -20,13 +21,13 @@ export const loadData = cache(async (ctx: AppContext): Promise<FullData> => load
 /** Načtení dat libovolné domácnosti přes zadané úložiště (např. pro plánované souhrny). */
 export async function loadHouseholdData(s: Store, householdId: string): Promise<FullData> {
   const h = { household_id: householdId };
-  const [settings, members, accounts, categories, transactions, recurring, incomeSources, budgets, goals, contributions, invoices, payouts, shifts, purchases, marks, workSettings, documents] =
+  const [settings, members, accounts, categories, transactions, recurring, incomeSources, budgets, goals, contributions, invoices, payouts, shifts, purchases, marks, workSettings, documents, trips, tripLegs, tripExpenses] =
     await Promise.all([
       s.select("household_settings", h), s.select("members", h), s.select("accounts", h), s.select("categories", h),
       s.select("transactions", h), s.select("recurring_payments", h), s.select("income_sources", h), s.select("budgets", h),
       s.select("savings_goals", h), s.select("savings_contributions", h), s.select("invoices", h), s.select("payouts", h),
       s.select("work_shifts", h), s.select("purchases", h), s.select("occurrence_marks", h), s.select("work_settings", h),
-      s.select("documents", h),
+      s.select("documents", h), s.select("trips", h), s.select("trip_legs", h), s.select("trip_expenses", h),
     ]);
   return {
     settings: (settings[0] as HouseholdSettings | undefined) ?? null,
@@ -41,6 +42,11 @@ export async function loadHouseholdData(s: Store, householdId: string): Promise<
     purchases, marks,
     workSettings: workSettings[0] ?? null,
     documents: documents.sort((a, b) => b.created_at.localeCompare(a.created_at)),
+    travel: {
+      trips: trips.sort((a, b) => (b.start_date ?? "9999").localeCompare(a.start_date ?? "9999")),
+      legs: tripLegs.sort((a, b) => a.sort - b.sort || a.created_at.localeCompare(b.created_at)),
+      expenses: tripExpenses.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "") || b.created_at.localeCompare(a.created_at)),
+    },
   };
 }
 

@@ -10,7 +10,7 @@ export type OccurrenceState = "paid" | "paid_untracked" | "skipped" | "due" | "o
 
 export interface PaymentOccurrence {
   key: string;
-  kind: "recurring" | "invoice";
+  kind: "recurring" | "invoice" | "trip";
   refId: string;
   name: string;
   date: ISODate;

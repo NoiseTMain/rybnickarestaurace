@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, CalendarClock, CircleCheck } from "lucide-react";
+import { AlertTriangle, CalendarClock, CircleCheck, Plane } from "lucide-react";
 import { requireContext } from "@/lib/context";
 import { loadSnapshot } from "@/lib/data";
 import { addDays, diffDays, formatDate, monthName } from "@/lib/dates";
@@ -52,7 +52,7 @@ export default async function DashboardPage() {
         </div>
         <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
           <Stat big label="Disponibilní zůstatek" value={s.planner.available} info="Peníze na běžných účtech a v hotovosti mínus částky odložené na cíle. Očekávané příjmy nejsou započteny." />
-          <Stat big label="Volné k utracení" value={s.planner.safeToSpend} tone="gold" info="Po odečtení závazků do konce měsíce, zbytku rozpočtů, rezervy a plánu spoření." />
+          <Stat big label="Volné k utracení" value={s.planner.safeToSpend} tone="gold" info="Po odečtení závazků do konce měsíce (vč. plateb za cesty), zbytku rozpočtů, rezervy, rezervy na cesty a plánu spoření." />
         </div>
       </div>
 
@@ -127,10 +127,10 @@ export default async function DashboardPage() {
                 return (
                   <li key={o.key} className="flex items-center gap-3 rounded-2xl bg-white/[0.04] px-3 py-2.5">
                     <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${o.state === "overdue" ? "bg-neg/20 text-neg" : days <= 3 ? "bg-warn/20 text-warn" : "bg-white/[0.07] text-ink-2"}`}>
-                      <CalendarClock className="h-4 w-4" />
+                      {o.kind === "trip" ? <Plane className="h-4 w-4" /> : <CalendarClock className="h-4 w-4" />}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm">{o.name}</p>
+                      {o.kind === "trip" ? <Link href={`/cestovani/${o.refId}`} className="block truncate text-sm hover:text-gold">{o.name}</Link> : <p className="truncate text-sm">{o.name}</p>}
                       <p className="text-[11px] text-ink-3">{formatDate(o.date, "day")} · {o.state === "overdue" ? "po splatnosti" : days === 0 ? "dnes" : `za ${days} d.`}</p>
                     </div>
                     <Money value={o.amount} className="text-sm" decimals="never" />

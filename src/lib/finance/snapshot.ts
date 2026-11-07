@@ -16,6 +16,7 @@ import { expensesIn, foodCategoryIds, periodStats } from "./period";
 import { plan, type PlannerResult } from "./planner";
 import { FREQUENCY_PER_MONTH } from "./recurrence";
 import { aggregate, inPeriod } from "./work";
+import { travelCommitments, type TravelInput } from "./travel";
 
 export interface FinanceData {
   settings: HouseholdSettings | null;
@@ -33,6 +34,8 @@ export interface FinanceData {
   shifts: WorkShift[];
   purchases: Purchase[];
   marks: OccurrenceMark[];
+  /** Cesty – jejich nezaplacené platby jsou závazky a zbytek rozpočtu se rezervuje. */
+  travel?: TravelInput;
 }
 
 export interface MissingData {
@@ -67,6 +70,8 @@ export interface Snapshot {
   work: { month: ReturnType<typeof aggregate>; lastMonth: ReturnType<typeof aggregate>; expectedPayouts: Payout[]; expectedPayoutTotal: Cents };
   planner: PlannerResult;
   monthlySurplus: { amount: Cents | null; basis: "history" | "plan" | "none"; months: number };
+  /** Rezerva na cesty a o kolik ji měsíčně navyšovat. */
+  travel: { reserve: Cents; monthlyAdd: Cents; obligationsThisMonth: Cents };
   /** Odhad zůstatku na konci měsíce při současném tempu (bez očekávaných příjmů). */
   projectedEndOfMonth: Cents;
   avgDailyVariableSpend: Cents;
@@ -134,7 +139,9 @@ export function computeSnapshot(data: FinanceData, today: ISODate): Snapshot {
   const lookback = addDays(today, -OVERDUE_LOOKBACK_DAYS);
   const rec = recurringOccurrences(data.recurring, data.transactions, data.marks, lookback, addDays(today, 45), today);
   const invObl = invoiceObligations(data.invoices, addDays(today, 45), today);
-  const all = [...rec, ...invObl].sort((a, b) => (a.date < b.date ? -1 : 1));
+  const trips = travelCommitments(data.travel, data.transactions, today, OVERDUE_LOOKBACK_DAYS);
+  const tripObl = trips.obligations.filter((o) => o.date <= addDays(today, 45));
+  const all = [...rec, ...invObl, ...tripObl].sort((a, b) => (a.date < b.date ? -1 : 1));
   const open = (o: PaymentOccurrence) => o.state === "due" || o.state === "overdue" || o.state === "upcoming";
   const obligationsThisMonth = all.filter((o) => o.date <= monthEnd && (o.date >= monthStart || open(o)));
   const unpaidObligationsTotal = sum(obligationsThisMonth.filter(open), (o) => o.amount);
@@ -182,6 +189,7 @@ export function computeSnapshot(data: FinanceData, today: ISODate): Snapshot {
     foodRemaining,
     otherBudgetsRemaining: remainingCategoryBudgets(catBudgets, foodIds),
     safetyBuffer: data.settings?.safety_buffer ?? 0,
+    tripReserve: trips.reserve,
     savingsPlanRemaining: goals.remainingThisMonth,
     expectedIncome: expectedIncomeTotal,
   });
@@ -197,7 +205,7 @@ export function computeSnapshot(data: FinanceData, today: ISODate): Snapshot {
   let monthlySurplus: Snapshot["monthlySurplus"];
   if (fullMonths.length > 0) {
     const net = sum(fullMonths, (m) => sub(m.income, m.expense));
-    monthlySurplus = { amount: sub(divRound(net, fullMonths.length), goals.requiredMonthlyTotal), basis: "history", months: fullMonths.length };
+    monthlySurplus = { amount: sub(sub(divRound(net, fullMonths.length), goals.requiredMonthlyTotal), trips.monthlyAdd), basis: "history", months: fullMonths.length };
   } else {
     const perMonth = (amount: Cents, f: keyof typeof FREQUENCY_PER_MONTH) => {
       const [n, d] = FREQUENCY_PER_MONTH[f];
@@ -207,7 +215,7 @@ export function computeSnapshot(data: FinanceData, today: ISODate): Snapshot {
     if (income > 0) {
       const fixed = sum(data.recurring.filter((r) => r.is_active), (r) => perMonth(r.amount, r.frequency));
       const budgets = add(foodBudget?.amount ?? 0, sum(catBudgets.filter((c) => !foodIds.has(c.budget.category_id ?? "")), (c) => c.budget.amount));
-      monthlySurplus = { amount: sub(sub(sub(income, fixed), budgets), goals.requiredMonthlyTotal), basis: "plan", months: 0 };
+      monthlySurplus = { amount: sub(sub(sub(sub(income, fixed), budgets), goals.requiredMonthlyTotal), trips.monthlyAdd), basis: "plan", months: 0 };
     } else monthlySurplus = { amount: null, basis: "none", months: 0 };
   }
 
@@ -228,5 +236,6 @@ export function computeSnapshot(data: FinanceData, today: ISODate): Snapshot {
     household, categoryBudgets: catBudgets, totalBudget, goals, reservedOnLiquid, obligationsThisMonth, upcoming,
     unpaidObligationsTotal, expectedIncomes, expectedIncomeTotal, invoices, work, planner, monthlySurplus,
     projectedEndOfMonth, avgDailyVariableSpend, missing,
+    travel: { reserve: trips.reserve, monthlyAdd: trips.monthlyAdd, obligationsThisMonth: sum(obligationsThisMonth.filter((o) => o.kind === "trip" && open(o)), (o) => o.amount) },
   };
 }

@@ -66,3 +66,56 @@ describe("cestování", () => {
     expect(r.rates.HUF).toBeCloseTo(0.06512);
   });
 });
+
+import { travelCommitments } from "@/lib/finance/travel";
+import { computeSnapshot, type FinanceData } from "@/lib/finance/snapshot";
+import type { Account } from "@/lib/db/types";
+
+describe("cestování v plánovači", () => {
+  const t = (p: Partial<Trip>): Trip => ({ ...trip, created_at: "2026-11-01T10:00:00Z", ...p });
+
+  it("platby splatné tento měsíc jsou závazky, zbytek se rezervuje postupně do odjezdu", () => {
+    // založeno v listopadu, odjezd v lednu → 3 měsíce; listopad = 1/3 rezervy
+    const tr = t({ start_date: "2027-01-10", end_date: "2027-01-14", budget: 3_000_000 });
+    const legs = [leg({ id: "l1", price: 120_000, depart_date: "2027-01-10" })];
+    const ex = effectiveExpenses([
+      ex_({ status: "planned", kind: "accommodation", amount: 600_000, date: "2026-11-20", description: "Záloha" }),
+      ex_({ status: "paid", kind: "accommodation", amount: 300_000 }),
+    ], []);
+    const s = summarizeTrip(tr, legs, ex, "2026-11-07");
+    expect(s.toCover).toBe(2_700_000);
+    expect(s.dueThisMonth).toBe(600_000);
+    expect(s.reserveNow).toBe(700_000); // (2 700 000 − 600 000) / 3
+    expect(s.monthsLeft).toBe(2);
+    expect(s.monthlyAdd).toBe(700_000);
+    // v měsíci odjezdu je rezervováno vše
+    expect(summarizeTrip(tr, legs, ex, "2027-01-02").reserveNow).toBe(s.toCover - 0 - 120_000 /* jízdenka je v lednu závazek */ - 600_000 /* záloha po splatnosti = závazek */);
+    const c = travelCommitments({ trips: [tr], legs, expenses: [] }, [], "2026-11-07", 45);
+    expect(c.obligations.map((o) => [o.kind, o.date, o.amount])).toEqual([["trip", "2027-01-10", 120_000]]);
+  });
+
+  it("probíhající cesta drží stranou zbytek peněz na útratu", () => {
+    const s = summarizeTrip(trip, [], effectiveExpenses([ex_({ amount: 400_000 })], []), "2026-12-11");
+    expect(s.reserveNow).toBe(600_000);
+    expect(s.monthlyAdd).toBeNull();
+  });
+
+  it("snapshot: cesty snižují Volné k utracení, očekávané příjmy se nemění", () => {
+    const acc: Account = { id: "a", household_id: "h", name: "Účet", kind: "checking", opening_balance: 5_000_000, opening_date: "2026-11-01", include_in_available: true, member_id: null, is_active: true, sort: 0, created_at: "" };
+    const base: FinanceData = { settings: null, members: [], accounts: [acc], categories: [], transactions: [], recurring: [], incomeSources: [], budgets: [], goals: [], contributions: [], invoices: [], payouts: [], shifts: [], purchases: [], marks: [] };
+    const tr = t({ start_date: "2026-12-10", end_date: "2026-12-13", budget: 1_000_000 });
+    const withTrip = { ...base, travel: { trips: [tr], legs: [leg({ id: "l1", trip_id: "t", price: 100_000, depart_date: "2026-11-20" })], expenses: [] } };
+    const a = computeSnapshot(base, "2026-11-07");
+    const b = computeSnapshot(withTrip, "2026-11-07");
+    expect(b.unpaidObligationsTotal - a.unpaidObligationsTotal).toBe(100_000);
+    expect(b.upcoming.some((o) => o.kind === "trip")).toBe(true);
+    expect(b.travel.reserve).toBe(450_000); // (1 000 000 − 100 000) / 2 měsíce
+    expect(a.planner.safeToSpend - b.planner.safeToSpend).toBe(550_000);
+    expect(b.expectedIncomeTotal).toBe(a.expectedIncomeTotal);
+    expect(b.planner.available).toBe(a.planner.available);
+  });
+});
+
+function ex_(p: Partial<TripExpense>): TripExpense {
+  return ex(p);
+}

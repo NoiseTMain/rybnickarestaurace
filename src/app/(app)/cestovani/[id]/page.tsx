@@ -5,7 +5,6 @@ import { canEdit, requireContext } from "@/lib/context";
 import { loadSnapshot } from "@/lib/data";
 import { loadTravel } from "@/lib/travel-data";
 import { carrierSite, connectionLinks, effectiveExpenses, KIND_LABEL, MODE_LABEL, STATUS_LABEL, summarizeTrip } from "@/lib/finance/travel";
-import { checkAffordability } from "@/lib/finance/affordability";
 import { addDays, diffDays, formatDate } from "@/lib/dates";
 import { divFloor, formatMoney, sum } from "@/lib/money";
 import { Card, EmptyState, PageHeader } from "@/components/ui/Card";
@@ -58,7 +57,6 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
     ? data.transactions.filter((t) => t.type === "expense" && t.status === "posted" && !linked.has(t.id) && t.date >= addDays(trip.start_date!, -2) && t.date <= addDays(trip.end_date ?? trip.start_date!, 1))
     : [];
 
-  const afford = s.status !== "finished" && s.toCover > 0 ? checkAffordability({ price: s.toCover, safeToSpend: snapshot.planner.safeToSpend, monthlySurplus: snapshot.monthlySurplus.amount, today }) : null;
 
   const points: MapPoint[] = trip.lat != null ? [{ lat: trip.lat, lon: trip.lon!, label: trip.destination, main: true }] : [];
   const lines: MapLine[] = legs.filter((l) => l.from_lat != null && l.to_lat != null).map((l) => ({ from: [l.from_lat!, l.from_lon!], to: [l.to_lat!, l.to_lon!], mode: l.mode, label: `${MODE_LABEL[l.mode]}${l.carrier ? ` · ${l.carrier}` : ""}: ${l.from_place} → ${l.to_place}` }));
@@ -92,14 +90,19 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
         <Progress value={Math.min(100, (s.total / s.budget) * 100)} marker={Math.min(100, (s.paid / s.budget) * 100)} tone={s.overBudget ? "neg" : "gold"} label={s.overBudget ? `Plán překračuje rozpočet o ${formatMoney(s.total - s.budget, { decimals: "never" })}` : `Rozpočet využit z ${Math.round((s.total / s.budget) * 100)} % (zaplaceno + naplánováno)`} />
       )}
 
-      {afford && (
+      {(s.status === "upcoming" || s.status === "ongoing") && s.toCover > 0 && (
         <Card className="!p-4">
           <div className="flex gap-3">
             <PiggyBank className="mt-0.5 h-5 w-5 shrink-0 text-gold" />
-            <div className="text-sm">
-              <p>{s.status === "ongoing" ? "Do konce cesty počítáte ještě s" : "Do odjezdu je potřeba ještě pokrýt"} <b>{formatMoney(s.toCover, { decimals: "never" })}</b>{s.budget != null ? " (do výše rozpočtu)" : ""}. Bezpečně k utracení teď máte <b>{formatMoney(snapshot.planner.safeToSpend, { decimals: "never" })}</b>.</p>
-              <p className={afford.affordable ? "text-pos" : "text-warn"}>{afford.affordable ? (s.status === "ongoing" ? "Vejde se to – peníze nebudou chybět na nic důležitého." : "Na cestu máte – peníze vám nebudou chybět na nic důležitého.") : `Chybí ${formatMoney(afford.shortfall, { decimals: "never" })}.${afford.affordableFrom ? ` Při současném tempu to půjde od ${formatDate(afford.affordableFrom)}.` : ""}`}</p>
-              {s.monthlySaving != null && s.monthsToSave != null && <p className="text-ink-2">Když budete odkládat <b>{formatMoney(s.monthlySaving, { decimals: "never" })} měsíčně</b> ({s.monthsToSave} {s.monthsToSave === 1 ? "měsíc" : s.monthsToSave < 5 ? "měsíce" : "měsíců"} do odjezdu), máte to pokryté. <Link href="/sporeni" className="text-gold underline">Založit cíl ve Spoření</Link></p>}
+            <div className="space-y-1 text-sm">
+              <p>{s.status === "ongoing" ? "Do konce cesty počítáte ještě s" : "Cesta bude stát ještě"} <b>{formatMoney(s.toCover, { decimals: "never" })}</b>{s.budget != null ? " (do výše rozpočtu)" : ""}. Plánovač s tím počítá:</p>
+              <ul className="space-y-0.5 text-ink-2">
+                {s.dueThisMonth > 0 && <li>• <b className="text-ink">{formatMoney(s.dueThisMonth, { decimals: "never" })}</b> splatné do konce měsíce je v nadcházejících platbách</li>}
+                {s.reserveNow > 0 && <li>• <b className="text-ink">{formatMoney(s.reserveNow, { decimals: "never" })}</b> je teď drženo stranou jako rezerva na cestu</li>}
+                {s.monthlyAdd != null && s.monthlyAdd > 0 && s.monthsLeft != null && <li>• rezerva se bude navyšovat o <b className="gold-text">{formatMoney(s.monthlyAdd, { decimals: "never" })} měsíčně</b> ({s.monthsLeft} {s.monthsLeft === 1 ? "měsíc" : s.monthsLeft < 5 ? "měsíce" : "měsíců"} do odjezdu)</li>}
+              </ul>
+              <p className="text-xs text-ink-3">Obojí je už odečtené od „Volné k utracení“ ({formatMoney(snapshot.planner.safeToSpend, { decimals: "never" })}). Očekávané příjmy se nemění.</p>
+              {snapshot.planner.needToEarn > 0 && <p className="text-warn">Na všechny plány tohoto měsíce teď chybí {formatMoney(snapshot.planner.needToEarn, { decimals: "never" })}.</p>}
             </div>
           </div>
         </Card>

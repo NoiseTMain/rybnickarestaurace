@@ -312,7 +312,7 @@ function listRecords(what: string, env: ToolEnv, n: { catName: (id: string | nul
         return {
           name: t.name, destination: t.destination, country: t.country, start: t.start_date, end: t.end_date, days: x.days, status: x.status, travelers: t.travelers,
           budget_czk: kc(t.budget), paid_czk: kc(x.paid), still_to_pay_czk: kc(x.plannedExpenses + x.unpaidLegs), spending_money_left_czk: kc(x.spendingMoney), per_day_allowance_czk: kc(x.perDayAllowance),
-          per_day_actual_czk: kc(x.perDayActual), monthly_saving_needed_czk: kc(x.monthlySaving),
+          per_day_actual_czk: kc(x.perDayActual), due_this_month_czk: kc(x.dueThisMonth), reserved_now_in_planner_czk: kc(x.reserveNow), add_to_reserve_monthly_czk: kc(x.monthlyAdd),
           route: legs.map((l) => ({ mode: MODE_LABEL[l.mode], carrier: l.carrier, from: l.from_place, to: l.to_place, depart: [l.depart_date, l.depart_time].filter(Boolean).join(" ") || null, price_czk: kc(l.price), km: l.distance_km })),
           spent_by_kind: x.byKind.map((k) => ({ kind: k.label, czk: kc(k.amount) })),
           spent_by_place: x.byPlace.slice(0, 10).map((p) => ({ place: p.place, czk: kc(p.amount) })),

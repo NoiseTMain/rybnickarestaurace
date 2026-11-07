@@ -1,6 +1,7 @@
 import type { Cents } from "@/lib/money";
 import { divFloor, sum } from "@/lib/money";
-import { diffDays, monthsBetween } from "@/lib/dates";
+import { addDays, diffDays, endOfMonth } from "@/lib/dates";
+import type { PaymentOccurrence } from "./obligations";
 import type { Transaction, Trip, TripExpense, TripExpenseKind, TripLeg, TripLegMode } from "@/lib/db/types";
 
 /** Cestování: stav cesty, rozpočet, kolik lze utratit na místě, souhrny po návratu. */
@@ -100,10 +101,24 @@ export interface TripSummary {
   legsByMode: { mode: TripLegMode; label: string; count: number; price: Cents; km: number }[];
   carriers: string[];
   distanceKm: number;
-  /** Do odjezdu: kolik ještě zbývá zaplatit/našetřit a kolik měsíčně. */
+  /** Kolik ještě cesta bude stát nad už zaplacené (do výše rozpočtu, nebo plánu, je-li vyšší). */
   toCover: Cents;
-  monthsToSave: number | null;
-  monthlySaving: Cents | null;
+  /** Naplánované platby a jízdenky splatné do konce tohoto měsíce (počítají se jako závazky). */
+  dueThisMonth: Cents;
+  /** Částka, kterou plánovač teď drží stranou na tuto cestu (mimo závazky tohoto měsíce). */
+  reserveNow: Cents;
+  /** O kolik rezervu navýšit každý další měsíc do odjezdu. */
+  monthlyAdd: Cents | null;
+  /** Celých kalendářních měsíců do měsíce odjezdu. */
+  monthsLeft: number | null;
+}
+
+/** Pořadové číslo kalendářního měsíce (pro počítání měsíců bez ohledu na den). */
+const monthIndex = (d: string) => Number(d.slice(0, 4)) * 12 + Number(d.slice(5, 7)) - 1;
+
+/** Termín platby: u výdaje jeho datum, jinak odjezd; u jízdenky datum odjezdu úseku, jinak odjezd. */
+function dueDate(trip: Trip, own: string | null): string | null {
+  return own ?? trip.start_date;
 }
 
 export function summarizeTrip(trip: Trip, legs: TripLeg[], expenses: EffectiveExpense[], today: string): TripSummary {
@@ -145,8 +160,28 @@ export function summarizeTrip(trip: Trip, legs: TripLeg[], expenses: EffectiveEx
   const daysUntil = status === "upcoming" && trip.start_date ? diffDays(today, trip.start_date) : null;
   const target = Math.max(budget ?? 0, total);
   const toCover = Math.max(0, target - paid);
-  // měsíců do odjezdu (alespoň 1, když se odjíždí ještě tento měsíc)
-  const monthsToSave = status === "upcoming" && trip.start_date ? Math.max(1, monthsBetween(today, trip.start_date)) : null;
+
+  // Plánovač: platby splatné do konce měsíce jsou závazky, zbytek se rezervuje postupně do odjezdu.
+  const monthEnd = endOfMonth(today);
+  const dueThisMonth = status === "ongoing" || status === "upcoming"
+    ? sum(tripObligationItems(trip, legs, expenses, today).filter((o) => o.date <= monthEnd), (o) => o.amount)
+    : 0;
+  const need = Math.max(0, toCover - dueThisMonth);
+  let reserveNow = 0;
+  let monthlyAdd: Cents | null = null;
+  let monthsLeft: number | null = null;
+  if (status === "ongoing") reserveNow = need;
+  else if (status === "upcoming" && trip.start_date) {
+    // rezerva roste rovnoměrně od měsíce založení cesty do měsíce odjezdu (v měsíci odjezdu = celá částka)
+    const created = trip.created_at ? trip.created_at.slice(0, 10) : today;
+    const c = Math.min(monthIndex(created), monthIndex(today));
+    const d = monthIndex(trip.start_date);
+    const m = monthIndex(today);
+    const total_ = Math.max(1, d - c + 1);
+    reserveNow = Math.min(need, Math.ceil((need * (m - c + 1)) / total_));
+    monthsLeft = Math.max(0, d - m);
+    monthlyAdd = monthsLeft > 0 ? Math.ceil((need - reserveNow) / monthsLeft) : 0;
+  }
   return {
     status, days, daysUntil, daysLeft, paid, plannedExpenses, unpaidLegs, total, budget, spendingMoney, perDayAllowance,
     overBudget: budget != null && total > budget,
@@ -161,9 +196,66 @@ export function summarizeTrip(trip: Trip, legs: TripLeg[], expenses: EffectiveEx
     carriers: [...new Set(legs.map((l) => l.carrier).filter((c): c is string => Boolean(c)))],
     distanceKm: [...modes.values()].reduce((a, m) => a + m.km, 0),
     toCover,
-    monthsToSave,
-    monthlySaving: monthsToSave && toCover ? Math.ceil(toCover / monthsToSave) : null,
+    dueThisMonth,
+    reserveNow,
+    monthlyAdd,
+    monthsLeft,
   };
+}
+
+/** Nezaplacené plánované výdaje a jízdenky cesty s termínem platby. */
+function tripObligationItems(trip: Trip, legs: TripLeg[], expenses: EffectiveExpense[], today: string) {
+  const status = tripStatus(trip, today);
+  const out: { key: string; name: string; date: string; amount: Cents }[] = [];
+  for (const e of expenses) {
+    if (e.status !== "planned" || e.value <= 0) continue;
+    const date = dueDate(trip, e.date);
+    if (date) out.push({ key: `trip|exp|${e.id}`, name: `${trip.name}: ${e.description}`, date, amount: e.value });
+  }
+  if (status !== "finished") {
+    const paidLegs = new Set(expenses.map((e) => e.leg_id).filter(Boolean));
+    for (const l of legs) {
+      if (paidLegs.has(l.id) || !l.price) continue;
+      const date = dueDate(trip, l.depart_date);
+      if (date) out.push({ key: `trip|leg|${l.id}`, name: `${trip.name}: ${MODE_LABEL[l.mode]} ${l.from_place} → ${l.to_place}`, date, amount: l.price });
+    }
+  }
+  return out;
+}
+
+export interface TravelInput {
+  trips: Trip[];
+  legs: TripLeg[];
+  expenses: TripExpense[];
+}
+
+/**
+ * Cesty v plánovači domácnosti:
+ *  - nezaplacené plánované výdaje a jízdenky = závazky (nadcházející platby),
+ *  - zbytek rozpočtu cesty = rezerva, která se do odjezdu postupně navyšuje.
+ * Očekávané příjmy se tím nijak nemění – odečítá se jen z peněz, které už na účtech jsou.
+ */
+export function travelCommitments(travel: TravelInput | undefined, transactions: Pick<Transaction, "id" | "status" | "amount">[], today: string, lookbackDays: number) {
+  const obligations: PaymentOccurrence[] = [];
+  let reserve = 0;
+  let monthlyAdd = 0;
+  if (!travel) return { obligations, reserve, monthlyAdd };
+  const from = addDays(today, -lookbackDays);
+  for (const trip of travel.trips) {
+    const legs = travel.legs.filter((l) => l.trip_id === trip.id);
+    const ex = effectiveExpenses(travel.expenses.filter((e) => e.trip_id === trip.id), transactions);
+    const s = summarizeTrip(trip, legs, ex, today);
+    reserve += s.reserveNow;
+    monthlyAdd += s.monthlyAdd ?? 0;
+    for (const o of tripObligationItems(trip, legs, ex, today)) {
+      if (o.date < from) continue;
+      obligations.push({
+        key: o.key, kind: "trip", refId: trip.id, name: o.name, date: o.date, amount: o.amount, categoryId: null, isDebt: false,
+        state: o.date < today ? "overdue" : o.date === today ? "due" : "upcoming", transactionId: null,
+      });
+    }
+  }
+  return { obligations, reserve, monthlyAdd };
 }
 
 
