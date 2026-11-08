@@ -1,6 +1,7 @@
 "use client";
 import { ArrowDown, ArrowUp, Check, Link2, Pencil, Plus, Trash2, Wallet as WalletIcon } from "lucide-react";
 import { MODE_ICON } from "./icons";
+import { queueIfOffline } from "@/lib/offline-queue";
 import { useEffect, useState, useTransition } from "react";
 import { deleteLeg, deleteTrip, deleteTripExpense, getExchangeRate, linkTransactionToTrip, moveLeg, saveLeg, saveTrip, saveTripExpense } from "@/lib/actions/travel";
 import { CARRIERS, CURRENCIES, fuelCost, KIND_LABEL, MODE_LABEL, type Wallet } from "@/lib/finance/travel";
@@ -43,6 +44,15 @@ function TripForm({ initial, onDone }: { initial?: Trip; onDone: () => void }) {
         <MoneyInput name="budget" label="Rozpočet celkem" placeholder="např. 25 000" defaultValue={toInputValue(initial?.budget)} error={fe("budget")} hint="vč. dopravy a ubytování" className="col-span-2" />
         <Input name="travelers" type="number" min={1} max={50} label="Osob" defaultValue={initial?.travelers ?? 1} error={fe("travelers")} />
       </div>
+      <details className="rounded-xl border border-white/10 bg-white/[0.03] p-3" open={Boolean(initial?.category_budgets)}>
+        <summary className="cursor-pointer text-sm text-ink-2">Rozpočet po kategoriích (nepovinné)</summary>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          {(Object.keys(KIND_LABEL) as TripExpenseKind[]).map((k) => (
+            <MoneyInput key={k} name={`budget_${k}`} label={KIND_LABEL[k]} defaultValue={toInputValue(initial?.category_budgets?.[k] ?? null)} error={fe(`budget_${k}`)} />
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-ink-3">Každou kategorii pak hlídáme zvlášť (např. ubytování 8 000, jídlo 6 000).</p>
+      </details>
       <Select name="currency" label="Měna na místě" defaultValue={initial?.currency ?? "EUR"}>
         {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
       </Select>
@@ -152,6 +162,7 @@ export interface ExpenseExtras { people?: TripPerson[]; wallets?: Wallet[] }
 
 export function ExpenseForm({ trip, initial, leg, planned, onDone, people = [], wallets = [] }: { trip: Trip; initial?: TripExpense; leg?: TripLeg; planned?: boolean; onDone: () => void } & ExpenseExtras) {
   const lk = useLookups();
+  const toast = useToast();
   const paying = initial?.status === "planned" && !planned;
   const [status, setStatus] = useState<"planned" | "paid">(paying ? "paid" : initial?.status ?? (planned ? "planned" : "paid"));
   const [currency, setCurrency] = useState(initial?.currency ?? (leg ? "CZK" : trip.currency));
@@ -162,6 +173,26 @@ export function ExpenseForm({ trip, initial, leg, planned, onDone, people = [], 
   const [rateInfo, setRateInfo] = useState<string | null>(null);
   const [recordTx, setRecordTx] = useState(!initial?.transaction_id);
   const [fromCash, setFromCash] = useState(initial?.from_cash ?? false);
+  const [desc, setDesc] = useState(initial?.description ?? (leg ? `${MODE_LABEL[leg.mode]} ${leg.from_place} → ${leg.to_place}` : ""));
+  const [scan, setScan] = useState<string | null>(null);
+  const readReceipt = async (f: File) => {
+    if (!lk.premium) return;
+    setScan("Čtu účtenku…");
+    try {
+      const [{ recognizeText }, { parseReceipt }] = await Promise.all([import("@/lib/ocr-client"), import("@/lib/receipt-parse")]);
+      const r = parseReceipt(await recognizeText(f, (_, label) => setScan(label)));
+      if (r.merchant && !desc) setDesc(r.merchant);
+      if (r.date) setDay(r.date);
+      if (r.currency && (CURRENCIES as readonly string[]).includes(r.currency)) setCurrency(r.currency);
+      if (r.amount != null) {
+        const v = toInputValue(r.amount);
+        if ((r.currency ?? currency) === "CZK") setCzk(v); else setOrig(v);
+      }
+      setScan(r.amount != null ? "Údaje z účtenky doplněny – zkontrolujte je prosím." : "Částku se nepodařilo přečíst – doplňte ji ručně.");
+    } catch {
+      setScan("Účtenku se nepodařilo přečíst – doplňte údaje ručně.");
+    }
+  };
   const [split, setSplit] = useState<string[]>(initial?.split_among ?? people.map((p) => p.id));
   const wallet = wallets.find((w) => w.currency === currency && w.avgRate);
   const me = people.find((p) => p.member_id && lk.members.find((m) => m.id === p.member_id)?.user_id) ?? people[0];
@@ -175,7 +206,7 @@ export function ExpenseForm({ trip, initial, leg, planned, onDone, people = [], 
       if (off) return;
       if (r) { setRate(String(Number(r.rate.toFixed(4))).replace(".", ",")); setRateInfo(`kurz ČNB${r.date ? ` ze dne ${r.date.split("-").reverse().join(". ")}` : ""}`); }
       else setRateInfo("kurz ČNB se nepodařilo načíst – zadejte ho ručně");
-    });
+    }).catch(() => { if (!off) setRateInfo("bez připojení – zadejte kurz ručně"); });
     return () => { off = true; };
   }, [currency, day, initial, lk.today, paying]);
 
@@ -183,7 +214,7 @@ export function ExpenseForm({ trip, initial, leg, planned, onDone, people = [], 
   const effRate = useCash ? wallet!.avgRate! : Number(rate.replace(",", "."));
   const converted = currency !== "CZK" && parseMoney(orig) != null && effRate > 0 ? Math.round((parseMoney(orig) ?? 0) * effRate) : null;
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-4" onSubmit={(e) => { if (!initial && !leg && queueIfOffline(e, "trip_expense", desc || "Výdaj na cestě")) { toast("Jste offline – výdaj uložen v telefonu, odešle se po připojení"); onDone(); } }}>
       {initial && <input type="hidden" name="id" value={initial.id} />}
       <input type="hidden" name="trip_id" value={trip.id} />
       <input type="hidden" name="leg_id" value={initial?.leg_id ?? leg?.id ?? ""} />
@@ -193,7 +224,13 @@ export function ExpenseForm({ trip, initial, leg, planned, onDone, people = [], 
           {(["paid", "planned"] as const).map((s) => <button key={s} type="button" onClick={() => setStatus(s)} aria-pressed={status === s} className={`flex-1 rounded-full px-3 py-1.5 text-sm ${status === s ? "bg-ink font-medium text-base" : "text-ink-2"}`}>{s === "paid" ? "Zaplaceno" : "Plánuji zaplatit"}</button>)}
         </div>
       )}
-      <Input name="description" label="Za co" placeholder="např. Večeře v konobě" defaultValue={initial?.description ?? (leg ? `${MODE_LABEL[leg.mode]} ${leg.from_place} → ${leg.to_place}` : "")} error={fe("description")} required autoFocus={!leg} />
+      {!initial && !leg && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+          <AttachDocument kind="receipt" label="Vyfotit účtenku – údaje doplníme" onFile={(f) => void readReceipt(f)} />
+          {scan && <p className="mt-1 text-xs text-ink-2">{scan}</p>}
+        </div>
+      )}
+      <Input name="description" label="Za co" placeholder="např. Večeře v konobě" value={desc} onChange={(e) => setDesc(e.target.value)} error={fe("description")} required autoFocus={!leg} />
       <div className="grid grid-cols-2 gap-3">
         <Select name="kind" label="Druh" defaultValue={initial?.kind ?? (leg ? "transport" : "food")}>
           {(Object.keys(KIND_LABEL) as TripExpenseKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
@@ -255,7 +292,7 @@ export function ExpenseForm({ trip, initial, leg, planned, onDone, people = [], 
         </div>
       )}
       {(status !== "paid" || initial?.transaction_id || !recordTx || useCash) && <input type="hidden" name="payment_method" value={useCash ? "cash" : "card"} />}
-      <AttachDocument kind="receipt" initialId={initial?.document_id} label="Účtenka / potvrzení" />
+      {(initial || leg) && <AttachDocument kind="receipt" initialId={initial?.document_id} label="Účtenka / potvrzení" />}
       {initial?.transaction_id && <p className="text-xs text-ink-3">Výdaj je propojený s platbou v příjmech a výdajích – změna částky ji upraví také.</p>}
       <FormError error={state.ok ? undefined : state.error} />
       <FormActions pending={pending} onCancel={onDone} submitLabel={paying ? "Zaplatit" : initial ? "Uložit" : status === "planned" ? "Naplánovat" : "Zapsat výdaj"} />

@@ -11,6 +11,7 @@ import { cn } from "@/components/ui/cn";
 import { MOBILE_TABS, NAV } from "./nav";
 import { QuickAdd } from "./QuickAdd";
 import { AccessWatcher } from "./AccessWatcher";
+import { OfflineSync } from "./OfflineSync";
 
 interface ShellProps {
   children: ReactNode;
@@ -88,13 +89,14 @@ export function Shell({ children, email, household, households, mode }: ShellPro
       {mode === "local" && <p className="rounded-xl bg-info/10 px-3 py-2 text-[11px] leading-snug text-info">Lokální režim – data jsou v souboru na tomto počítači. Pro produkci nastavte Supabase.</p>}
       <div className="flex items-center gap-2 px-1">
         <span className="min-w-0 flex-1 truncate text-xs text-ink-3">{email}</span>
-        <form action={signOut}><button className="rounded-full p-2 text-ink-3 hover:bg-white/10 hover:text-ink" aria-label="Odhlásit se" title="Odhlásit se"><LogOut className="h-4 w-4" /></button></form>
+        <form action={signOut} onSubmit={() => navigator.serviceWorker?.controller?.postMessage("clear")}><button className="rounded-full p-2 text-ink-3 hover:bg-white/10 hover:text-ink" aria-label="Odhlásit se" title="Odhlásit se"><LogOut className="h-4 w-4" /></button></form>
       </div>
     </div>
   );
   return (
     <div className="min-h-dvh">
       <AccessWatcher householdId={household.id} />
+      <OfflineSync />
       {/* desktop sidebar */}
       <aside className="glass fixed inset-y-3 left-3 z-30 hidden w-64 flex-col gap-4 rounded-[28px] p-4 lg:flex">
         <Logo />

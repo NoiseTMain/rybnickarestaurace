@@ -22,6 +22,8 @@ import { DashboardMode } from "@/components/dashboard/DashboardMode";
 import { DASH_COOKIE } from "@/lib/dashboard-mode";
 import { cookies } from "next/headers";
 import { getPremium } from "@/lib/premium";
+import { monthlyClosing } from "@/lib/finance/closing";
+import { addMonths as addM, startOfMonth as som } from "@/lib/dates";
 
 export const metadata = { title: "Přehled" };
 
@@ -68,12 +70,25 @@ export default async function DashboardPage() {
       </div>
     </Card>
   );
+  const closing = Number(today.slice(8)) <= 7 ? monthlyClosing(data, addM(som(today), -1)) : null;
+  const closingBlock = closing && closing.txCount > 0 && (
+    <Card className="!p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1 text-sm">
+          <p className="text-[11px] uppercase tracking-wider text-ink-3">Uzávěrka – {closing.label}</p>
+          {premium.household ? <p className={closing.verdict.tone === "positive" ? "text-pos" : closing.verdict.tone === "warning" ? "text-warn" : ""}>{closing.verdict.text} {closing.highlights[0] ?? ""}</p> : <p className="text-ink-2">Podívejte se, jak jste minulý měsíc dopadli – měsíční uzávěrka je součástí Premium.</p>}
+        </div>
+        <Link href={premium.household ? "/uzaverka" : "/premium"} className="rounded-full bg-gold/90 px-3 py-1.5 text-xs font-medium text-[#1b1407]">{premium.household ? "Celá uzávěrka" : "Premium"}</Link>
+      </div>
+    </Card>
+  );
   if (mode === "simple") {
     return (
       <div className="space-y-4">
         {greetingBlock}
         {ongoing && <OngoingTripBanner item={ongoing} today={today} />}
         {missingBlock}
+        {closingBlock}
         <SimpleDashboard s={s} today={today} insights={insights} categories={s.month.byCategory.map((c) => ({ name: catName(c.categoryId), amount: c.amount }))}
           extra={premium.household && trips.some((t) => t.s.status === "upcoming" || t.s.status === "ongoing") ? <TravelCard items={trips} today={today} /> : null} />
       </div>
@@ -97,6 +112,7 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      {closingBlock}
       {ongoing && <OngoingTripBanner item={ongoing} today={today} />}
 
       {s.missing.length > 0 && (

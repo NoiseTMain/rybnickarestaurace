@@ -26,6 +26,8 @@ async function geo(place: string | null) {
 const tripSchema = z.object({
   id: optionalUuid(), name: text(120), destination: text(120), country: optText(60), start_date: optionalDate(), end_date: optionalDate(),
   travelers: int(1, 50), budget: optionalMoney(), currency: currency(), note: optText(2000),
+  budget_transport: optionalMoney(), budget_accommodation: optionalMoney(), budget_food: optionalMoney(),
+  budget_activities: optionalMoney(), budget_shopping: optionalMoney(), budget_other: optionalMoney(),
 }).refine((t) => !t.end_date || !t.start_date || t.end_date >= t.start_date, { message: "Návrat musí být po odjezdu", path: ["end_date"] })
   .refine((t) => !t.end_date || t.start_date, { message: "Zadejte i datum odjezdu", path: ["start_date"] });
 
@@ -34,7 +36,9 @@ export async function saveTrip(_: ActionResult, fd: FormData): Promise<ActionRes
     { const err = await premiumError(ctx, "Cestování"); if (err) return fail(err); }
     const p = parse(tripSchema, fd);
     if (!p.ok) return p.result;
-    const { id, ...row } = p.data;
+    const { id, budget_transport, budget_accommodation, budget_food, budget_activities, budget_shopping, budget_other, ...base } = p.data;
+    const cb = Object.fromEntries(Object.entries({ transport: budget_transport, accommodation: budget_accommodation, food: budget_food, activities: budget_activities, shopping: budget_shopping, other: budget_other }).filter(([, v]) => v != null && v > 0));
+    const row = { ...base, category_budgets: Object.keys(cb).length ? cb : null };
     const h = ctx.household.id;
     if (id) {
       const old = (await own(ctx, "trips", id)) as Trip;
@@ -593,5 +597,51 @@ export async function linkSuggestedTransactions(tripId: string): Promise<ActionR
       paid_by: null, split_among: null, from_cash: false, document_id: null,
     })));
     return done(`Přiřazeno ${list.length} plateb`);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Účet účastníka (QR platba), vyrovnání, sdílení
+
+export async function updateTripPerson(id: string, name: string, account: string): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    await own(ctx, "trip_people", id);
+    const n = String(name).trim().slice(0, 60);
+    if (!n) return fail("Zadejte jméno.");
+    const acc = String(account ?? "").trim();
+    const { normalizeIban } = await import("@/lib/qr-payment");
+    if (acc && !normalizeIban(acc)) return fail("Neplatné číslo účtu – zadejte např. 123456789/0800 nebo IBAN.");
+    await ctx.store.update("trip_people", { id, household_id: ctx.household.id }, { name: n, account: acc ? acc.slice(0, 40) : null });
+    return done("Uloženo");
+  });
+}
+
+export async function markSettled(tripId: string, from: string, to: string, amount: number): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    { const err = await premiumError(ctx, "Cestování"); if (err) return fail(err); }
+    await Promise.all([own(ctx, "trips", tripId), own(ctx, "trip_people", from), own(ctx, "trip_people", to)]);
+    if (!Number.isSafeInteger(amount) || amount <= 0) return fail("Neplatná částka.");
+    await ctx.store.insert("trip_settlements", [{ household_id: ctx.household.id, trip_id: tripId, from_person: from, to_person: to, amount, date: todayISO() }]);
+    return done("Označeno jako vyrovnané");
+  });
+}
+
+export async function deleteSettlement(id: string): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    await own(ctx, "trip_settlements", id);
+    await ctx.store.remove("trip_settlements", { id, household_id: ctx.household.id });
+    return done("Vyrovnání vráceno");
+  });
+}
+
+/** Zapne/vypne veřejný odkaz jen pro čtení (trasa, program, kdo komu dluží). */
+export async function setTripShare(tripId: string, enable: boolean): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    if (enable) { const err = await premiumError(ctx, "Sdílení cesty"); if (err) return fail(err); }
+    await own(ctx, "trips", tripId);
+    const { randomBytes } = await import("node:crypto");
+    const token = enable ? randomBytes(18).toString("base64url") : null;
+    await ctx.store.update("trips", { id: tripId, household_id: ctx.household.id }, { share_token: token });
+    return done(enable ? "Odkaz pro sdílení vytvořen" : "Sdílení vypnuto – starý odkaz už nefunguje", token ?? undefined);
   });
 }

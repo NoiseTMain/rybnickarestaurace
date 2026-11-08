@@ -102,7 +102,7 @@ export function BankImport({ onDone }: { onDone: () => void }) {
       amount: guess(h, [/^(castka|objem|amount)$/, /castka|objem|amount/]),
       credit: -1, debit: -1,
       description: guess(h, [/zprava pro prijemce/, /popis/, /poznamka/, /description|message/]),
-      counterparty: guess(h, [/nazev protiuctu/, /protistrana|nazev uctu|counterparty|obchodnik/]),
+      counterparty: guess(h, [/nazev protiuctu/, /^nazev protistrany$/, /protistran|nazev uctu|counterparty|obchodnik/]),
       reference: guess(h, [/^vs$|variabilni/]),
     });
   }

@@ -411,6 +411,20 @@ export interface Trip {
   lon: number | null;
   note: string | null;
   goal_id: string | null;
+  share_token?: string | null;
+  /** Rozpočet po druzích výdajů (haléře). */
+  category_budgets?: Partial<Record<TripExpenseKind, number>> | null;
+  created_at: string;
+}
+
+export interface TripSettlement {
+  id: string;
+  household_id: string;
+  trip_id: string;
+  from_person: string;
+  to_person: string;
+  amount: Cents;
+  date: ISODate;
   created_at: string;
 }
 
@@ -420,6 +434,8 @@ export interface TripPerson {
   trip_id: string;
   name: string;
   member_id: string | null;
+  /** Číslo účtu / IBAN pro QR platbu při vyrovnání. */
+  account?: string | null;
   sort: number;
   created_at: string;
 }
@@ -603,6 +619,7 @@ export interface Tables {
   trip_checklist: TripChecklistItem;
   trip_plan_items: TripPlanItem;
   trip_notifications: TripNotification;
+  trip_settlements: TripSettlement;
   push_subscriptions: PushSubscriptionRow;
   subscriptions: Subscription;
   admin_audit: AdminAudit;
@@ -640,6 +657,7 @@ export const HOUSEHOLD_TABLES = [
   "transactions",
   "trip_expenses",
   "trip_cash_moves",
+  "trip_settlements",
 ] as const satisfies readonly TableName[];
 
 export type HouseholdTable = (typeof HOUSEHOLD_TABLES)[number];
@@ -665,4 +683,5 @@ export const MONEY_COLUMNS: Partial<Record<TableName, string[]>> = {
   trip_legs: ["price"],
   trip_expenses: ["amount", "amount_original", "rate"],
   trip_cash_moves: ["amount", "amount_original", "rate"],
+  trip_settlements: ["amount"],
 };

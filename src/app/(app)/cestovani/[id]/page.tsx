@@ -5,7 +5,7 @@ import { canEdit, requireContext } from "@/lib/context";
 import { getPremium } from "@/lib/premium";
 import { PremiumWall } from "@/components/premium/PremiumWall";
 import { loadSnapshot } from "@/lib/data";
-import { carrierSite, connectionLinks, effectiveExpenses, KIND_LABEL, MODE_LABEL, settle, STATUS_LABEL, suggestTripTransactions, summarizeTrip, wallets } from "@/lib/finance/travel";
+import { carrierSite, categoryBudgetStatus, connectionLinks, effectiveExpenses, KIND_LABEL, MODE_LABEL, settle, STATUS_LABEL, suggestTripTransactions, summarizeTrip, wallets } from "@/lib/finance/travel";
 import { addDays, diffDays, formatDate } from "@/lib/dates";
 import { divFloor, formatMoney, sum } from "@/lib/money";
 import { Card, EmptyState, PageHeader } from "@/components/ui/Card";
@@ -16,7 +16,8 @@ import { ReadOnlyNotice } from "@/components/ui/ReadOnlyNotice";
 import { FilterTabs } from "@/components/lists/Filters";
 import { CategoryDonut, TripDaysChart } from "@/components/charts/Charts";
 import { DeleteExpenseButton, DeleteTripButton, ExpenseButton, LegActions, LegButton, LinkTxRow, TripButton } from "@/components/travel/TripForms";
-import { CashButton, Checklist, DeleteCashButton, DeletePlanButton, DetachDocButton, DuplicateTripButton, GoalButton, LinkSuggestedButton, PeopleEditor, PlanButton, TripDocUpload } from "@/components/travel/TripExtras";
+import { CashButton, Checklist, DeleteCashButton, DeletePlanButton, DetachDocButton, DuplicateTripButton, GoalButton, LinkSuggestedButton, PeopleEditor, PlanButton, SettleActions, ShareTrip, TripDocUpload, UndoSettlementButton } from "@/components/travel/TripExtras";
+import { normalizeIban } from "@/lib/qr-payment";
 import { MODE_ICON } from "@/components/travel/icons";
 import { TripMap, type MapLine, type MapPoint } from "@/components/travel/TripMap";
 
@@ -71,7 +72,9 @@ export default async function TripPage({ params, searchParams }: { params: Promi
   const suggestedCount = candidates.filter((c) => c.suggested).length;
 
   const docs = data.documents.filter((d) => d.trip_id === id || legs.some((l) => l.document_id === d.id) || expenses.some((e) => e.document_id === d.id));
-  const settlement = people.length >= 2 ? settle(people, expenses) : null;
+  const doneSettlements = tr.settlements.filter((x) => x.trip_id === id);
+  const settlement = people.length >= 2 ? settle(people, expenses, doneSettlements) : null;
+  const kindBudgets = categoryBudgetStatus(trip, legs, expenses);
 
   const points: MapPoint[] = trip.lat != null ? [{ lat: trip.lat, lon: trip.lon!, label: trip.destination, main: true }] : [];
   const lines: MapLine[] = legs.filter((l) => l.from_lat != null && l.to_lat != null).map((l) => ({ from: [l.from_lat!, l.from_lon!], to: [l.to_lat!, l.to_lon!], mode: l.mode, polyline: l.route_polyline, label: `${MODE_LABEL[l.mode]}${l.carrier ? ` · ${l.carrier}` : ""}: ${l.from_place} → ${l.to_place}` }));
@@ -174,7 +177,22 @@ export default async function TripPage({ params, searchParams }: { params: Promi
                     <thead className="text-xs text-ink-3"><tr><th className="text-left font-medium">Kdo</th><th className="text-right font-medium">Zaplatil</th><th className="text-right font-medium">Jeho podíl</th><th className="text-right font-medium">Rozdíl</th></tr></thead>
                     <tbody>{settlement.balances.map((b) => <tr key={b.personId} className="border-t border-white/[0.06]"><td className="py-1.5">{b.name}</td><td className="num text-right">{kc(b.paid)}</td><td className="num text-right">{kc(b.share)}</td><td className={`num text-right ${b.balance > 0 ? "text-pos" : b.balance < 0 ? "text-neg" : ""}`}>{formatMoney(b.balance, { decimals: "never", sign: true })}</td></tr>)}</tbody>
                   </table>
-                  {settlement.transfers.map((t) => <p key={`${t.from}-${t.to}`} className="flex items-center gap-2 rounded-xl bg-gold/10 px-3 py-2 text-sm"><b>{t.fromName}</b><ArrowRight className="h-4 w-4 text-gold" /><b>{t.toName}</b><span className="num ml-auto font-semibold">{formatMoney(t.amount)}</span></p>)}
+                  {settlement.transfers.map((t) => {
+                    const acc = people.find((p) => p.id === t.to)?.account;
+                    return (
+                      <div key={`${t.from}-${t.to}`} className="flex flex-wrap items-center gap-2 rounded-xl bg-gold/10 px-3 py-2 text-sm">
+                        <b>{t.fromName}</b><ArrowRight className="h-4 w-4 text-gold" /><b>{t.toName}</b><span className="num ml-auto font-semibold">{formatMoney(t.amount)}</span>
+                        <SettleActions tripId={trip.id} from={t.from} to={t.to} amount={t.amount} iban={acc ? normalizeIban(acc) : null} message={`${trip.name} vyrovnani`} edit={edit} />
+                      </div>
+                    );
+                  })}
+                  {doneSettlements.length > 0 && (
+                    <div className="text-xs text-ink-3">
+                      <p className="mb-1 uppercase tracking-wider">Už vyrovnáno</p>
+                      {doneSettlements.map((d) => <p key={d.id} className="flex items-center gap-2"><span className="flex-1">{personName(d.from_person)} → {personName(d.to_person)} · {formatDate(d.date)}</span><span className="num">{formatMoney(d.amount)}</span>{edit && <UndoSettlementButton id={d.id} />}</p>)}
+                    </div>
+                  )}
+                  {people.length > 0 && !people.some((p) => p.account) && settlement.transfers.length > 0 && <p className="text-xs text-ink-3">Tip: klikněte na jméno účastníka a doplňte číslo účtu – u převodu se pak ukáže QR kód pro platbu.</p>}
                   {settlement.unassigned > 0 && <p className="text-xs text-ink-3">{kc(settlement.unassigned)} je bez uvedeného plátce – do vyrovnání se nepočítá.</p>}
                 </div>
               )}
@@ -198,6 +216,20 @@ export default async function TripPage({ params, searchParams }: { params: Promi
               ) : <p className="text-sm text-ink-3">Vyměnili jste peníze nebo vybrali z bankomatu? Zapište to sem – hotovostní platby pak půjdou z peněženky a nezapočítají se dvakrát.</p>}
             </Card>
           </div>
+          {kindBudgets.length > 0 && (
+            <Card title="Rozpočet po kategoriích" subtitle="Zaplaceno + naplánováno proti limitu">
+              <div className="grid gap-3 sm:grid-cols-2">
+                {kindBudgets.map((k) => (
+                  <div key={k.kind} className="text-sm">
+                    <div className="flex justify-between"><span>{k.label}</span><span className={k.over ? "text-neg" : "text-ink-2"}>{kc(k.spent + k.planned)} / {kc(k.budget)}</span></div>
+                    <Progress className="mt-1" value={Math.min(100, ((k.spent + k.planned) / k.budget) * 100)} marker={Math.min(100, (k.spent / k.budget) * 100)} tone={k.over ? "neg" : "gold"} label={k.label} />
+                    <p className={`mt-0.5 text-xs ${k.over ? "text-neg" : "text-ink-3"}`}>{k.over ? `přes limit o ${kc(-k.left)}` : `zbývá ${kc(k.left)}`}</p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+          {edit && <Card title="Sdílet cestu" subtitle="Odkaz jen pro čtení pro spolucestující"><ShareTrip tripId={trip.id} token={trip.share_token ?? null} /></Card>}
           {paid.length > 0 && <p className="text-sm text-ink-2">Utraceno zatím {kc(s.paid)}{s.perDayActual != null ? ` · ${kc(s.perDayActual)} na den` : ""}. <Link href="?tab=souhrn" className="text-gold underline">Grafy a souhrn</Link></p>}
         </>
       )}

@@ -2,7 +2,7 @@ import type { Cents } from "@/lib/money";
 import { divFloor, sum } from "@/lib/money";
 import { addDays, diffDays, endOfMonth } from "@/lib/dates";
 import type { PaymentOccurrence } from "./obligations";
-import type { Transaction, Trip, TripCashMove, TripChecklistItem, TripExpense, TripExpenseKind, TripLeg, TripLegMode, TripPerson, TripPlanItem } from "@/lib/db/types";
+import type { Transaction, Trip, TripCashMove, TripChecklistItem, TripExpense, TripExpenseKind, TripLeg, TripLegMode, TripPerson, TripPlanItem, TripSettlement } from "@/lib/db/types";
 
 /** Cestování: stav cesty, rozpočet, kolik lze utratit na místě, souhrny po návratu. */
 
@@ -239,6 +239,7 @@ export interface TravelInput {
   cash?: TripCashMove[];
   checklist?: TripChecklistItem[];
   plan?: TripPlanItem[];
+  settlements?: TripSettlement[];
 }
 
 /**
@@ -345,7 +346,7 @@ export interface Settlement {
   unassigned: Cents;
 }
 
-export function settle(people: TripPerson[], expenses: EffectiveExpense[]): Settlement {
+export function settle(people: TripPerson[], expenses: EffectiveExpense[], done: Pick<TripSettlement, "from_person" | "to_person" | "amount">[] = []): Settlement {
   const ids = new Set(people.map((p) => p.id));
   const paid = new Map<string, number>();
   const share = new Map<string, number>();
@@ -363,7 +364,14 @@ export function settle(people: TripPerson[], expenses: EffectiveExpense[]): Sett
       if (rest > 0) rest--;
     }
   }
-  const balances = people.map((p) => ({ personId: p.id, name: p.name, paid: paid.get(p.id) ?? 0, share: share.get(p.id) ?? 0, balance: (paid.get(p.id) ?? 0) - (share.get(p.id) ?? 0) }));
+  // už provedené vyrovnání: kdo poslal peníze, tomu se dluh snižuje
+  const sent = new Map<string, number>();
+  for (const s of done) {
+    if (!ids.has(s.from_person) || !ids.has(s.to_person)) continue;
+    sent.set(s.from_person, (sent.get(s.from_person) ?? 0) + s.amount);
+    sent.set(s.to_person, (sent.get(s.to_person) ?? 0) - s.amount);
+  }
+  const balances = people.map((p) => ({ personId: p.id, name: p.name, paid: paid.get(p.id) ?? 0, share: share.get(p.id) ?? 0, balance: (paid.get(p.id) ?? 0) - (share.get(p.id) ?? 0) + (sent.get(p.id) ?? 0) }));
   // minimum převodů: největší dlužník platí největšímu věřiteli
   const debtors = balances.filter((b) => b.balance < 0).map((b) => ({ ...b, left: -b.balance })).sort((a, b) => b.left - a.left);
   const creditors = balances.filter((b) => b.balance > 0).map((b) => ({ ...b, left: b.balance })).sort((a, b) => b.left - a.left);
@@ -482,6 +490,26 @@ export function decodePolyline(str: string): [number, number][] {
       if (which === 0) lat += d; else lon += d;
     }
     out.push([lat / 1e5, lon / 1e5]);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Rozpočet po kategoriích
+
+export interface KindBudget { kind: TripExpenseKind; label: string; budget: Cents; spent: Cents; planned: Cents; left: Cents; over: boolean }
+
+export function categoryBudgetStatus(trip: Pick<Trip, "category_budgets">, legs: TripLeg[], expenses: EffectiveExpense[]): KindBudget[] {
+  const b = trip.category_budgets ?? {};
+  const paidLegs = new Set(expenses.map((e) => e.leg_id).filter(Boolean));
+  const out: KindBudget[] = [];
+  for (const kind of Object.keys(KIND_LABEL) as TripExpenseKind[]) {
+    const budget = b[kind];
+    if (!budget) continue;
+    const spent = sum(expenses.filter((e) => e.kind === kind && e.status === "paid"), (e) => e.value);
+    const planned = sum(expenses.filter((e) => e.kind === kind && e.status === "planned"), (e) => e.value)
+      + (kind === "transport" ? sum(legs.filter((l) => !paidLegs.has(l.id)), (l) => l.price ?? 0) : 0);
+    out.push({ kind, label: KIND_LABEL[kind], budget, spent, planned, left: budget - spent - planned, over: spent + planned > budget });
   }
   return out;
 }

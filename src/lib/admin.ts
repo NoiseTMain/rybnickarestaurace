@@ -2,7 +2,7 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import { appMode, publicEnv } from "@/lib/env";
-import type { AdminAudit, Subscription } from "@/lib/db/types";
+import type { AdminAudit, Subscription, Transaction, Trip, TripExpense, TripLeg, TripPerson, TripPlanItem, TripSettlement } from "@/lib/db/types";
 
 /**
  * Serverový přístup napříč všemi uživateli – jen pro administraci, webhook plateb a plánované úlohy.
@@ -30,7 +30,19 @@ export interface AdminHousehold {
   lastActivity: string | null;
 }
 
+export interface SharedTrip {
+  trip: Trip;
+  legs: TripLeg[];
+  plan: TripPlanItem[];
+  people: TripPerson[];
+  expenses: TripExpense[];
+  settlements: TripSettlement[];
+  transactions: Pick<Transaction, "id" | "status" | "amount">[];
+}
+
 export interface AdminBackend {
+  /** Cesta podle tokenu ze sdíleného odkazu (jen pro čtení). */
+  sharedTrip(token: string): Promise<SharedTrip | null>;
   listUsers(): Promise<AdminUser[]>;
   findUserByEmail(email: string): Promise<AdminUser | null>;
   subscriptions(): Promise<Subscription[]>;
@@ -77,6 +89,20 @@ function supabaseBackend(): AdminBackend {
     return out;
   };
   return {
+    async sharedTrip(token) {
+      if (!/^[A-Za-z0-9_-]{20,64}$/.test(token)) return null;
+      const { data: trip } = await db.from("trips").select("*").eq("share_token", token).maybeSingle();
+      if (!trip) return null;
+      const q = async <T>(table: string) => ((await db.from(table).select("*").eq("trip_id", trip.id)).data ?? []) as T[];
+      const [legs, plan, people, expenses, settlements] = await Promise.all([q<TripLeg>("trip_legs"), q<TripPlanItem>("trip_plan_items"), q<TripPerson>("trip_people"), q<TripExpense>("trip_expenses"), q<TripSettlement>("trip_settlements")]);
+      const ids = expenses.map((e) => e.transaction_id).filter((x): x is string => Boolean(x));
+      const txs = ids.length ? ((await db.from("transactions").select("id,status,amount").in("id", ids)).data ?? []) : [];
+      const num = <T extends object>(rows: T[], cols: string[]) => rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, cols.includes(k) && v != null ? Number(v) : v])) as T);
+      return {
+        trip: num([trip as Trip], ["budget"])[0], legs: num(legs, ["price"]).sort((a, b) => a.sort - b.sort), plan, people: people.sort((a, b) => a.sort - b.sort),
+        expenses: num(expenses, ["amount", "amount_original", "rate"]), settlements: num(settlements, ["amount"]), transactions: num(txs as Transaction[], ["amount"]),
+      };
+    },
     async listUsers() {
       const users: AdminUser[] = [];
       for (let page = 1; page < 100; page++) {
@@ -171,6 +197,18 @@ async function localBackend(): Promise<AdminBackend> {
   type Any = Record<string, unknown>;
   const t = (d: { tables: Record<string, unknown[] | undefined> }, name: string) => ((d.tables[name] ??= []) as Any[]);
   const backend: AdminBackend = {
+    sharedTrip: (token) => readLocal((d) => {
+      const trip = t(d as never, "trips").find((x) => x.share_token === token) as unknown as Trip | undefined;
+      if (!trip || !/^[A-Za-z0-9_-]{20,64}$/.test(token)) return null;
+      const of = <T>(n: string) => t(d as never, n).filter((r) => r.trip_id === trip.id).map((r) => ({ ...r })) as unknown as T[];
+      const expenses = of<TripExpense>("trip_expenses");
+      const ids = new Set(expenses.map((e) => e.transaction_id));
+      return {
+        trip: { ...trip }, legs: of<TripLeg>("trip_legs").sort((a, b) => a.sort - b.sort), plan: of<TripPlanItem>("trip_plan_items"), people: of<TripPerson>("trip_people"), expenses,
+        settlements: of<TripSettlement>("trip_settlements"),
+        transactions: t(d as never, "transactions").filter((x) => ids.has(x.id as string)).map((x) => ({ id: x.id, status: x.status, amount: x.amount })) as never,
+      };
+    }),
     listUsers: () => readLocal((d) => d.users.map((u) => ({ id: u.id, email: u.email, created_at: u.created_at, last_sign_in_at: (u as unknown as Any).last_sign_in_at as string ?? null, confirmed: true, banned: Boolean((u as unknown as Any).banned) }))),
     async findUserByEmail(email) {
       return (await backend.listUsers()).find((u) => u.email.toLowerCase() === email.toLowerCase()) ?? null;

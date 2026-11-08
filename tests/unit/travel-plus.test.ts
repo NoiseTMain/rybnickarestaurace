@@ -80,3 +80,28 @@ describe("upozornění", () => {
     expect(travelAlerts(data, "2026-12-10")).toEqual([]);
   });
 });
+
+import { categoryBudgetStatus } from "@/lib/finance/travel";
+import { monthlyClosing } from "@/lib/finance/closing";
+
+describe("cestování 3 a uzávěrka", () => {
+  it("vyrovnání odečte už zaplacené převody", () => {
+    const A = person("a", "Petra"), B = person("b", "Tomáš");
+    const e = effectiveExpenses([ex({ paid_by: "a", amount: 100_000 })], []);
+    expect(settle([A, B], e).transfers[0].amount).toBe(50_000);
+    expect(settle([A, B], e, [{ from_person: "b", to_person: "a", amount: 20_000 }]).transfers[0].amount).toBe(30_000);
+    expect(settle([A, B], e, [{ from_person: "b", to_person: "a", amount: 50_000 }]).transfers).toEqual([]);
+  });
+  it("rozpočet po kategoriích včetně nezaplacené dopravy", () => {
+    const r = categoryBudgetStatus({ category_budgets: { food: 300_000, transport: 100_000 } }, [{ id: "l", price: 80_000 } as never], effectiveExpenses([ex({ kind: "food", amount: 350_000 }), ex({ kind: "transport", amount: 30_000 })], []));
+    expect(r.map((k) => [k.kind, k.spent, k.planned, k.over])).toEqual([["transport", 30_000, 80_000, true], ["food", 350_000, 0, true]]);
+  });
+  it("měsíční uzávěrka", () => {
+    const tx = (p: Partial<Transaction>) => ({ id: Math.random().toString(), status: "posted", type: "expense", amount: 0, date: "2026-10-05", category_id: null, description: "", recurring_payment_id: null, ...p }) as Transaction;
+    const c = monthlyClosing({ settings: null, members: [], accounts: [], categories: [], recurring: [], incomeSources: [], budgets: [], goals: [], contributions: [], invoices: [], payouts: [], shifts: [], purchases: [], marks: [],
+      transactions: [tx({ type: "income", amount: 3_000_000, date: "2026-10-15" }), tx({ amount: 1_000_000, description: "Pračka" }), tx({ amount: 500_000, date: "2026-09-10" })] }, "2026-10-20");
+    expect(c).toMatchObject({ income: 3_000_000, expense: 1_000_000, net: 2_000_000, biggest: { description: "Pračka" } });
+    expect(c.verdict.tone).toBe("positive");
+    expect(c.highlights[0]).toMatch(/o 5\s000 Kč více/);
+  });
+});

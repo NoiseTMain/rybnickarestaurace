@@ -1,4 +1,6 @@
 "use client";
+import { useToast } from "@/components/ui/Toast";
+import { queueIfOffline } from "@/lib/offline-queue";
 import { useState } from "react";
 import { Pencil, Plus } from "lucide-react";
 import { saveTransaction } from "@/lib/actions/transactions";
@@ -13,6 +15,7 @@ import { AccountOptions, AttachDocument, CategoryOptions, FormActions, MemberOpt
 
 export function TransactionForm({ initial, defaultType = "expense", onDone }: { initial?: Transaction; defaultType?: TxType; onDone?: () => void }) {
   const lk = useLookups();
+  const toast = useToast();
   const [type, setType] = useState<TxType>(initial?.type ?? defaultType);
   const { state, formAction, pending, fe } = useFormAction(saveTransaction, onDone);
   const firstAccount = lk.accounts.find((a) => a.is_active && a.include_in_available)?.id ?? lk.accounts[0]?.id;
@@ -20,7 +23,7 @@ export function TransactionForm({ initial, defaultType = "expense", onDone }: { 
     return <p className="text-sm text-ink-2">Nejdřív si v <a className="text-gold underline" href="/nastaveni#ucty">Nastavení</a> přidejte účet nebo hotovost.</p>;
   }
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-4" onSubmit={(e) => { if (!initial && queueIfOffline(e, "transaction", String(new FormData(e.currentTarget).get("description") || "Záznam"))) { toast("Jste offline – uloženo v telefonu, odešle se po připojení"); onDone?.(); } }}>
       {initial && <input type="hidden" name="id" value={initial.id} />}
       <Segmented name="type" value={type} onChange={setType} options={[{ value: "expense", label: "Výdaj" }, { value: "income", label: "Příjem" }, { value: "transfer", label: "Převod" }]} />
       <div className="grid grid-cols-2 gap-3">

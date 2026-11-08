@@ -1,10 +1,12 @@
 "use client";
-import { Check, Copy, FileText, Link2, PiggyBank, Plus, Sparkles, Trash2, UserPlus, Users, X } from "lucide-react";
-import { useOptimistic, useState, useTransition } from "react";
+import { Check, Copy, FileText, Link2, PiggyBank, Plus, QrCode, Share2, Sparkles, Trash2, UserPlus, Users, X } from "lucide-react";
+import { useEffect, useOptimistic, useState, useTransition } from "react";
+import { spdString } from "@/lib/qr-payment";
 import { useRouter } from "next/navigation";
 import {
   addChecklistItem, addMembersToTrip, addTripPerson, attachDocumentToTrip, createGoalForTrip, deleteCashMove, deleteChecklistItem, deletePlanItem,
   deleteTripPerson, detachDocumentFromTrip, duplicateTrip, fillChecklist, linkSuggestedTransactions, saveCashMove, savePlanItem, toggleChecklistItem, unlinkGoal,
+  deleteSettlement, markSettled, setTripShare, updateTripPerson,
 } from "@/lib/actions/travel";
 import { getExchangeRate } from "@/lib/actions/travel";
 import { CURRENCIES } from "@/lib/finance/travel";
@@ -42,8 +44,8 @@ export function PeopleEditor({ tripId, people, edit }: { tripId: string; people:
     <div>
       <div className="flex flex-wrap gap-2">
         {people.map((p) => (
-          <span key={p.id} className="flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.05] py-1 pl-3 pr-1 text-sm">
-            {p.name}
+          <span key={p.id} className="flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.05] py-0.5 pl-1 pr-1 text-sm">
+            {edit ? <EditPersonButton person={p} /> : <span className="px-2">{p.name}</span>}
             {edit && <button type="button" aria-label={`Odebrat ${p.name}`} onClick={() => confirm(`Odebrat ${p.name} z cesty?`) && run(() => deleteTripPerson(p.id))} className="rounded-full p-1 text-ink-3 hover:text-neg"><X className="h-3.5 w-3.5" /></button>}
           </span>
         ))}
@@ -75,7 +77,7 @@ function CashForm({ trip, kind, onDone }: { trip: Trip; kind: "buy" | "return"; 
   const load = (c: string, d: string) => getExchangeRate(c, d).then((r) => {
     if (r) { setRate(String(Number(r.rate.toFixed(4))).replace(".", ",")); setInfo(`kurz ČNB – směnárna bývá horší, upravte podle dokladu`); }
     else setInfo("kurz ČNB se nepodařilo načíst – zadejte ho podle dokladu");
-  });
+  }).catch(() => setInfo("bez připojení – zadejte kurz podle dokladu"));
   const czk = parseMoney(orig) != null && Number(rate.replace(",", ".")) > 0 ? Math.round((parseMoney(orig) ?? 0) * Number(rate.replace(",", "."))) : null;
   return (
     <form action={formAction} className="space-y-4">
@@ -255,4 +257,82 @@ export function GoalButton({ tripId, linked }: { tripId: string; linked: boolean
 
 export function LinkSuggestedButton({ tripId, count }: { tripId: string; count: number }) {
   return <ActionButton action={() => linkSuggestedTransactions(tripId)} size="sm" variant="primary" icon={<Link2 className="h-4 w-4" />}>Přiřadit navržené ({count})</ActionButton>;
+}
+
+// ---------------------------------------------------------------------------
+// Vyrovnání: QR platba a „Vyrovnáno“
+
+export function SettleActions({ tripId, from, to, amount, iban, message, edit }: { tripId: string; from: string; to: string; amount: number; iban: string | null; message: string; edit: boolean }) {
+  return (
+    <span className="flex shrink-0 items-center gap-1">
+      {iban && <ModalButton label="QR" size="sm" variant="ghost" icon={<QrCode className="h-4 w-4" />} title="QR platba" render={() => <QrPayment iban={iban} amount={amount} message={message} />} />}
+      {edit && <ActionButton action={() => markSettled(tripId, from, to, amount)} size="sm" variant="secondary" icon={<Check className="h-4 w-4" />}>Vyrovnáno</ActionButton>}
+    </span>
+  );
+}
+
+function QrPayment({ iban, amount, message }: { iban: string; amount: number; message: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let off = false;
+    import("qrcode").then((q) => q.toDataURL(spdString({ iban, amount, message }), { margin: 1, width: 280 })).then((u) => { if (!off) setSrc(u); }).catch(() => undefined);
+    return () => { off = true; };
+  }, [iban, amount, message]);
+  return (
+    <div className="space-y-3 text-center">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {src ? <img src={src} alt="QR platba" className="mx-auto rounded-xl bg-white p-2" width={280} height={280} /> : <p className="py-16 text-sm text-ink-3">Připravuji QR kód…</p>}
+      <p className="text-sm">Naskenujte v aplikaci své banky: <b>{formatMoney(amount)}</b></p>
+      <p className="break-all text-xs text-ink-3">{iban}</p>
+    </div>
+  );
+}
+
+export function UndoSettlementButton({ id }: { id: string }) {
+  return <ActionButton action={() => deleteSettlement(id)} confirm="Vrátit označení vyrovnání?" size="icon" icon={<X className="h-4 w-4" />} />;
+}
+
+function PersonForm({ person, onDone }: { person: TripPerson; onDone: () => void }) {
+  const [name, setName] = useState(person.name);
+  const [account, setAccount] = useState(person.account ?? "");
+  const { pending, run } = useRun();
+  return (
+    <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); run(() => updateTripPerson(person.id, name, account), onDone); }}>
+      <Input label="Jméno" value={name} onChange={(e) => setName(e.target.value)} required maxLength={60} />
+      <Input label="Číslo účtu pro QR platbu" placeholder="123456789/0800 nebo IBAN" value={account} onChange={(e) => setAccount(e.target.value)} hint="nepovinné – ostatní mu pak pošlou peníze naskenováním QR kódu" />
+      <div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={onDone}>Zrušit</Button><Button type="submit" variant="primary" loading={pending}>Uložit</Button></div>
+    </form>
+  );
+}
+
+export function EditPersonButton({ person }: { person: TripPerson }) {
+  return <ModalButton label={person.name} size="sm" variant="ghost" title={`Účastník ${person.name}`} render={(close) => <PersonForm person={person} onDone={close} />} />;
+}
+
+// ---------------------------------------------------------------------------
+// Sdílení cesty odkazem
+
+export function ShareTrip({ tripId, token }: { tripId: string; token: string | null }) {
+  const { pending, run } = useRun();
+  const toast = useToast();
+  const url = token ? `/sdilene/${token}` : null;
+  return (
+    <div className="space-y-2 text-sm">
+      {url ? (
+        <>
+          <div className="flex gap-2">
+            <input readOnly value={url} className="field !h-10 min-w-0 flex-1 text-xs" aria-label="Odkaz pro sdílení" onFocus={(e) => e.target.select()} />
+            <Button size="sm" variant="secondary" icon={<Copy className="h-4 w-4" />} onClick={() => navigator.clipboard?.writeText(new URL(url, window.location.href).href).then(() => toast("Odkaz zkopírován"))}>Kopírovat</Button>
+          </div>
+          <p className="text-xs text-ink-3">Kdo má odkaz, uvidí trasu, program a kdo komu dluží – bez přihlášení a bez ostatních financí domácnosti.</p>
+          <Button size="sm" variant="ghost" loading={pending} onClick={() => run(() => setTripShare(tripId, false))}>Vypnout sdílení</Button>
+        </>
+      ) : (
+        <>
+          <p className="text-ink-2">Pošlete kamarádům, se kterými jedete, odkaz jen pro čtení – nepotřebují účet.</p>
+          <Button size="sm" variant="secondary" loading={pending} icon={<Share2 className="h-4 w-4" />} onClick={() => run(() => setTripShare(tripId, true))}>Vytvořit odkaz</Button>
+        </>
+      )}
+    </div>
+  );
 }

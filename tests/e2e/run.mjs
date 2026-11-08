@@ -638,6 +638,40 @@ step("cestování: cesta, účastníci, hotovost, trasa, program, výdaje, vyrov
   const ov = await page.locator("main").innerText();
   assert.match(ov, /Petr\s*Jana\s*566,32\s*Kč/, "Petr dluží Janě (798 + 584,64 − 250) / 2");
   await page.getByText(/je teď drženo stranou jako rezerva na cestu/).waitFor();
+  // účet pro QR platbu, QR kód a označení vyrovnání
+  await page.getByRole("button", { name: "Jana", exact: true }).click();
+  await dlg.getByLabel("Číslo účtu pro QR platbu").fill("19-2000145399/0800");
+  await dlg.getByRole("button", { name: "Uložit" }).click();
+  await toast("Uloženo");
+  await page.getByRole("button", { name: "QR" }).click();
+  await dlg.getByRole("img", { name: "QR platba" }).waitFor();
+  await dlg.getByText("CZ6508000000192000145399").waitFor();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Vyrovnáno" }).click();
+  await toast("Označeno jako vyrovnané");
+  await page.getByText("Vše je vyrovnané").waitFor();
+  await page.getByText("Už vyrovnáno").waitFor();
+  // sdílení odkazem jen pro čtení
+  await page.getByRole("button", { name: "Vytvořit odkaz" }).click();
+  await toast("Odkaz pro sdílení vytvořen");
+  const shareUrl = await page.getByLabel("Odkaz pro sdílení").inputValue();
+  {
+    const anon = await browser.newContext();
+    const ap = await anon.newPage();
+    await ap.goto(B + shareUrl);
+    await ap.getByText("Sdílená cesta · jen pro čtení").waitFor();
+    await ap.getByRole("heading", { name: "Test Vídeň" }).waitFor();
+    await ap.getByText("Hotel Sacher").waitFor();
+    await anon.close();
+  }
+  // rozpočet po kategoriích
+  await page.getByRole("button", { name: "Upravit" }).first().click();
+  await dlg.getByText("Rozpočet po kategoriích (nepovinné)").click();
+  await dlg.getByLabel("Jídlo a pití").fill("300");
+  await modalSubmit("Uložit");
+  await toast("Cesta upravena");
+  await page.getByText("Rozpočet po kategoriích", { exact: true }).waitFor();
+  await page.getByText(/přes limit o/).first().waitFor();
   await page.screenshot({ path: `${SHOTS}/30-cesta.png`, fullPage: true });
 
   // souhrn
@@ -650,6 +684,20 @@ step("cestování: cesta, účastníci, hotovost, trasa, program, výdaje, vyrov
   await toast("podle typu cesty");
   await page.getByRole("button", { name: "Cestovní pojištění" }).click();
   await page.getByText(/Hotovo 1 z/).waitFor();
+
+  // offline: výdaj se uloží v telefonu a odešle po připojení
+  await tab("Výdaje");
+  await ctx.setOffline(true);
+  await page.getByRole("button", { name: "Výdaj", exact: true }).click();
+  await dlg.getByLabel("Za co").fill("Offline kafe");
+  await dlg.getByLabel("Měna").selectOption("CZK");
+  await dlg.getByLabel("Částka (Kč)").fill("50");
+  await modalSubmit("Zapsat výdaj");
+  await toast("Jste offline");
+  await page.getByText(/1 čeká na odeslání/).waitFor();
+  await ctx.setOffline(false);
+  await toast("Odesláno 1");
+  await page.getByText("Offline kafe").waitFor({ timeout: 20000 });
 
   // výdaje v příjmech a výdajích: výměna jednou, kafe z hotovosti ne
   await page.goto(B + "/transakce");
@@ -688,6 +736,8 @@ step("cestování: cesta, účastníci, hotovost, trasa, program, výdaje, vyrov
 
   await page.goto(B + "/cestovani?tab=navstivene");
   await page.getByText("Zatím žádná dokončená cesta").waitFor();
+  await page.goto(B + "/uzaverka");
+  await page.getByRole("heading", { name: /Uzávěrka:/ }).waitFor();
 }
 
 step("vzhled: interiér na pozadí (DEMO)");

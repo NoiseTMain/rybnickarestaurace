@@ -7,6 +7,8 @@ import { createSupabaseStore } from "@/lib/db/supabase-store";
 import { loadHouseholdData } from "@/lib/data";
 import { addDays, todayISO } from "@/lib/dates";
 import { travelAlerts } from "@/lib/finance/travel-alerts";
+import { monthlyClosing } from "@/lib/finance/closing";
+import { addMonths, startOfMonth } from "@/lib/dates";
 
 /**
  * Denní upozornění (Vercel Cron, večer): den před odjezdem rozpis cesty,
@@ -27,6 +29,17 @@ export async function GET(req: Request) {
   for (const [hid, list] of byHousehold) {
     if (!(await store.householdPremium(hid))) continue; // upozornění jsou Premium
     const data = await loadHouseholdData(store, hid);
+    if (today.slice(8) === "01") {
+      const c = monthlyClosing(data, addMonths(startOfMonth(today), -1));
+      if (c.txCount > 0) {
+        for (const s of list) {
+          try {
+            await sendPush(s, { title: `Uzávěrka: ${c.label}`, body: [c.verdict.text, ...c.highlights.slice(0, 2)].join(" "), url: "/uzaverka" });
+            sent++;
+          } catch { /* neplatný odběr se smaže při dalších upozorněních */ }
+        }
+      }
+    }
     const sentBefore = await store.select("trip_notifications", { household_id: hid });
     for (const a of travelAlerts(data, today)) {
       if (sentBefore.some((n) => n.trip_id === a.tripId && n.kind === a.kind && n.date === today)) continue;

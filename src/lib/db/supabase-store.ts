@@ -30,17 +30,25 @@ export function createSupabaseStore(client: SupabaseClient): Store {
   return {
     mode: "supabase",
     async select<T extends TableName>(table: T, filter?: Filter<T>) {
-      const out: Row<T>[] = [];
-      for (let from = 0; ; from += PAGE) {
-        let q = client.from(table).select("*");
+      const page = (from: number, count = false) => {
+        let q = client.from(table).select("*", count ? { count: "exact" } : undefined);
         for (const [k, v] of Object.entries(filter ?? {})) {
           if (v === undefined) continue;
           q = v === null ? q.is(k, null) : q.eq(k, v as string);
         }
-        const { data, error } = await q.order("id").range(from, from + PAGE - 1);
-        if (error) throw mapError(error);
-        out.push(...(data ?? []).map((r) => normalize(table, r)));
-        if (!data || data.length < PAGE) break;
+        return q.order("id").range(from, from + PAGE - 1);
+      };
+      // první stránka zjistí počet; zbylé stránky se načtou souběžně (rychlé i pro tisíce záznamů)
+      const first = await page(0, true);
+      if (first.error) throw mapError(first.error);
+      const out: Row<T>[] = (first.data ?? []).map((r) => normalize(table, r));
+      const total = first.count ?? out.length;
+      if (total > PAGE) {
+        const rest = await Promise.all(Array.from({ length: Math.ceil(total / PAGE) - 1 }, (_, i) => page((i + 1) * PAGE)));
+        for (const r of rest) {
+          if (r.error) throw mapError(r.error);
+          out.push(...(r.data ?? []).map((x) => normalize(table, x)));
+        }
       }
       return out;
     },

@@ -116,7 +116,7 @@ export function localHouseholdPremium(data: LocalData, hid: string): boolean {
   if (rows(data, "households").some((h) => h.id === hid && h.is_demo)) return true;
   return rows(data, "household_users").some((hu) => hu.household_id === hid && localUserPremium(data, hu.user_id));
 }
-const PREMIUM_TABLES = new Set<string>(["trips", "trip_legs", "trip_expenses", "trip_people", "trip_cash_moves", "trip_checklist", "trip_plan_items"]);
+const PREMIUM_TABLES = new Set<string>(["trip_settlements", "trips", "trip_legs", "trip_expenses", "trip_people", "trip_cash_moves", "trip_checklist", "trip_plan_items"]);
 
 /** Napodobení triggerů s limity verze zdarma. */
 function checkFreeLimits(data: LocalData, table: TableName, row: Record<string, unknown>) {
