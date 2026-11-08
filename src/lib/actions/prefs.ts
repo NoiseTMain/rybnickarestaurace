@@ -30,3 +30,9 @@ export async function setTourSeen(seen: boolean): Promise<void> {
   else jar.delete(TOUR_COOKIE);
   if (!seen) revalidatePath("/", "layout");
 }
+
+/** Večerní souhrn dne na telefon (zapnout/vypnout). */
+export async function setDailyDigest(on: boolean): Promise<void> {
+  const ctx = await requireContext();
+  await savePrefs(ctx.store, ctx.user, { daily_digest: on });
+}

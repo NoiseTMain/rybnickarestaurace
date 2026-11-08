@@ -36,3 +36,27 @@ describe("série zápisů", () => {
     expect(s).toEqual({ current: 2, best: 3, todayDone: false });
   });
 });
+
+import { evaluateChallenge, suggestChallenges } from "@/lib/finance/challenges";
+describe("výzvy", () => {
+  const cats = [{ id: "r", name: "Restaurace", kind: "expense" }, { id: "f", name: "Potraviny", kind: "expense" }] as never[];
+  const tx = (date: string, amount: number, category_id: string) => ({ id: date + amount, status: "posted", type: "expense", date, amount, category_id, recurring_payment_id: null, created_at: `${date}T10:00:00Z` }) as never;
+  const txs = [tx("2026-10-05", 100_000, "r"), tx("2026-10-06", 300_000, "f"), tx("2026-11-02", 30_000, "r"), tx("2026-11-03", 200_000, "f")];
+  const d = { txs, categories: cats, contributions: [], today: "2026-11-08" };
+  it("jídlo venku s limitem", () => {
+    const s = evaluateChallenge({ kind: "no_takeout", month: "2026-11", target: 50_000, category_id: null }, d);
+    expect(s).toMatchObject({ value: 30_000, status: "active", percent: 60 });
+    expect(evaluateChallenge({ kind: "no_takeout", month: "2026-11", target: 0, category_id: null }, d).status).toBe("failed");
+  });
+  it("dny bez utrácení a škrt v kategorii", () => {
+    expect(evaluateChallenge({ kind: "no_spend_days", month: "2026-11", target: 5, category_id: null }, d)).toMatchObject({ value: 6, status: "done" });
+    const cut = evaluateChallenge({ kind: "category_cut", month: "2026-11", target: 20, category_id: "f" }, d);
+    expect(cut).toMatchObject({ target: 240_000, value: 200_000, status: "active" });
+  });
+  it("návrhy z minulého měsíce", () => {
+    const s = suggestChallenges(d, [{ kind: "daily_log" }]);
+    expect(s.find((x) => x.kind === "no_takeout")?.target).toBe(50_000);
+    expect(s.find((x) => x.kind === "category_cut")?.category_id).toBe("f");
+    expect(s.some((x) => x.kind === "daily_log")).toBe(false);
+  });
+});

@@ -4,6 +4,7 @@ import { requireContext } from "@/lib/context";
 import { loadSnapshot } from "@/lib/data";
 import { REMINDER_KIND, dueReminders } from "@/lib/finance/networth";
 import { badges } from "@/lib/finance/badges";
+import { evaluateChallenge } from "@/lib/finance/challenges";
 import { resolveBudget } from "@/lib/finance/budgets";
 import { addDays, diffDays, formatDate, monthName } from "@/lib/dates";
 import { formatMoney, percent, sub } from "@/lib/money";
@@ -66,6 +67,8 @@ export default async function DashboardPage() {
     debtsLeft: debtRows.length ? debtRows.reduce((a, d) => a + d.balance, 0) : null,
     budgetKept: lastBudget ? s.lastMonth.expense <= lastBudget.amount : null,
   });
+  const monthChallenges = (await ctx.store.select("challenges", { household_id: ctx.household.id })).filter((c) => c.month === today.slice(0, 7))
+    .map((c) => evaluateChallenge(c, { txs: data.transactions, categories: data.categories, contributions: data.contributions, today }));
   const mode = (await cookies()).get(DASH_COOKIE)?.value === "detailed" ? "detailed" : "simple";
   const greetingBlock = (
     <div className="flex flex-wrap items-end justify-between gap-3">
@@ -88,7 +91,7 @@ export default async function DashboardPage() {
     </Card>
   );
   const closing = Number(today.slice(8)) <= 7 ? monthlyClosing(data, addM(som(today), -1)) : null;
-  const dueSoon = dueReminders(await ctx.store.select("reminders", { household_id: ctx.household.id }), today).slice(0, 4);
+  const dueSoon = premium.household ? dueReminders(await ctx.store.select("reminders", { household_id: ctx.household.id }), today).slice(0, 4) : [];
   const remindersBlock = dueSoon.length > 0 && (
     <Card className="!p-4" data-testid="due-reminders">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
@@ -115,7 +118,6 @@ export default async function DashboardPage() {
         {ongoing && <OngoingTripBanner item={ongoing} today={today} />}
         {missingBlock}
         {closingBlock}
-      {remindersBlock}
         {remindersBlock}
         <ProfileTips profile={prefs.profile} premium={premium.household} />
         <SimpleDashboard locale={locale} s={s} today={today} insights={insights} categories={s.month.byCategory.map((c) => ({ name: catName(c.categoryId), amount: c.amount }))}
@@ -142,6 +144,7 @@ export default async function DashboardPage() {
       </div>
 
       {closingBlock}
+      {remindersBlock}
       {ongoing && <OngoingTripBanner item={ongoing} today={today} />}
 
       {s.missing.length > 0 && (
@@ -321,6 +324,10 @@ export default async function DashboardPage() {
             {ach.list.map((b) => <span key={b.key} title={`${b.title} – ${b.detail}${!b.earned && b.progress ? ` (${b.progress.value.toLocaleString("cs-CZ")}/${b.progress.target.toLocaleString("cs-CZ")})` : ""}`} className={`flex h-9 w-9 items-center justify-center rounded-xl text-lg ${b.earned ? "bg-gold/15 ring-1 ring-gold/40" : "bg-white/[0.04] opacity-35 grayscale"}`} aria-label={`${b.title}${b.earned ? " – získáno" : ""}`}>{b.emoji}</span>)}
           </div>
           <p className="mt-2 text-xs text-ink-3">{ach.list.filter((b) => b.earned).length} z {ach.list.length} odznaků{(() => { const next = ach.list.find((b) => !b.earned && b.progress); return next ? ` · další: ${next.title} (${next.progress!.value.toLocaleString("cs-CZ")}/${next.progress!.target.toLocaleString("cs-CZ")})` : ""; })()}</p>
+          <div className="mt-3 space-y-1.5 border-t border-white/[0.06] pt-2">
+            {monthChallenges.slice(0, 3).map((c) => <div key={c.challenge.id} className="text-xs"><div className="flex justify-between gap-2"><span className="truncate">{c.emoji} {c.title}</span><span className={c.status === "failed" ? "text-neg" : c.status === "done" ? "text-pos" : "text-ink-3"}>{c.status === "done" ? "✓" : c.status === "failed" ? "✗" : `${c.percent} %`}</span></div></div>)}
+            <Link href="/vyzvy" className="text-xs text-gold underline">{monthChallenges.length ? "Všechny výzvy" : "Přijmout výzvu na tento měsíc →"}</Link> <Link href="/rok" className="ml-2 text-xs text-gold underline">Můj rok v číslech</Link>
+          </div>
         </Card>
 
         {/* Cestování */}

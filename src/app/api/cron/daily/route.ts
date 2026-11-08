@@ -12,6 +12,8 @@ import { addMonths, startOfMonth } from "@/lib/dates";
 import { REMINDER_KIND, dueReminders } from "@/lib/finance/networth";
 import { adminBackend } from "@/lib/admin";
 import { processReferrals } from "@/lib/referrals";
+import { computeSnapshot } from "@/lib/finance/snapshot";
+import { formatMoney } from "@/lib/money";
 
 /**
  * Denní upozornění (Vercel Cron, večer): den před odjezdem rozpis cesty,
@@ -53,6 +55,22 @@ export async function GET(req: Request) {
           await sendPush(s, { title: `${REMINDER_KIND[r.kind].emoji} ${r.title}`, body: r.daysLeft === 0 ? "Termín je dnes." : `Termín ${r.due_date.split("-").reverse().join(". ")} – za ${r.daysLeft} dní.`, url: "/majetek#terminy" });
           sent++;
         } catch { /* neplatný odběr */ }
+      }
+    }
+    // večerní souhrn dne (jen kdo si ho zapnul)
+    const digestUsers = new Set((await store.select("user_prefs")).filter((p) => p.daily_digest).map((p) => p.user_id));
+    const digestSubs = list.filter((s) => digestUsers.has(s.user_id));
+    if (digestSubs.length && (await backend.notifyOnce(`digest:${hid}`, today))) {
+      const snap = computeSnapshot(data, today);
+      const spentToday = data.transactions.filter((t) => t.status === "posted" && t.type === "expense" && t.date === today).reduce((a, t) => a + t.amount, 0);
+      const days = Math.max(1, snap.daysLeftInMonth);
+      const perDay = Math.max(0, Math.floor(snap.planner.safeToSpend / days));
+      const kc = (c: number) => formatMoney(c, { decimals: "never" });
+      const body = snap.planner.safeToSpend > 0
+        ? `Dnes utraceno ${kc(spentToday)}. Do konce měsíce můžete bezpečně utratit ${kc(snap.planner.safeToSpend)} – asi ${kc(perDay)} denně.`
+        : `Dnes utraceno ${kc(spentToday)}. Pozor: do konce měsíce chybí ${kc(snap.planner.needToEarn)} na naplánované výdaje.`;
+      for (const s of digestSubs) {
+        try { await sendPush(s, { title: "Souhrn dne", body, url: "/" }); sent++; } catch { /* neplatný odběr */ }
       }
     }
     const sentBefore = await store.select("trip_notifications", { household_id: hid });

@@ -10,6 +10,7 @@ export const SECTIONS: { key: string; href: string; label: string }[] = [
   { key: "recepty", href: "/recepty", label: "Recepty" },
   { key: "cestovani", href: "/cestovani", label: "Cestování" },
   { key: "sporeni", href: "/sporeni", label: "Spoření" },
+  { key: "vyzvy", href: "/vyzvy", label: "Výzvy" },
   { key: "majetek", href: "/majetek", label: "Majetek a dluhy" },
   { key: "rozpocty", href: "/rozpocty", label: "Rozpočty" },
   { key: "platby", href: "/platby", label: "Pravidelné platby" },

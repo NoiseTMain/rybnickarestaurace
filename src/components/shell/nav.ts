@@ -1,5 +1,5 @@
 import {
-  Bot, Briefcase, Calculator, ClipboardList, CalendarClock, FileText, FolderArchive, Home, Landmark, LayoutDashboard, PiggyBank, Plane, Receipt, ChefHat, Settings, ShoppingBag, Wallet,
+  Bot, Briefcase, Calculator, Trophy, ClipboardList, CalendarClock, FileText, FolderArchive, Home, Landmark, LayoutDashboard, PiggyBank, Plane, Receipt, ChefHat, Settings, ShoppingBag, Wallet,
 } from "lucide-react";
 
 export const NAV = [
@@ -13,10 +13,11 @@ export const NAV = [
   { href: "/recepty", label: "Recepty", icon: ChefHat },
   { href: "/cestovani", label: "Cestování", icon: Plane },
   { href: "/sporeni", label: "Spoření", icon: PiggyBank },
+  { href: "/vyzvy", label: "Výzvy", icon: Trophy },
   { href: "/majetek", label: "Majetek a dluhy", icon: Landmark },
   { href: "/rozpocty", label: "Rozpočty", icon: FileText },
   { href: "/platby", label: "Pravidelné platby", icon: CalendarClock },
-  { href: "/kalkulacky", label: "Kalkulačky", icon: Calculator },
+  { href: "/nastroje", label: "Kalkulačky", icon: Calculator },
   { href: "/asistent", label: "Finanční asistent", icon: Bot },
   { href: "/dokumenty", label: "Dokumenty", icon: FolderArchive },
   { href: "/nastaveni", label: "Nastavení", icon: Settings },

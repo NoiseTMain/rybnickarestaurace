@@ -4,6 +4,7 @@ import { checkbox, date, enumOf, int, money, moneyOrZero, optionalUuid, optText,
 import type { AppContext } from "@/lib/context";
 import { addMonths, todayISO } from "@/lib/dates";
 import { done, fail, own, parse, withContext } from "./helpers";
+import { premiumError } from "@/lib/premium";
 import type { ActionResult } from "./result";
 
 /** Uloží (přepíše) stav čistého jmění za aktuální měsíc – pro graf vývoje. */
@@ -28,6 +29,8 @@ const assetSchema = z.object({
 
 export async function saveAsset(_: ActionResult, fd: FormData): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    const pe = await premiumError(ctx, "Majetek a dluhy");
+    if (pe) return fail(pe);
     const p = parse(assetSchema, fd);
     if (!p.ok) return p.result;
     const { id, ...row } = p.data;
@@ -40,6 +43,8 @@ export async function saveAsset(_: ActionResult, fd: FormData): Promise<ActionRe
 
 export async function deleteAsset(id: string): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    const pe = await premiumError(ctx, "Majetek a dluhy");
+    if (pe) return fail(pe);
     await own(ctx, "assets", id);
     await ctx.store.remove("assets", { id, household_id: ctx.household.id });
     await snapshot(ctx);
@@ -58,6 +63,8 @@ const debtSchema = z.object({
 
 export async function saveDebt(_: ActionResult, fd: FormData): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    const pe = await premiumError(ctx, "Majetek a dluhy");
+    if (pe) return fail(pe);
     const p = parse(debtSchema, fd);
     if (!p.ok) return p.result;
     const { id, ...row } = p.data;
@@ -70,6 +77,8 @@ export async function saveDebt(_: ActionResult, fd: FormData): Promise<ActionRes
 
 export async function deleteDebt(id: string): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    const pe = await premiumError(ctx, "Majetek a dluhy");
+    if (pe) return fail(pe);
     await own(ctx, "debts", id);
     await ctx.store.remove("debts", { id, household_id: ctx.household.id });
     await snapshot(ctx);
@@ -89,6 +98,8 @@ const reminderSchema = z.object({
 
 export async function saveReminder(_: ActionResult, fd: FormData): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    const pe = await premiumError(ctx, "Majetek a dluhy");
+    if (pe) return fail(pe);
     const p = parse(reminderSchema, fd);
     if (!p.ok) return p.result;
     const { id, ...row } = p.data;
@@ -101,6 +112,8 @@ export async function saveReminder(_: ActionResult, fd: FormData): Promise<Actio
 /** Hotovo: opakovaný termín se posune o rok, jinak se označí jako vyřízený. */
 export async function completeReminder(id: string): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    const pe = await premiumError(ctx, "Majetek a dluhy");
+    if (pe) return fail(pe);
     const r = await own(ctx, "reminders", id);
     if (!r) return fail("Termín nenalezen");
     if (r.repeat_yearly) {
@@ -114,6 +127,8 @@ export async function completeReminder(id: string): Promise<ActionResult> {
 
 export async function deleteReminder(id: string): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    const pe = await premiumError(ctx, "Majetek a dluhy");
+    if (pe) return fail(pe);
     await own(ctx, "reminders", id);
     await ctx.store.remove("reminders", { id, household_id: ctx.household.id });
     return done("Smazáno");

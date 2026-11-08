@@ -24,6 +24,7 @@ import { PermissionsButton } from "@/components/forms/PermissionsForm";
 import { ResetHouseholdButton } from "@/components/forms/ResetForm";
 import { IcoForm, IcoInfoCard } from "@/components/forms/IcoForm";
 import { PushToggle } from "@/components/forms/PushToggle";
+import { DailyDigestToggle } from "@/components/forms/DailyDigestToggle";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { LinkButton } from "@/components/ui/Button";
 import { SetupButton } from "@/components/forms/SetupForms";
@@ -175,6 +176,7 @@ export default async function SettingsPage() {
           <div className="mt-4 border-t border-white/[0.06] pt-4">
             <p className="mb-2 text-sm font-medium">Týdenní souhrn na telefon</p>
             <PushToggle publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || null} premium={premium.household} />
+            <div className="mt-3"><DailyDigestToggle initial={Boolean(prefs.daily_digest)} premium={premium.household} /></div>
           </div>
         </Card>
 

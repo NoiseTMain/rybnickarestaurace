@@ -23,6 +23,7 @@ const ROWS: [string, string | boolean, string | boolean][] = [
   ["AI asistent – ptejte se na cokoli", false, true],
   ["Čtení účtenek a faktur z fotky", false, true],
   ["Cestování (trasy, vyrovnání, hotovost, sdílení…)", false, true],
+  ["Majetek, plán splacení dluhů a hlídač termínů", false, true],
   ["Všech 500+ fitness receptů z 10 kuchyní", false, true],
   ["Upozornění na telefon a měsíční uzávěrka", false, true],
   ["Balíčky pro vaši situaci (podnikatel, samoživitel/ka, student…)", false, true],

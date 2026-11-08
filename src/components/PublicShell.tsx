@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { LanguageSwitcher } from "@/components/I18n";
 import { getT } from "@/lib/i18n/server";
@@ -10,14 +11,15 @@ export async function PublicShell({ children }: { children: ReactNode }) {
   const user = await getUser().catch(() => null);
   return (
     <div className="min-h-dvh">
-      <header className="mx-auto flex max-w-5xl items-center justify-between px-4 py-5">
-        <Link href="/vitejte" className="flex items-center gap-2.5">
+      <header className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))]">
+        {user && <Link href="/" className="flex h-11 items-center gap-1 rounded-full px-2 text-sm text-ink-2 hover:bg-white/[0.06] hover:text-ink" aria-label="Zpět do aplikace"><ArrowLeft className="h-5 w-5" />Zpět</Link>}
+        <Link href={user ? "/" : "/vitejte"} className="flex items-center gap-2.5">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-gold-bright to-gold-deep font-bold text-[#1b1407]">H</span>
           <span className="font-[family-name:var(--font-display)] text-xl font-semibold">Home<span className="gold-text">OS</span></span>
         </Link>
         <nav className="flex items-center gap-2 text-sm">
           <LanguageSwitcher className="hidden sm:flex" />
-          {user ? <Link href="/" className="rounded-full bg-gold px-4 py-1.5 font-medium text-[#1b1407]">Do aplikace</Link> : <>
+          {user ? null : <>
             <Link href="/prihlaseni" className="rounded-full px-3 py-1.5 text-ink-2 hover:text-ink">{t("land.login")}</Link>
             <Link href="/registrace" className="rounded-full bg-gold px-4 py-1.5 font-medium text-[#1b1407]">{t("land.start")}</Link>
           </>}

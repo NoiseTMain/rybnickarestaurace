@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Check, Trash2 } from "lucide-react";
 import { requireContext } from "@/lib/context";
+import { getPremium } from "@/lib/premium";
+import { PremiumWall } from "@/components/premium/PremiumWall";
 import { loadSnapshot } from "@/lib/data";
 import { formatDate } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
@@ -22,6 +24,7 @@ const daysText = (d: number) => d < 0 ? `${-d} dní po termínu` : d === 0 ? "dn
 
 export default async function WealthPage() {
   const ctx = await requireContext();
+  if (!(await getPremium(ctx)).household) return <PremiumWall title="Majetek, dluhy a termíny jsou součástí Premium" highlight="wealth">Čisté jmění s vývojem v čase, nejrychlejší plán splacení dluhů (lavina vs. sněhová koule) a hlídání STK, záruk, pojištění či konce fixace s upozorněním na telefon. Uložená data se neztratí.</PremiumWall>;
   const hid = { household_id: ctx.household.id };
   const [{ snapshot: s, data, today }, assets, debts, history, reminders] = await Promise.all([
     loadSnapshot(ctx), ctx.store.select("assets", hid), ctx.store.select("debts", hid), ctx.store.select("net_worth_snapshots", hid), ctx.store.select("reminders", hid),

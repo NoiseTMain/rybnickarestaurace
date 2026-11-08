@@ -588,6 +588,7 @@ export interface UserPrefs {
   locale: Locale;
   promo_seen_at: string | null;
   tour_seen_at?: string | null;
+  daily_digest?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -599,6 +600,8 @@ export interface Asset { id: string; household_id: string; name: string; kind: "
 export interface Debt { id: string; household_id: string; name: string; balance: Cents; rate: number; min_payment: Cents; note: string | null; created_at: string }
 export interface NetWorthSnapshot { id: string; household_id: string; month: string; assets: Cents; liabilities: Cents; created_at: string }
 export interface Reminder { id: string; household_id: string; title: string; kind: "warranty" | "stk" | "insurance" | "fixation" | "contract" | "document" | "tax" | "other"; due_date: ISODate; notify_days: number; repeat_yearly: boolean; done: boolean; note: string | null; created_at: string }
+export type ChallengeKind = "no_takeout" | "no_spend_days" | "save_amount" | "category_cut" | "daily_log";
+export interface Challenge { id: string; household_id: string; kind: ChallengeKind; month: string; target: Cents; category_id: string | null; created_at: string }
 export interface ReferralCode { user_id: string; code: string; created_at: string }
 export interface Referral { id: string; referrer_id: string; referred_id: string; status: "pending" | "rewarded" | "rejected"; created_at: string; rewarded_at: string | null }
 
@@ -663,6 +666,7 @@ export interface Tables {
   debts: Debt;
   net_worth_snapshots: NetWorthSnapshot;
   reminders: Reminder;
+  challenges: Challenge;
   referral_codes: ReferralCode;
   referrals: Referral;
 }
@@ -703,6 +707,7 @@ export const HOUSEHOLD_TABLES = [
   "debts",
   "net_worth_snapshots",
   "reminders",
+  "challenges",
 ] as const satisfies readonly TableName[];
 
 export type HouseholdTable = (typeof HOUSEHOLD_TABLES)[number];
@@ -733,4 +738,5 @@ export const MONEY_COLUMNS: Partial<Record<TableName, string[]>> = {
   assets: ["value"],
   debts: ["balance", "min_payment", "rate"],
   net_worth_snapshots: ["assets", "liabilities"],
+  challenges: ["target"],
 };
