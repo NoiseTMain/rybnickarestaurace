@@ -1,6 +1,6 @@
 "use server";
 import { z } from "zod";
-import { checkbox, date, duration, int, money, moneyOrZero, optionalDate, optionalUuid, quantity, text, optText, uuid } from "@/lib/validation";
+import { checkbox, date, duration, int, money, moneyOrZero, optionalDate, optionalUuid, quantity, text, optText, uuid, enumOf } from "@/lib/validation";
 import { privateKmCost } from "@/lib/finance/work";
 import { fingerprint } from "@/lib/csv";
 import type { Payout, WorkSettings } from "@/lib/db/types";
@@ -9,6 +9,8 @@ import type { ActionResult } from "./result";
 
 const settingsSchema = z.object({
   company: text(80),
+  job_type: enumOf(["employee", "shifts", "courier", "freelance"] as const),
+  position: optText(80),
   member_id: optionalUuid(),
   rate_hour: moneyOrZero(),
   rate_regular_route: moneyOrZero(),
@@ -168,7 +170,7 @@ export async function receivePayout(_: ActionResult, fd: FormData): Promise<Acti
     if (d.create_transaction && d.received_amount > 0) {
       if (!d.account_id) return fail("Vyberte účet, na který výplata přišla.", { account_id: "Vyberte účet" });
       await own(ctx, "accounts", d.account_id);
-      const cat = (await ctx.store.select("categories", { household_id: ctx.household.id, kind: "income" })).find((c) => c.name.includes("Rohlík"));
+      const cat = (await ctx.store.select("categories", { household_id: ctx.household.id, kind: "income" })).find((c) => c.name.startsWith("Práce")) ?? (await ctx.store.select("categories", { household_id: ctx.household.id, kind: "income" })).find((c) => c.name.startsWith("Mzda"));
       const [t] = await ctx.store.insert("transactions", [{
         household_id: ctx.household.id, type: "income", status: "posted", amount: d.received_amount, date: d.received_date,
         account_id: d.account_id, transfer_account_id: null, category_id: cat?.id ?? null, description: payout.label,

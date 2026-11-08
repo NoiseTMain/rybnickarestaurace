@@ -237,6 +237,9 @@ export interface WorkSettings {
   household_id: string;
   member_id: string | null;
   company: string;
+  /** Typ práce: zaměstnání/brigáda, směny, kurýr/řidič, OSVČ. */
+  job_type?: "employee" | "shifts" | "courier" | "freelance";
+  position?: string | null;
   rate_hour: Cents;
   rate_regular_route: Cents;
   rate_express_route: Cents;

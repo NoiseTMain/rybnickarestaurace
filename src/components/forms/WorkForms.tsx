@@ -1,4 +1,5 @@
 "use client";
+import { JOB_TYPES, type JobType } from "@/lib/work-types";
 import { Banknote, Pencil, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { receivePayout, savePayout, saveShift, saveWorkSettings } from "@/lib/actions/work";
@@ -36,6 +37,7 @@ export function ShiftForm({ initial, onDone }: { initial?: WorkShift; onDone?: (
   }, [ws, v]);
   const kmCost = useMemo(() => { try { return privateKmCost(ws?.private_km_rate ?? 0, v.km.replace(",", ".") || "0"); } catch { return 0; } }, [ws, v.km]);
   const { state, formAction, pending, fe } = useFormAction(saveShift, onDone);
+  const courier = (ws?.job_type ?? "courier") === "courier";
   return (
     <form action={formAction} className="space-y-4">
       {initial && <input type="hidden" name="id" value={initial.id} />}
@@ -45,15 +47,19 @@ export function ShiftForm({ initial, onDone }: { initial?: WorkShift; onDone?: (
       </div>
       <div className="grid grid-cols-2 gap-3">
         <Input name="minutes" label="Odpracováno" placeholder="7:30" value={v.minutes} onChange={set("minutes")} error={fe("minutes")} inputMode="decimal" />
-        <Input name="peak_minutes" label="Z toho ve špičce" placeholder="2:00" value={v.peak} onChange={set("peak")} error={fe("peak_minutes")} inputMode="decimal" />
+        {courier ? <Input name="peak_minutes" label="Z toho ve špičce" placeholder="2:00" value={v.peak} onChange={set("peak")} error={fe("peak_minutes")} inputMode="decimal" /> : <input type="hidden" name="peak_minutes" value={v.peak} />}
       </div>
-      <div className="grid grid-cols-3 gap-3">
-        <Input name="regular_routes" label="Běžné trasy" inputMode="numeric" value={v.reg} onChange={set("reg")} error={fe("regular_routes")} />
-        <Input name="express_routes" label="Expresní" inputMode="numeric" value={v.exp} onChange={set("exp")} error={fe("express_routes")} />
-        <Input name="orders" label="Objednávky" inputMode="numeric" value={v.orders} onChange={set("orders")} error={fe("orders")} />
-      </div>
+      {courier ? (
+        <div className="grid grid-cols-3 gap-3">
+          <Input name="regular_routes" label="Běžné trasy" inputMode="numeric" value={v.reg} onChange={set("reg")} error={fe("regular_routes")} />
+          <Input name="express_routes" label="Expresní" inputMode="numeric" value={v.exp} onChange={set("exp")} error={fe("express_routes")} />
+          <Input name="orders" label="Objednávky" inputMode="numeric" value={v.orders} onChange={set("orders")} error={fe("orders")} />
+        </div>
+      ) : (
+        <><input type="hidden" name="regular_routes" value={v.reg} /><input type="hidden" name="express_routes" value={v.exp} /><input type="hidden" name="orders" value={v.orders} /></>
+      )}
       <div>
-        <MoneyInput name="base_earnings" label="Základní výdělek" value={v.base} onChange={set("base")} error={fe("base_earnings")} />
+        <MoneyInput name="base_earnings" label={courier ? "Základní výdělek" : "Výdělek za směnu (hrubý)"} value={v.base} onChange={set("base")} error={fe("base_earnings")} />
         {suggestion > 0 && (
           <button type="button" className="mt-1 text-xs text-gold hover:underline" onClick={() => setV((s) => ({ ...s, base: toInputValue(suggestion) }))}>
             Podle sazeb: {formatMoney(suggestion)} – použít
@@ -67,12 +73,14 @@ export function ShiftForm({ initial, onDone }: { initial?: WorkShift; onDone?: (
       </div>
       <p className="pt-1 text-xs font-medium uppercase tracking-wider text-ink-3">Náklady a srážky</p>
       <div className="grid grid-cols-2 gap-3">
-        <MoneyInput name="vehicle_rent" label="Pronájem vozidla" defaultValue={toInputValue(initial ? initial.vehicle_rent || null : ws?.default_vehicle_rent || null)} error={fe("vehicle_rent")} />
-        <MoneyInput name="equipment_cost" label="Vybavení" defaultValue={toInputValue(initial?.equipment_cost || null)} error={fe("equipment_cost")} />
-        <div>
-          <Input name="private_km" label="Soukromé km" placeholder="0" inputMode="decimal" value={v.km} onChange={set("km")} error={fe("private_km")} />
-          {kmCost > 0 && <p className="mt-1 text-xs text-ink-3">Náklad {formatMoney(kmCost)}</p>}
-        </div>
+        {courier ? <MoneyInput name="vehicle_rent" label="Pronájem vozidla" defaultValue={toInputValue(initial ? initial.vehicle_rent || null : ws?.default_vehicle_rent || null)} error={fe("vehicle_rent")} /> : <input type="hidden" name="vehicle_rent" value={toInputValue(initial?.vehicle_rent || null)} />}
+        <MoneyInput name="equipment_cost" label={courier ? "Vybavení" : "Náklady (jízdenka, oblečení…)"} defaultValue={toInputValue(initial?.equipment_cost || null)} error={fe("equipment_cost")} />
+        {courier ? (
+          <div>
+            <Input name="private_km" label="Soukromé km" placeholder="0" inputMode="decimal" value={v.km} onChange={set("km")} error={fe("private_km")} />
+            {kmCost > 0 && <p className="mt-1 text-xs text-ink-3">Náklad {formatMoney(kmCost)}</p>}
+          </div>
+        ) : <input type="hidden" name="private_km" value={v.km} />}
         <MoneyInput name="other_deductions" label="Ostatní srážky" defaultValue={toInputValue(initial?.other_deductions || null)} error={fe("other_deductions")} />
       </div>
       <Textarea name="note" label="Poznámka" defaultValue={initial?.note ?? ""} />
@@ -93,7 +101,7 @@ export function PayoutForm({ initial, invoices = [], onDone }: { initial?: Payou
   return (
     <form action={formAction} className="space-y-4">
       {initial && <input type="hidden" name="id" value={initial.id} />}
-      <Input name="label" label="Označení" placeholder="např. Výplata Rohlík – říjen" defaultValue={initial?.label} error={fe("label")} required autoFocus />
+      <Input name="label" label="Označení" placeholder="např. Výplata – říjen" defaultValue={initial?.label} error={fe("label")} required autoFocus />
       <div className="grid grid-cols-2 gap-3">
         <Input name="period_from" type="date" label="Období od" defaultValue={initial?.period_from ?? ""} error={fe("period_from")} />
         <Input name="period_to" type="date" label="Období do" defaultValue={initial?.period_to ?? ""} error={fe("period_to")} />
@@ -152,25 +160,37 @@ function ReceivePayoutForm({ payout, onDone }: { payout: Payout; onDone: () => v
   );
 }
 
+
+
 export function WorkSettingsForm() {
   const lk = useLookups();
   const ws = lk.workSettings;
+  const [job, setJob] = useState<JobType>((ws?.job_type as JobType) ?? "shifts");
   const { state, formAction, pending, fe } = useFormAction(saveWorkSettings);
   return (
     <form action={formAction} className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Input name="company" label="Firma" defaultValue={ws?.company ?? "Rohlík"} error={fe("company")} />
+      <input type="hidden" name="job_type" value={job} />
+      <div className="grid gap-2 sm:grid-cols-2">
+        {(Object.keys(JOB_TYPES) as JobType[]).map((k) => (
+          <button key={k} type="button" aria-pressed={job === k} onClick={() => setJob(k)} className={`rounded-2xl border p-3 text-left text-sm ${job === k ? "border-gold bg-gold/15" : "border-white/10"}`}>
+            <b>{JOB_TYPES[k].label}</b><span className="block text-xs text-ink-3">{JOB_TYPES[k].detail}</span>
+          </button>
+        ))}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Input name="company" label="Kde pracujete" placeholder="např. Albert, Bolt, kavárna U Nováků" defaultValue={ws?.company ?? ""} error={fe("company")} required />
+        <Input name="position" label="Pozice" placeholder="např. prodavač, kurýr, programátor" defaultValue={ws?.position ?? ""} error={fe("position")} />
         <Select name="member_id" label="Kdo pracuje" defaultValue={ws?.member_id ?? ""}><MemberOptions includeEmpty="—" /></Select>
       </div>
       <p className="text-xs text-ink-3">Sazby slouží jen k návrhu výdělku u směny – skutečnou částku vždy můžete přepsat. Nevyplněné sazby se nepoužijí.</p>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <MoneyInput name="rate_hour" label="Za hodinu" defaultValue={toInputValue(ws?.rate_hour || null)} error={fe("rate_hour")} />
-        <MoneyInput name="rate_peak_hour_bonus" label="Příplatek špička/h" defaultValue={toInputValue(ws?.rate_peak_hour_bonus || null)} error={fe("rate_peak_hour_bonus")} />
-        <MoneyInput name="rate_regular_route" label="Běžná trasa" defaultValue={toInputValue(ws?.rate_regular_route || null)} error={fe("rate_regular_route")} />
-        <MoneyInput name="rate_express_route" label="Expresní trasa" defaultValue={toInputValue(ws?.rate_express_route || null)} error={fe("rate_express_route")} />
-        <MoneyInput name="rate_order" label="Za objednávku" defaultValue={toInputValue(ws?.rate_order || null)} error={fe("rate_order")} />
-        <MoneyInput name="private_km_rate" label="Soukromý km" defaultValue={toInputValue(ws?.private_km_rate || null)} error={fe("private_km_rate")} />
-        <MoneyInput name="default_vehicle_rent" label="Pronájem vozu/den" defaultValue={toInputValue(ws?.default_vehicle_rent || null)} error={fe("default_vehicle_rent")} />
+        <MoneyInput name="rate_hour" label={job === "freelance" ? "Hodinová sazba" : "Mzda za hodinu"} defaultValue={toInputValue(ws?.rate_hour || null)} error={fe("rate_hour")} />
+        {job === "courier" ? <MoneyInput name="rate_peak_hour_bonus" label="Příplatek špička/h" defaultValue={toInputValue(ws?.rate_peak_hour_bonus || null)} error={fe("rate_peak_hour_bonus")} /> : <input type="hidden" name="rate_peak_hour_bonus" value={toInputValue(ws?.rate_peak_hour_bonus || null)} />}
+        {job === "courier" ? <MoneyInput name="rate_regular_route" label="Běžná trasa" defaultValue={toInputValue(ws?.rate_regular_route || null)} error={fe("rate_regular_route")} /> : <input type="hidden" name="rate_regular_route" value={toInputValue(ws?.rate_regular_route || null)} />}
+        {job === "courier" ? <MoneyInput name="rate_express_route" label="Expresní trasa" defaultValue={toInputValue(ws?.rate_express_route || null)} error={fe("rate_express_route")} /> : <input type="hidden" name="rate_express_route" value={toInputValue(ws?.rate_express_route || null)} />}
+        {job === "courier" ? <MoneyInput name="rate_order" label="Za objednávku" defaultValue={toInputValue(ws?.rate_order || null)} error={fe("rate_order")} /> : <input type="hidden" name="rate_order" value={toInputValue(ws?.rate_order || null)} />}
+        {job === "courier" ? <MoneyInput name="private_km_rate" label="Soukromý km" defaultValue={toInputValue(ws?.private_km_rate || null)} error={fe("private_km_rate")} /> : <input type="hidden" name="private_km_rate" value={toInputValue(ws?.private_km_rate || null)} />}
+        {job === "courier" ? <MoneyInput name="default_vehicle_rent" label="Pronájem vozu/den" defaultValue={toInputValue(ws?.default_vehicle_rent || null)} error={fe("default_vehicle_rent")} /> : <input type="hidden" name="default_vehicle_rent" value={toInputValue(ws?.default_vehicle_rent || null)} />}
       </div>
       <FormError error={state.ok ? undefined : state.error} />
       <div className="flex justify-end"><Button type="submit" variant="primary" loading={pending}>Uložit nastavení práce</Button></div>

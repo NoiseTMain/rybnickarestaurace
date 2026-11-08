@@ -22,6 +22,8 @@ import { DashboardMode } from "@/components/dashboard/DashboardMode";
 import { DASH_COOKIE } from "@/lib/dashboard-mode";
 import { cookies } from "next/headers";
 import { getPremium } from "@/lib/premium";
+import { getPrefs } from "@/lib/prefs";
+import { ProfileTips } from "@/components/dashboard/ProfileTips";
 import { monthlyClosing } from "@/lib/finance/closing";
 import { addMonths as addM, startOfMonth as som } from "@/lib/dates";
 
@@ -35,7 +37,7 @@ export default async function DashboardPage() {
     const legs = travel.legs.filter((l) => l.trip_id === trip.id);
     return { trip, legs, s: summarizeTrip(trip, legs, effectiveExpenses(travel.expenses.filter((e) => e.trip_id === trip.id), data.transactions), today, travel.cash.filter((c) => c.trip_id === trip.id)) };
   });
-  const premium = await getPremium(ctx);
+  const [premium, prefs] = await Promise.all([getPremium(ctx), getPrefs(ctx.store, ctx.user)]);
   const ongoing = premium.household ? trips.find((t) => t.s.status === "ongoing") : undefined;
   const catName = (id: string | null) => data.categories.find((c) => c.id === id)?.name ?? "Bez kategorie";
   const firstOpening = data.accounts.reduce((m, a) => (a.opening_date < m ? a.opening_date : m), today);
@@ -89,6 +91,7 @@ export default async function DashboardPage() {
         {ongoing && <OngoingTripBanner item={ongoing} today={today} />}
         {missingBlock}
         {closingBlock}
+        <ProfileTips profile={prefs.profile} premium={premium.household} />
         <SimpleDashboard s={s} today={today} insights={insights} categories={s.month.byCategory.map((c) => ({ name: catName(c.categoryId), amount: c.amount }))}
           extra={premium.household && trips.some((t) => t.s.status === "upcoming" || t.s.status === "ongoing") ? <TravelCard items={trips} today={today} /> : null} />
       </div>

@@ -51,7 +51,7 @@ async function wipe(ctx: AppContext, parts: Set<ResetPart>) {
       notify_payments: true, billing_name: null, billing_dic: null, billing_address: null, billing_bank_account: null, invoice_number_prefix: null,
     });
     await ctx.store.update("work_settings", { household_id: h }, {
-      member_id: null, company: "Rohlík", rate_hour: 0, rate_regular_route: 0, rate_express_route: 0, rate_order: 0, rate_peak_hour_bonus: 0,
+      member_id: null, company: "", job_type: "shifts", rate_hour: 0, rate_regular_route: 0, rate_express_route: 0, rate_order: 0, rate_peak_hour_bonus: 0,
       private_km_rate: 0, default_vehicle_rent: 0,
     });
   }

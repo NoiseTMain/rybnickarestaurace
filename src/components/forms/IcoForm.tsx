@@ -50,7 +50,7 @@ export function IcoForm({ current, nextChange }: { current: string | null; nextC
         <>
           <Input name="password" type="password" label="Potvrďte heslem" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} error={fe("password")} />
           {(aresDown || state.error?.includes("ARES")) && <Toggle name="manual" label="Registr nedostupný – uložit zatím bez ověření" />}
-          <p className="text-xs text-ink-3">{current ? "IČO půjde znovu změnit až za 30 dní." : "Po aktivaci se zpřístupní obsah sekcí Faktury a Práce."}</p>
+          <p className="text-xs text-ink-3">{current ? "IČO půjde znovu změnit až za 30 dní." : "Po aktivaci se zpřístupní sekce Faktury."}</p>
           <FormError error={state.ok ? undefined : state.error} />
           <Button type="submit" variant="primary" loading={pending}>{current ? "Změnit IČO" : "Aktivovat IČO"}</Button>
         </>

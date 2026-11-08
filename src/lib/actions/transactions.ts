@@ -119,6 +119,7 @@ export interface ImportAnalysis {
 
 const RULES: [RegExp, string][] = [
   [/(rohlik.*vyplat|velka pecka|rohlik\.cz.*mzd)/i, "Práce – Rohlík"],
+  [/(vyplat|mzda|mzdy|plat za)/i, "Práce / brigády"],
   ...CATEGORY_RULES,
 ];
 

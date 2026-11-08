@@ -256,8 +256,15 @@ const pdfResp = await page.request.get(B + docLink);
 assert.equal(pdfResp.status(), 200);
 assert.equal(pdfResp.headers()["content-type"], "application/pdf");
 
-step("práce: směna a výplata");
+step("práce: kde pracuji (obecně), směna a výplata");
 await page.goto(B + "/prace");
+await page.getByText("Kde pracujete?").waitFor();
+await page.getByRole("button", { name: /Kurýr \/ řidič/ }).click();
+await page.getByLabel("Kde pracujete").fill("Rohlík");
+await page.getByLabel("Pozice").fill("kurýr");
+await page.getByRole("button", { name: "Uložit nastavení práce" }).click();
+await toast("Pracovní nastavení uloženo");
+await page.getByRole("heading", { name: "Práce – Rohlík" }).waitFor();
 await page.getByRole("button", { name: "Nová směna" }).click();
 await page.locator("[role=dialog] input[name=minutes]").fill("8:00");
 await page.locator("[role=dialog] input[name=base_earnings]").fill("1600");
@@ -523,10 +530,11 @@ await op.getByText("Disponibilní zůstatek").first().waitFor();
 await op.goto(B + "/faktury");
 assert.equal(await op.getByText("2026-0999").count(), 0);
 
-step("IČO: bez aktivace jsou Faktury a Práce zamčené, aktivace s heslem a ARES");
+step("IČO: bez aktivace jsou Faktury zamčené (Práce je pro každého), aktivace s heslem a ARES");
 await op.getByText("Aktivujte IČO").waitFor();
 await op.goto(B + "/prace");
-await op.getByText("Aktivujte IČO").waitFor();
+await op.getByText("Kde pracujete?").waitFor();
+await op.goto(B + "/faktury");
 await op.getByRole("link", { name: "Aktivovat IČO" }).click();
 await op.locator("#ico input[name=ico]").fill("27082440");
 await op.locator("#ico").getByRole("button", { name: "Ověřit" }).click();
@@ -811,6 +819,17 @@ assert.equal(after.tables.transactions.length, 0);
 assert.equal(after.tables.accounts.length, 0);
 assert.equal(after.tables.categories.length, 19, "výchozí kategorie");
 assert.equal(after.tables.household_settings[0].billing_ico, "27082440", "IČO zůstalo");
+
+step("životní situace: student skryje Faktury a Domácnost, sekci jde vrátit");
+await op.goto(B + "/nastaveni#situace");
+await op.getByRole("button", { name: /Student\/ka/ }).click();
+await op.locator("[role=status]", { hasText: "Uloženo" }).first().waitFor();
+await op.reload();
+assert.equal(await op.locator("aside nav").getByRole("link", { name: "Faktury" }).count(), 0, "faktury skryté");
+await op.locator("#situace label", { hasText: /^Faktury/ }).click();
+await op.locator("[role=status]", { hasText: "Uloženo" }).first().waitFor();
+await op.reload();
+await op.locator("aside nav").getByRole("link", { name: "Faktury" }).waitFor();
 
 step("smazání účtu (GDPR)");
 await op.goto(B + "/nastaveni#ucet");

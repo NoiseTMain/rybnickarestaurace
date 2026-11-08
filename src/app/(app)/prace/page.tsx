@@ -1,7 +1,6 @@
 import { Download, RotateCcw, Trash2, XCircle } from "lucide-react";
 import { requireContext } from "@/lib/context";
 import { ReadOnlyNotice } from "@/components/ui/ReadOnlyNotice";
-import { IcoLocked } from "@/components/ui/IcoLocked";
 import { loadData } from "@/lib/data";
 import { addDays, endOfMonth, endOfWeek, formatDate, monthName, shortMonth, startOfMonth, startOfWeek, todayISO } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
@@ -14,6 +13,7 @@ import { ActionButton } from "@/components/ui/ActionButton";
 import { LinkButton } from "@/components/ui/Button";
 import { FilterTabs, MonthPicker } from "@/components/lists/Filters";
 import { PayoutButton, ReceivePayoutButton, ShiftButton, WorkSettingsForm } from "@/components/forms/WorkForms";
+import { JOB_TYPES, type JobType } from "@/lib/work-types";
 import { ShiftImportButton } from "@/components/forms/CsvImport";
 import { WorkChart } from "@/components/charts/Charts";
 import { KV } from "@/components/dashboard/bits";
@@ -26,11 +26,14 @@ export default async function WorkPage({ searchParams }: { searchParams: Promise
   const sp = await searchParams;
   const ctx = await requireContext();
   const data = await loadData(ctx);
-  if (!(data.settings?.billing_ico && data.settings.ico_activated_at)) {
+  const ws = data.workSettings;
+  if (!ws?.company) {
     return (
       <div className="space-y-4">
-        <PageHeader title={"Práce"} subtitle="Pro podnikání na IČO" />
-        <IcoLocked what="Sekce Práce" />
+        <PageHeader title="Práce" subtitle="Evidence práce, výdělků a výplat – pro zaměstnání, brigády, směny, kurýry i OSVČ" />
+        <Card title="Kde pracujete?" subtitle="Nastavte jednou, pak jen zapisujete směny nebo hodiny">
+          <WorkSettingsForm />
+        </Card>
       </div>
     );
   }
@@ -57,7 +60,7 @@ export default async function WorkPage({ searchParams }: { searchParams: Promise
   return (
     <div className="space-y-4">
       <ReadOnlyNotice ctx={ctx} section="work" />
-      <PageHeader title={`Práce – ${data.workSettings?.company ?? "Rohlík"}`} subtitle="Evidence směn, výdělků, nákladů a výplat (IČO)"
+      <PageHeader title={`Práce – ${ws.company}`} subtitle={`${ws.position ? `${ws.position} · ` : ""}${JOB_TYPES[(ws.job_type ?? "courier") as JobType].label} · evidence směn, výdělků, nákladů a výplat`}
         actions={<><ShiftImportButton /><LinkButton href="/api/export/smeny" size="sm" icon={<Download className="h-4 w-4" />}>Export</LinkButton><ShiftButton label="Nová směna" variant="primary" size="md" /></>} />
       <FilterTabs name="tab" options={[{ value: "", label: "Přehled" }, { value: "smeny", label: "Směny", count: data.shifts.length }, { value: "vyplaty", label: "Výplaty", count: data.payouts.length }, { value: "nastaveni", label: "Nastavení" }]} />
 

@@ -21,7 +21,7 @@ export const DEFAULT_CATEGORIES: CatDef[] = [
   { name: "Restaurace", kind: "expense", icon: "utensils", color: "#ffab91", is_food: false, is_household: false },
   { name: "Ostatní", kind: "expense", icon: "circle", color: "#b0bec5", is_food: false, is_household: false },
   { name: "Mzda / výplata", kind: "income", icon: "wallet", color: "#d4b483", is_food: false, is_household: false },
-  { name: "Práce – Rohlík", kind: "income", icon: "truck", color: "#c5e1a5", is_food: false, is_household: false },
+  { name: "Práce / brigády", kind: "income", icon: "truck", color: "#c5e1a5", is_food: false, is_household: false },
   { name: "Ostatní příjmy", kind: "income", icon: "plus-circle", color: "#b0bec5", is_food: false, is_household: false },
 ];
 

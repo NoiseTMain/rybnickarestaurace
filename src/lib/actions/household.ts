@@ -2,6 +2,8 @@
 import { randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { profileDef } from "@/lib/profiles";
+import { savePrefs } from "@/lib/prefs";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { HOUSEHOLD_COOKIE, requireContext, requireUser } from "@/lib/context";
@@ -25,6 +27,7 @@ const onboardingSchema = z.object({
   foodBudget: optionalMoney(),
   safetyBuffer: optionalMoney(),
   billingIco: ico(),
+  profile: z.string().nullable().optional(),
 });
 
 export type OnboardingInput = z.input<typeof onboardingSchema>;
@@ -44,6 +47,8 @@ export async function completeOnboarding(json: string): Promise<ActionResult> {
     if (!p.ok) return p.result;
     const d = p.data;
     const hh = await createHousehold(store, user, d.householdName);
+    const prof = profileDef(d.profile as never);
+    if (prof) await savePrefs(store, user, { profile: prof.key, hidden_sections: prof.hide }).catch(() => undefined);
     householdId = hh.id;
     const hid = hh.id;
     const members = await store.insert("members", d.members.map((m, i) => ({

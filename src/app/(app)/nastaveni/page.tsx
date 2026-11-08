@@ -3,6 +3,8 @@ import { canEdit, requireContext } from "@/lib/context";
 import { ReadOnlyNotice } from "@/components/ui/ReadOnlyNotice";
 import { loadSnapshot } from "@/lib/data";
 import { getPremium } from "@/lib/premium";
+import { getPrefs } from "@/lib/prefs";
+import { ProfileForm } from "@/components/forms/ProfileForm";
 import { FREE_LIMITS } from "@/lib/plans";
 import { addDays, formatDate, todayISO } from "@/lib/dates";
 import { ACCOUNT_KIND_LABEL } from "@/lib/defaults";
@@ -28,11 +30,11 @@ import { AutosaveField, AutosaveToggle, CreateDemoButton, DeleteAccountForm, Del
 
 export const metadata = { title: "Nastavení" };
 
-const SECTIONS = [["predplatne", "Předplatné"], ["vzhled", "Vzhled"], ["domacnost", "Domácnost"], ["clenove", "Členové"], ["ucty", "Účty"], ["prijmy", "Příjmy"], ["kategorie", "Kategorie"], ["planovani", "Rezerva a upozornění"], ["ico", "IČO"], ["fakturace", "Fakturační údaje"], ["prace", "Práce"], ["banka", "Banka"], ["zaloha", "Export a záloha"], ["ucet", "Účet"]];
+const SECTIONS = [["predplatne", "Předplatné"], ["situace", "Situace a sekce"], ["vzhled", "Vzhled"], ["domacnost", "Domácnost"], ["clenove", "Členové"], ["ucty", "Účty"], ["prijmy", "Příjmy"], ["kategorie", "Kategorie"], ["planovani", "Rezerva a upozornění"], ["ico", "IČO"], ["fakturace", "Fakturační údaje"], ["prace", "Práce"], ["banka", "Banka"], ["zaloha", "Export a záloha"], ["ucet", "Účet"]];
 
 export default async function SettingsPage() {
   const ctx = await requireContext();
-  const [{ data, snapshot: s }, premium] = await Promise.all([loadSnapshot(ctx), getPremium(ctx)]);
+  const [{ data, snapshot: s }, premium, prefs] = await Promise.all([loadSnapshot(ctx), getPremium(ctx), getPrefs(ctx.store, ctx.user)]);
   const st = data.settings!;
   const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
   const icoActive = Boolean(st.billing_ico && st.ico_activated_at);
@@ -50,6 +52,9 @@ export default async function SettingsPage() {
       <div className="grid gap-4 xl:grid-cols-2">
         <Card id="predplatne" title="Předplatné" className="xl:col-span-2" action={<LinkButton href="/premium" size="sm" variant={premium.household ? "ghost" : "primary"}>{premium.household ? "Detail" : "Získat Premium"}</LinkButton>}>
           <p className="text-sm text-ink-2">{premium.isAdmin ? "Jste správce aplikace – Premium máte napořád." : premium.user ? "Máte Premium – děkujeme!" : premium.household ? "Premium máte díky jinému členovi této domácnosti." : `Používáte verzi zdarma (${FREE_LIMITS.members} členové, ${FREE_LIMITS.households} domácnost). AI asistent, cestování, upozornění a další jsou v Premium.`}</p>
+        </Card>
+        <Card id="situace" title="Moje situace a sekce" subtitle="Skryjte sekce, které nepotřebujete – třeba Faktury, když nepodnikáte" className="xl:col-span-2">
+          <ProfileForm profile={prefs.profile} hidden={prefs.hidden_sections} />
         </Card>
         <Card id="vzhled" title="Vzhled aplikace" subtitle="Platí pro toto zařízení" className="xl:col-span-2">
           <ThemePicker initial={theme} premium={premium.household} />
@@ -163,7 +168,7 @@ export default async function SettingsPage() {
           </div>
         </Card>
 
-        <Card id="ico" title="Podnikání na IČO" subtitle={icoActive ? "Aktivní – sekce Faktury a Práce jsou zpřístupněné" : "Zpřístupní sekce Faktury a Práce"}>
+        <Card id="ico" title="Podnikání na IČO" subtitle={icoActive ? "Aktivní – sekce Faktury je zpřístupněná" : "Zpřístupní sekci Faktury"}>
           {icoActive && st.ico_info && <IcoInfoCard info={st.ico_info} />}
           {icoActive && !st.ico_info && <p className="text-sm">IČO {st.billing_ico}</p>}
           <div className={icoActive ? "mt-4 border-t border-white/[0.06] pt-4" : ""}>

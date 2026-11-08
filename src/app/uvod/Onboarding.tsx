@@ -9,6 +9,9 @@ import { parseMoney, formatMoney } from "@/lib/money";
 import { FREQUENCY_LABEL } from "@/lib/finance/recurrence";
 import { Button } from "@/components/ui/Button";
 import { FormError, Input, MoneyInput, Select } from "@/components/ui/Field";
+import { PROFILES, SECTIONS } from "@/lib/profiles";
+import { FREE_LIMITS } from "@/lib/plans";
+import type { LifeProfile } from "@/lib/db/types";
 import { cn } from "@/components/ui/cn";
 
 type Freq = "weekly" | "monthly" | "quarterly" | "yearly" | "once";
@@ -21,6 +24,7 @@ interface State {
   foodBudget: string;
   safetyBuffer: string;
   billingIco: string;
+  profile: LifeProfile | null;
 }
 
 const STEPS = ["Domácnost", "Účty", "Příjmy", "Výdaje", "Rozpočet", "Shrnutí"];
@@ -37,6 +41,7 @@ export function Onboarding({ today, email, hasHousehold, hasAny }: { today: stri
     foodBudget: "",
     safetyBuffer: "",
     billingIco: "",
+    profile: null,
   });
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -84,6 +89,7 @@ export function Onboarding({ today, email, hasHousehold, hasAny }: { today: stri
       foodBudget: s.foodBudget,
       safetyBuffer: s.safetyBuffer,
       billingIco: s.billingIco,
+      profile: s.profile,
     };
     start(async () => {
       const r = await completeOnboarding(JSON.stringify(payload));
@@ -131,14 +137,24 @@ export function Onboarding({ today, email, hasHousehold, hasAny }: { today: stri
         <motion.div key={step} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.2 }} className="mt-1 space-y-4">
           {step === 0 && (
             <>
-              <H title="Domácnost a členové" text="Kdo do rozpočtu patří? Každý člen může mít vlastní příjmy a výdaje." />
+              <H title="Vaše situace a domácnost" text="Podle situace vám přizpůsobíme sekce a tipy (vše jde později změnit v Nastavení)." />
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Vaše situace">
+                {PROFILES.map((p) => (
+                  <button key={p.key} type="button" role="radio" aria-checked={s.profile === p.key} onClick={() => upd("profile", s.profile === p.key ? null : p.key)}
+                    className={cn("rounded-2xl border p-3 text-left text-sm transition", s.profile === p.key ? "border-gold bg-gold/15" : "border-white/10 hover:bg-white/[0.04]")}>
+                    <span className="text-xl">{p.emoji}</span>
+                    <span className="mt-1 block font-medium">{p.label}</span>
+                  </button>
+                ))}
+              </div>
+              {s.profile && <p className="text-xs text-ink-3">{PROFILES.find((p) => p.key === s.profile)?.detail}{(PROFILES.find((p) => p.key === s.profile)?.hide.length ?? 0) > 0 ? ` Skryjeme: ${PROFILES.find((p) => p.key === s.profile)!.hide.map((h) => SECTIONS.find((x) => x.key === h)?.label).join(", ")}.` : ""}</p>}
               <Input label="Název domácnosti" value={s.householdName} onChange={(e) => upd("householdName", e.target.value)} />
               {s.members.map((m, i) => (
                 <Row key={i} onRemove={s.members.length > 1 ? () => remove("members", i) : undefined}>
                   <Input label={i === 0 ? "Vaše jméno" : `Člen ${i + 1}`} value={m.name} onChange={(e) => list("members", i, { name: e.target.value })} className="flex-1" />
                 </Row>
               ))}
-              <AddButton onClick={() => upd("members", [...s.members, { name: "" }])}>Přidat člena</AddButton>
+              {s.members.length < FREE_LIMITS.members ? <AddButton onClick={() => upd("members", [...s.members, { name: "" }])}>Přidat člena</AddButton> : <p className="text-xs text-ink-3">Ve verzi zdarma můžete mít {FREE_LIMITS.members} členy. Další přidáte s Premium.</p>}
             </>
           )}
           {step === 1 && (
@@ -163,7 +179,7 @@ export function Onboarding({ today, email, hasHousehold, hasAny }: { today: stri
           )}
           {step === 2 && (
             <>
-              <H title="Pravidelné příjmy" text="Mzda, výplaty, příspěvky… Jsou to OČEKÁVANÉ příjmy – do dostupných peněz se započtou až po přijetí. Výplaty z Rohlíku můžete evidovat zvlášť v sekci Práce." />
+              <H title="Pravidelné příjmy" text="Mzda, výplaty, příspěvky… Jsou to OČEKÁVANÉ příjmy – do dostupných peněz se započtou až po přijetí. Výplaty z práce na směny (brigády, kurýr…) můžete evidovat podrobně v sekci Práce." />
               {s.incomes.map((inc, i) => (
                 <div key={i} className="rounded-2xl border border-white/10 p-3">
                   <Row onRemove={() => remove("incomes", i)}><Input label="Název" value={inc.name} onChange={(e) => list("incomes", i, { name: e.target.value })} className="flex-1" /></Row>

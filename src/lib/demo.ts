@@ -76,7 +76,7 @@ export async function seedDemo(store: Store, user: AppUser, hid: string, today: 
 
   // práce – směny a výplaty
   await store.update("work_settings", { household_id: hid }, {
-    member_id: b.id, rate_hour: 18_000, rate_regular_route: 4_000, rate_express_route: 7_000, rate_order: 0, rate_peak_hour_bonus: 3_000, private_km_rate: 500, default_vehicle_rent: 25_000,
+    member_id: b.id, company: "Rohlík (demo)", job_type: "courier", position: "kurýr", rate_hour: 18_000, rate_regular_route: 4_000, rate_express_route: 7_000, rate_order: 0, rate_peak_hour_bonus: 3_000, private_km_rate: 500, default_vehicle_rent: 25_000,
   });
   const shifts = [];
   for (let d = start; d <= today; d = addDays(d, 1)) {
@@ -113,7 +113,7 @@ export async function seedDemo(store: Store, user: AppUser, hid: string, today: 
   const insertedPayouts = await store.insert("payouts", payouts as never);
   for (const p of insertedPayouts) {
     if (p.status === "received" && p.received_amount) {
-      txs.push({ ...base, type: "income", amount: p.received_amount, date: p.received_date!, account_id: main.id, category_id: cat("Práce – Rohlík"), description: p.label,
+      txs.push({ ...base, type: "income", amount: p.received_amount, date: p.received_date!, account_id: main.id, category_id: cat("Práce / brigády"), description: p.label,
         member_id: b.id, is_recurring: false, payment_method: "transfer", source: "payout", payout_id: p.id });
     }
   }

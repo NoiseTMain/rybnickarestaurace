@@ -15,7 +15,7 @@ export async function createHousehold(store: Store, user: AppUser, name: string,
   }]);
   await store.insert("categories", DEFAULT_CATEGORIES.map((c, i) => ({ ...c, household_id: household.id, is_archived: false, sort: i })));
   await store.insert("work_settings", [{
-    household_id: household.id, member_id: null, company: "Rohlík", rate_hour: 0, rate_regular_route: 0, rate_express_route: 0,
+    household_id: household.id, member_id: null, company: "", job_type: "shifts", rate_hour: 0, rate_regular_route: 0, rate_express_route: 0,
     rate_order: 0, rate_peak_hour_bonus: 0, private_km_rate: 0, default_vehicle_rent: 0,
   }]);
   return household;

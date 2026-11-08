@@ -16,7 +16,7 @@ import { ExpenseForm } from "@/components/travel/TripForms";
 function NeedIco({ onClose }: { onClose: () => void }) {
   return (
     <div className="space-y-3 text-sm text-ink-2">
-      <p>Faktury a pracovní směny jsou pro podnikání na IČO. Nejdřív aktivujte IČO v Nastavení.</p>
+      <p>Faktury jsou pro podnikání na IČO. Nejdřív aktivujte IČO v Nastavení.</p>
       <Link href="/nastaveni#ico" onClick={onClose} className="inline-flex h-10 items-center rounded-full bg-gold px-4 font-medium text-[#1b1407]">Aktivovat IČO</Link>
     </div>
   );
@@ -105,7 +105,7 @@ export function QuickAdd({ floating }: { floating?: boolean }) {
         {form === "expense" && <TransactionForm defaultType="expense" onDone={close} />}
         {form === "invoice" && (icoActive ? <InvoiceForm onDone={close} /> : <NeedIco onClose={close} />)}
         {form === "purchase" && <PurchaseForm onDone={close} />}
-        {form === "shift" && (icoActive ? <ShiftForm onDone={close} /> : <NeedIco onClose={close} />)}
+        {form === "shift" && <ShiftForm onDone={close} />}
         {form === "saving" && <ContributionForm onDone={close} />}
       </Modal>
     </div>
