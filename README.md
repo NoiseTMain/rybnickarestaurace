@@ -48,6 +48,10 @@ nastavení a v jednotlivých sekcích. Ukázková data existují jen v samostatn
   letadlo, trajekt… s dopravcem, časy, cenou, kalkulačkou paliva) na mapě (OpenStreetMap) s odkazy
   na IDOS a mapy, výdaje i v cizí měně s kurzem ČNB, kolik lze utratit na místě za den, a po návratu
   souhrn s grafy – za co, po dnech, kde, podle měny, doprava – a přehled navštívených destinací.
+  Dále: účastníci a vyrovnání (kdo komu dluží), hotovost v cizí měně (výměna se odečte jednou),
+  program po dnech, seznam věcí k vyřízení a sbalení podle typu cesty, jízdenky a dokumenty u cesty,
+  návrh plateb z banky k přiřazení, kopie cesty, srovnání cest, cíl ve Spoření pro cestu, rychlý zápis
+  výdaje přes + a upozornění (den před odjezdem, překročení denního limitu – denní cron `/api/cron/daily`).
 - **Spoření a plánovač** – cíle s termínem, automaticky spočítaný potřebný měsíční vklad,
   procento splnění, odhad data; plánovač počítá 5 výstupů (viz níže).
 - **Rozpočty** – inteligentní rozpočet na jídlo (měsíc/týden/den, přepočet, tempo, upozornění),
@@ -156,7 +160,7 @@ unikátní klíče, vazby mezi tabulkami a přístup jen k vlastní domácnosti.
 ### Bezpečnost
 
 - Žádný tajný klíč v prohlížeči. Aplikace používá veřejný `anon` klíč; service-role klíč je
-  potřeba jen volitelně pro plánovaný týdenní souhrn (`/api/cron/weekly`, chráněno `CRON_SECRET`).
+  potřeba jen volitelně pro plánovaný týdenní souhrn (`/api/cron/weekly`) a denní upozornění k cestám (`/api/cron/daily`), obojí chráněno `CRON_SECRET`.
 - **Oprávnění členů** se vynucují v databázi (RLS): připojený člen vidí vše, upravovat smí jen
   sekce, které mu vlastník povolí (výchozí plná práva).
 - **Row Level Security** na všech tabulkách: uživatel vidí jen domácnosti, jichž je členem.

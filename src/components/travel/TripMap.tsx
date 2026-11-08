@@ -2,9 +2,10 @@
 import { useEffect, useRef } from "react";
 import "leaflet/dist/leaflet.css";
 import type { TripLegMode } from "@/lib/db/types";
+import { decodePolyline } from "@/lib/finance/travel";
 
 export interface MapPoint { lat: number; lon: number; label: string; main?: boolean }
-export interface MapLine { from: [number, number]; to: [number, number]; mode: TripLegMode; label: string }
+export interface MapLine { from: [number, number]; to: [number, number]; mode: TripLegMode; label: string; polyline?: string | null }
 
 const MODE_COLOR: Record<TripLegMode, string> = {
   train: "#4fc3f7", bus: "#9ccc65", car: "#ffb74d", plane: "#ce93d8", ferry: "#4db6ac", transit: "#90a4ae", bike: "#aed581", other: "#b0bec5",
@@ -34,13 +35,13 @@ export function TripMap({ points, lines, height = 320 }: { points: MapPoint[]; l
       const L = (await import("leaflet")).default;
       if (cancelled || !el.current) return;
       map = L.map(el.current, { scrollWheelZoom: false, attributionControl: true, zoomControl: true });
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
         maxZoom: 18,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
       }).addTo(map);
       const bounds: [number, number][] = [];
       for (const l of lines) {
-        const path = l.mode === "plane" ? arc(l.from, l.to) : [l.from, l.to];
+        const path = l.polyline ? decodePolyline(l.polyline) : l.mode === "plane" ? arc(l.from, l.to) : [l.from, l.to];
         L.polyline(path, { color: MODE_COLOR[l.mode], weight: 4, opacity: 0.9, dashArray: l.mode === "plane" || l.mode === "ferry" ? "8 8" : undefined }).bindTooltip(l.label).addTo(map);
         for (const p of [l.from, l.to]) {
           L.circleMarker(p, { radius: 5, color: "#1b1407", weight: 2, fillColor: MODE_COLOR[l.mode], fillOpacity: 1 }).addTo(map);

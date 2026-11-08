@@ -39,6 +39,7 @@ export const UNIQUE: Partial<Record<TableName, UniqueConstraint[]>> = {
     { columns: ["contribution_id"], where: posted("contribution_id"), message: "Vklad už je zaznamenán." },
     { columns: ["shopping_list_id"], where: posted("shopping_list_id"), message: "Nákup podle seznamu už je zaznamenán." },
   ],
+  trip_notifications: [{ columns: ["trip_id", "kind", "date"], message: "Upozornění už bylo odesláno." }],
   trip_expenses: [
     { columns: ["transaction_id"], where: (r) => r.transaction_id != null, message: "Tento výdaj už je u cesty zapsán." },
     { columns: ["leg_id"], where: (r) => r.leg_id != null, message: "Tento úsek už je zaplacen." },
@@ -58,7 +59,7 @@ export const TABLE_SECTION: Partial<Record<TableName, string>> = {
   transactions: "finance", accounts: "finance", categories: "finance", recurring_payments: "finance", income_sources: "finance",
   occurrence_marks: "finance", budgets: "finance", invoices: "invoices", work_shifts: "work", payouts: "work", work_settings: "work",
   purchases: "purchases", shopping_lists: "purchases", shopping_items: "purchases", price_history: "purchases",
-  savings_goals: "savings", savings_contributions: "savings", trips: "travel", trip_legs: "travel", trip_expenses: "travel", household_settings: "settings", members: "settings", documents: "*",
+  savings_goals: "savings", savings_contributions: "savings", trips: "travel", trip_legs: "travel", trip_expenses: "travel", trip_people: "travel", trip_cash_moves: "travel", trip_checklist: "travel", trip_plan_items: "travel", household_settings: "settings", members: "settings", documents: "*",
 };
 
 export const REFS: Partial<Record<TableName, Ref[]>> = {
@@ -83,6 +84,7 @@ export const REFS: Partial<Record<TableName, Ref[]>> = {
   savings_contributions: [{ column: "goal_id", table: "savings_goals", onDelete: "cascade" }],
   work_settings: [{ column: "member_id", table: "members", onDelete: "set_null" }],
   invoices: [{ column: "document_id", table: "documents", onDelete: "set_null" }],
+  documents: [{ column: "trip_id", table: "trips", onDelete: "set_null" }],
   payouts: [
     { column: "member_id", table: "members", onDelete: "set_null" },
     { column: "account_id", table: "accounts", onDelete: "set_null" },
@@ -94,12 +96,29 @@ export const REFS: Partial<Record<TableName, Ref[]>> = {
     { column: "image_document_id", table: "documents", onDelete: "set_null" },
   ],
   shopping_items: [{ column: "list_id", table: "shopping_lists", onDelete: "cascade" }],
-  trip_legs: [{ column: "trip_id", table: "trips", onDelete: "cascade" }],
+  trips: [{ column: "goal_id", table: "savings_goals", onDelete: "set_null" }],
+  trip_people: [
+    { column: "trip_id", table: "trips", onDelete: "cascade" },
+    { column: "member_id", table: "members", onDelete: "set_null" },
+  ],
+  trip_legs: [
+    { column: "trip_id", table: "trips", onDelete: "cascade" },
+    { column: "document_id", table: "documents", onDelete: "set_null" },
+  ],
   trip_expenses: [
     { column: "trip_id", table: "trips", onDelete: "cascade" },
     { column: "leg_id", table: "trip_legs", onDelete: "set_null" },
     { column: "transaction_id", table: "transactions", onDelete: "set_null" },
+    { column: "paid_by", table: "trip_people", onDelete: "set_null" },
+    { column: "document_id", table: "documents", onDelete: "set_null" },
   ],
+  trip_cash_moves: [
+    { column: "trip_id", table: "trips", onDelete: "cascade" },
+    { column: "transaction_id", table: "transactions", onDelete: "set_null" },
+  ],
+  trip_checklist: [{ column: "trip_id", table: "trips", onDelete: "cascade" }],
+  trip_plan_items: [{ column: "trip_id", table: "trips", onDelete: "cascade" }],
+  trip_notifications: [{ column: "trip_id", table: "trips", onDelete: "cascade" }],
   transactions: [
     { column: "account_id", table: "accounts", onDelete: "restrict" },
     { column: "transfer_account_id", table: "accounts", onDelete: "restrict" },

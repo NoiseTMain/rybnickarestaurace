@@ -3,9 +3,9 @@ import { connectionLinks, effectiveExpenses, fuelCost, haversineKm, summarizeTri
 import { parseCnbRates } from "@/lib/travel-services";
 import type { Trip, TripExpense, TripLeg } from "@/lib/db/types";
 
-const trip: Trip = { id: "t", household_id: "h", name: "Vídeň", destination: "Vídeň", country: "Rakousko", start_date: "2026-12-10", end_date: "2026-12-13", travelers: 2, budget: 1_000_000, currency: "EUR", lat: null, lon: null, note: null, created_at: "" };
-const leg = (p: Partial<TripLeg>): TripLeg => ({ id: "l", household_id: "h", trip_id: "t", mode: "train", carrier: "RegioJet", from_place: "Praha", to_place: "Vídeň", depart_date: null, depart_time: null, arrive_date: null, arrive_time: null, price: null, distance_km: null, booking_ref: null, url: null, note: null, from_lat: null, from_lon: null, to_lat: null, to_lon: null, sort: 0, created_at: "", ...p });
-const ex = (p: Partial<TripExpense>): TripExpense => ({ id: Math.random().toString(), household_id: "h", trip_id: "t", leg_id: null, transaction_id: null, status: "paid", kind: "food", description: "x", place: null, date: "2026-12-10", amount: 0, currency: "CZK", amount_original: null, rate: null, created_at: "", ...p });
+const trip: Trip = { id: "t", household_id: "h", name: "Vídeň", destination: "Vídeň", country: "Rakousko", start_date: "2026-12-10", end_date: "2026-12-13", travelers: 2, budget: 1_000_000, currency: "EUR", lat: null, lon: null, note: null, goal_id: null, created_at: "" };
+const leg = (p: Partial<TripLeg>): TripLeg => ({ id: "l", household_id: "h", trip_id: "t", mode: "train", carrier: "RegioJet", from_place: "Praha", to_place: "Vídeň", depart_date: null, depart_time: null, arrive_date: null, arrive_time: null, price: null, distance_km: null, booking_ref: null, url: null, note: null, from_lat: null, from_lon: null, to_lat: null, to_lon: null, document_id: null, route_polyline: null, sort: 0, created_at: "", ...p });
+const ex = (p: Partial<TripExpense>): TripExpense => ({ id: Math.random().toString(), household_id: "h", trip_id: "t", leg_id: null, transaction_id: null, status: "paid", kind: "food", description: "x", place: null, date: "2026-12-10", amount: 0, currency: "CZK", amount_original: null, rate: null, paid_by: null, split_among: null, from_cash: false, document_id: null, created_at: "", ...p });
 
 describe("cestování", () => {
   it("stav cesty podle data", () => {

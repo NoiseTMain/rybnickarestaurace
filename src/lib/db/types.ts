@@ -325,6 +325,7 @@ export interface DocumentRow {
   ocr_text: string | null;
   tags: string | null;
   uploaded_by: string | null;
+  trip_id?: string | null;
   created_at: string;
 }
 
@@ -409,6 +410,68 @@ export interface Trip {
   lat: number | null;
   lon: number | null;
   note: string | null;
+  goal_id: string | null;
+  created_at: string;
+}
+
+export interface TripPerson {
+  id: string;
+  household_id: string;
+  trip_id: string;
+  name: string;
+  member_id: string | null;
+  sort: number;
+  created_at: string;
+}
+
+export interface TripCashMove {
+  id: string;
+  household_id: string;
+  trip_id: string;
+  kind: "buy" | "return";
+  currency: string;
+  amount_original: number;
+  /** Kč (haléře) */
+  amount: Cents;
+  rate: number;
+  date: ISODate;
+  transaction_id: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+export interface TripChecklistItem {
+  id: string;
+  household_id: string;
+  trip_id: string;
+  text: string;
+  category: string | null;
+  done: boolean;
+  sort: number;
+  created_at: string;
+}
+
+export interface TripPlanItem {
+  id: string;
+  household_id: string;
+  trip_id: string;
+  kind: "stay" | "activity" | "note";
+  date: ISODate | null;
+  end_date: ISODate | null;
+  time: string | null;
+  title: string;
+  address: string | null;
+  url: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+export interface TripNotification {
+  id: string;
+  household_id: string;
+  trip_id: string;
+  kind: "departure" | "overspend";
+  date: ISODate;
   created_at: string;
 }
 
@@ -433,6 +496,8 @@ export interface TripLeg {
   from_lon: number | null;
   to_lat: number | null;
   to_lon: number | null;
+  document_id: string | null;
+  route_polyline: string | null;
   sort: number;
   created_at: string;
 }
@@ -454,6 +519,13 @@ export interface TripExpense {
   /** Původní částka v cizí měně (v setinách měny). */
   amount_original: number | null;
   rate: number | null;
+  /** Účastník cesty, který platil. */
+  paid_by: string | null;
+  /** Za koho se platilo (null = za všechny účastníky). */
+  split_among: string[] | null;
+  /** Placeno z hotovosti v cizí měně (výměna už je zapsaná jako výdaj domácnosti). */
+  from_cash: boolean;
+  document_id: string | null;
   created_at: string;
 }
 
@@ -494,6 +566,11 @@ export interface Tables {
   trips: Trip;
   trip_legs: TripLeg;
   trip_expenses: TripExpense;
+  trip_people: TripPerson;
+  trip_cash_moves: TripCashMove;
+  trip_checklist: TripChecklistItem;
+  trip_plan_items: TripPlanItem;
+  trip_notifications: TripNotification;
   push_subscriptions: PushSubscriptionRow;
 }
 
@@ -521,9 +598,13 @@ export const HOUSEHOLD_TABLES = [
   "shopping_items",
   "price_history",
   "trips",
+  "trip_people",
   "trip_legs",
+  "trip_checklist",
+  "trip_plan_items",
   "transactions",
   "trip_expenses",
+  "trip_cash_moves",
 ] as const satisfies readonly TableName[];
 
 export type HouseholdTable = (typeof HOUSEHOLD_TABLES)[number];
@@ -548,4 +629,5 @@ export const MONEY_COLUMNS: Partial<Record<TableName, string[]>> = {
   trips: ["budget"],
   trip_legs: ["price"],
   trip_expenses: ["amount", "amount_original", "rate"],
+  trip_cash_moves: ["amount", "amount_original", "rate"],
 };

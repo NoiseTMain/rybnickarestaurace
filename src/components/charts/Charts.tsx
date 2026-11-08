@@ -227,3 +227,23 @@ export function TripDaysChart({ data, limit }: { data: { label: string; amount: 
     </div>
   );
 }
+
+/** Srovnání cest: útrata na osobu a den. */
+export function TripCompareChart({ data }: { data: { label: string; perPersonDay: number; total: number }[] }) {
+  const { gold } = useAccent();
+  return (
+    <div className="h-56 w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>
+          <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
+          <XAxis dataKey="label" {...AXIS} interval={0} tick={{ fontSize: 10 }} />
+          <YAxis {...AXIS} width={52} tickFormatter={compact} />
+          <Tooltip cursor={{ fill: "rgba(255,255,255,0.04)" }} content={({ active, payload }) => active && payload?.length ? (
+            <TooltipBox title={String(payload[0].payload.label)} rows={[{ label: "Na osobu a den", value: payload[0].payload.perPersonDay, color: gold }, { label: "Celkem", value: payload[0].payload.total }]} />
+          ) : null} />
+          <Bar dataKey="perPersonDay" radius={[4, 4, 0, 0]} maxBarSize={36} fill={gold} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}

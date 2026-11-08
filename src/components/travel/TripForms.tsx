@@ -1,18 +1,18 @@
 "use client";
-import { ArrowDown, ArrowUp, Check, Link2, Pencil, Plus, Trash2, Wallet } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Link2, Pencil, Plus, Trash2, Wallet as WalletIcon } from "lucide-react";
 import { MODE_ICON } from "./icons";
 import { useEffect, useState, useTransition } from "react";
 import { deleteLeg, deleteTrip, deleteTripExpense, getExchangeRate, linkTransactionToTrip, moveLeg, saveLeg, saveTrip, saveTripExpense } from "@/lib/actions/travel";
-import { CARRIERS, CURRENCIES, fuelCost, KIND_LABEL, MODE_LABEL } from "@/lib/finance/travel";
+import { CARRIERS, CURRENCIES, fuelCost, KIND_LABEL, MODE_LABEL, type Wallet } from "@/lib/finance/travel";
 import { formatMoney, parseMoney, toInputValue } from "@/lib/money";
-import type { Trip, TripExpense, TripExpenseKind, TripLeg, TripLegMode } from "@/lib/db/types";
+import type { Trip, TripExpense, TripExpenseKind, TripLeg, TripLegMode, TripPerson } from "@/lib/db/types";
 import { useLookups } from "@/components/Lookups";
 import { FormError, Input, MoneyInput, Select, Textarea, Toggle } from "@/components/ui/Field";
 import { useFormAction } from "@/components/ui/useFormAction";
 import { ModalButton } from "@/components/ui/ModalButton";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { useToast } from "@/components/ui/Toast";
-import { AccountOptions, FormActions } from "@/components/forms/common";
+import { AccountOptions, AttachDocument, FormActions } from "@/components/forms/common";
 import { useRouter } from "next/navigation";
 
 
@@ -123,6 +123,7 @@ function LegForm({ tripId, initial, last, onDone }: { tripId: string; initial?: 
         <Input name="url" label="Odkaz na jízdenku" placeholder="https://" defaultValue={initial?.url ?? ""} error={fe("url")} />
       </div>
       <Textarea name="note" label="Poznámka" placeholder="sedadlo, nástupiště, přestup…" defaultValue={initial?.note ?? ""} />
+      <AttachDocument kind="other" initialId={initial?.document_id} label="Jízdenka / palubenka (PDF, fotka)" />
       <FormError error={state.ok ? undefined : state.error} />
       <FormActions pending={pending} onCancel={onDone} submitLabel={initial ? "Uložit" : "Přidat úsek"} />
     </form>
@@ -147,7 +148,9 @@ export function LegActions({ leg, first, lastOne }: { leg: TripLeg; first: boole
 // ---------------------------------------------------------------------------
 // Výdaj na cestě
 
-function ExpenseForm({ trip, initial, leg, planned, onDone }: { trip: Trip; initial?: TripExpense; leg?: TripLeg; planned?: boolean; onDone: () => void }) {
+export interface ExpenseExtras { people?: TripPerson[]; wallets?: Wallet[] }
+
+export function ExpenseForm({ trip, initial, leg, planned, onDone, people = [], wallets = [] }: { trip: Trip; initial?: TripExpense; leg?: TripLeg; planned?: boolean; onDone: () => void } & ExpenseExtras) {
   const lk = useLookups();
   const paying = initial?.status === "planned" && !planned;
   const [status, setStatus] = useState<"planned" | "paid">(paying ? "paid" : initial?.status ?? (planned ? "planned" : "paid"));
@@ -158,10 +161,15 @@ function ExpenseForm({ trip, initial, leg, planned, onDone }: { trip: Trip; init
   const [day, setDay] = useState(initial?.date ?? (paying ? lk.today : leg?.depart_date ?? (trip.start_date && lk.today < trip.start_date ? lk.today : lk.today)));
   const [rateInfo, setRateInfo] = useState<string | null>(null);
   const [recordTx, setRecordTx] = useState(!initial?.transaction_id);
+  const [fromCash, setFromCash] = useState(initial?.from_cash ?? false);
+  const [split, setSplit] = useState<string[]>(initial?.split_among ?? people.map((p) => p.id));
+  const wallet = wallets.find((w) => w.currency === currency && w.avgRate);
+  const me = people.find((p) => p.member_id && lk.members.find((m) => m.id === p.member_id)?.user_id) ?? people[0];
   const { state, formAction, pending, fe } = useFormAction(saveTripExpense, onDone);
 
   useEffect(() => {
-    if (currency === "CZK" || (initial?.rate && initial.currency === currency)) return;
+    // u úpravy ponechat uložený kurz; při zaplacení naplánovaného výdaje načíst aktuální
+    if (currency === "CZK" || (initial?.rate && initial.currency === currency && !paying)) return;
     let off = false;
     getExchangeRate(currency, day || lk.today).then((r) => {
       if (off) return;
@@ -169,9 +177,11 @@ function ExpenseForm({ trip, initial, leg, planned, onDone }: { trip: Trip; init
       else setRateInfo("kurz ČNB se nepodařilo načíst – zadejte ho ručně");
     });
     return () => { off = true; };
-  }, [currency, day, initial, lk.today]);
+  }, [currency, day, initial, lk.today, paying]);
 
-  const converted = currency !== "CZK" && parseMoney(orig) != null && Number(rate.replace(",", ".")) > 0 ? Math.round((parseMoney(orig) ?? 0) * Number(rate.replace(",", "."))) : null;
+  const useCash = fromCash && Boolean(wallet) && status === "paid";
+  const effRate = useCash ? wallet!.avgRate! : Number(rate.replace(",", "."));
+  const converted = currency !== "CZK" && parseMoney(orig) != null && effRate > 0 ? Math.round((parseMoney(orig) ?? 0) * effRate) : null;
   return (
     <form action={formAction} className="space-y-4">
       {initial && <input type="hidden" name="id" value={initial.id} />}
@@ -200,14 +210,38 @@ function ExpenseForm({ trip, initial, leg, planned, onDone }: { trip: Trip; init
           <MoneyInput name="amount_original" label={`Částka (${currency})`} value={orig} onChange={(e) => setOrig(e.target.value)} error={fe("amount_original")} required />
         )}
       </div>
-      {currency !== "CZK" && (
+      {currency !== "CZK" && status === "paid" && wallet && (
+        <Toggle name="from_cash" label={`Placeno z hotovosti v ${currency}`} description={`zbývá ${(wallet.left / 100).toLocaleString("cs-CZ")} ${currency} · kurz výměny ${wallet.avgRate!.toLocaleString("cs-CZ", { maximumFractionDigits: 3 })} Kč – neodečte se znovu z účtu`} checked={fromCash} onChange={(e) => setFromCash(e.target.checked)} />
+      )}
+      {currency !== "CZK" && useCash && converted != null && <p className="text-sm">= <b>{formatMoney(converted)}</b> <span className="text-xs text-ink-3">(podle kurzu výměny)</span></p>}
+      {currency !== "CZK" && !useCash && (
         <div>
           <Input name="rate" label={`Kurz (Kč za 1 ${currency})`} inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} error={fe("rate")} hint={rateInfo ?? "načítám kurz ČNB…"} />
           {converted != null && <p className="mt-1 text-sm">= <b>{formatMoney(converted)}</b></p>}
         </div>
       )}
       <Input name="date" type="date" label={status === "planned" ? "Kdy zaplatit (nepovinné)" : "Datum"} value={day ?? ""} onChange={(e) => setDay(e.target.value)} error={fe("date")} />
-      {status === "paid" && !initial?.transaction_id && (
+      {people.length > 0 && (
+        <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+          <Select name="paid_by" label="Kdo platil" defaultValue={initial ? initial.paid_by ?? "" : me?.id ?? ""}>
+            <option value="">— neuvedeno —</option>
+            {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </Select>
+          <div>
+            <p className="mb-1 text-sm text-ink-2">Za koho</p>
+            <div className="flex flex-wrap gap-2">
+              {people.map((p) => (
+                <label key={p.id} className={`cursor-pointer rounded-full border px-3 py-1 text-sm ${split.includes(p.id) ? "border-gold bg-gold/15" : "border-white/10 text-ink-3"}`}>
+                  <input type="checkbox" name="split_among" value={p.id} className="sr-only" checked={split.includes(p.id)} onChange={(e) => setSplit((s) => (e.target.checked ? [...s, p.id] : s.filter((x) => x !== p.id)))} />
+                  {p.name}
+                </label>
+              ))}
+            </div>
+            {split.length === 0 && <p className="mt-1 text-xs text-warn">Nikdo nevybrán = rozdělí se mezi všechny.</p>}
+          </div>
+        </div>
+      )}
+      {status === "paid" && !initial?.transaction_id && !useCash && (
         <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
           <Toggle name="record_tx" label="Zapsat i do výdajů domácnosti" description="odečte se z účtu a promítne do přehledů (kategorie Cestování)" checked={recordTx} onChange={(e) => setRecordTx(e.target.checked)} />
           {recordTx && (
@@ -220,7 +254,8 @@ function ExpenseForm({ trip, initial, leg, planned, onDone }: { trip: Trip; init
           )}
         </div>
       )}
-      {(status !== "paid" || initial?.transaction_id || !recordTx) && <input type="hidden" name="payment_method" value="card" />}
+      {(status !== "paid" || initial?.transaction_id || !recordTx || useCash) && <input type="hidden" name="payment_method" value={useCash ? "cash" : "card"} />}
+      <AttachDocument kind="receipt" initialId={initial?.document_id} label="Účtenka / potvrzení" />
       {initial?.transaction_id && <p className="text-xs text-ink-3">Výdaj je propojený s platbou v příjmech a výdajích – změna částky ji upraví také.</p>}
       <FormError error={state.ok ? undefined : state.error} />
       <FormActions pending={pending} onCancel={onDone} submitLabel={paying ? "Zaplatit" : initial ? "Uložit" : status === "planned" ? "Naplánovat" : "Zapsat výdaj"} />
@@ -228,17 +263,17 @@ function ExpenseForm({ trip, initial, leg, planned, onDone }: { trip: Trip; init
   );
 }
 
-export function ExpenseButton({ trip, initial, leg, planned, label, variant = "secondary", size = "md", icon }: { trip: Trip; initial?: TripExpense; leg?: TripLeg; planned?: boolean; label?: string; variant?: Variant; size?: "sm" | "md" | "icon"; icon?: "pay" | "edit" }) {
+export function ExpenseButton({ trip, initial, leg, planned, label, variant = "secondary", size = "md", icon, people, wallets }: { trip: Trip; initial?: TripExpense; leg?: TripLeg; planned?: boolean; label?: string; variant?: Variant; size?: "sm" | "md" | "icon"; icon?: "pay" | "edit" } & ExpenseExtras) {
   const title = leg ? "Zaplatit úsek" : initial?.status === "planned" && !planned && icon === "pay" ? "Zaplatit" : initial ? "Upravit výdaj" : "Výdaj na cestě";
-  const ic = icon === "pay" || leg ? <Wallet className="h-4 w-4" /> : initial ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />;
-  return <ModalButton label={label} variant={variant} size={size} icon={ic} title={title} render={(close) => <ExpenseForm trip={trip} initial={initial} leg={leg} planned={planned ?? (icon === "edit" && initial?.status === "planned")} onDone={close} />} />;
+  const ic = icon === "pay" || leg ? <WalletIcon className="h-4 w-4" /> : initial ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />;
+  return <ModalButton label={label} variant={variant} size={size} icon={ic} title={title} render={(close) => <ExpenseForm trip={trip} initial={initial} leg={leg} planned={planned ?? (icon === "edit" && initial?.status === "planned")} onDone={close} people={people} wallets={wallets} />} />;
 }
 
 export function DeleteExpenseButton({ e }: { e: TripExpense }) {
   return <ActionButton action={() => deleteTripExpense(e.id)} confirm={e.transaction_id ? "Smazat výdaj? Propojená platba v příjmech a výdajích se stornuje." : "Smazat výdaj?"} size="icon" icon={<Trash2 className="h-4 w-4" />} />;
 }
 
-export function LinkTxRow({ tripId, tx }: { tripId: string; tx: { id: string; date: string; description: string; amount: number; category: string | null } }) {
+export function LinkTxRow({ tripId, tx }: { tripId: string; tx: { id: string; date: string; description: string; amount: number; category: string | null; reason?: string | null } }) {
   const [kind, setKind] = useState<TripExpenseKind>("other");
   const [pending, start] = useTransition();
   const [doneFlag, setDone] = useState(false);
@@ -247,7 +282,7 @@ export function LinkTxRow({ tripId, tx }: { tripId: string; tx: { id: string; da
   return (
     <li className="flex flex-wrap items-center gap-2 border-t border-white/[0.06] py-2 text-sm">
       <span className="w-16 shrink-0 text-xs text-ink-3">{tx.date.slice(8, 10)}. {tx.date.slice(5, 7)}.</span>
-      <span className="min-w-0 flex-1 truncate">{tx.description}{tx.category && <span className="text-ink-3"> · {tx.category}</span>}</span>
+      <span className="min-w-0 flex-1 truncate">{tx.description}{tx.category && <span className="text-ink-3"> · {tx.category}</span>}{tx.reason && <span className="ml-1 rounded-full bg-gold/15 px-1.5 text-[10px] text-gold-bright">{tx.reason}</span>}</span>
       <span className="num">{formatMoney(tx.amount)}</span>
       <select aria-label="Druh" className="field !h-9 !w-auto !py-1 text-xs" value={kind} onChange={(e) => setKind(e.target.value as TripExpenseKind)}>
         {(Object.keys(KIND_LABEL) as TripExpenseKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}

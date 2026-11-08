@@ -1,6 +1,7 @@
 "use client";
 import { createContext, useContext, type ReactNode } from "react";
-import type { Account, Category, Member, Permissions, SavingsGoal, WorkSettings } from "@/lib/db/types";
+import type { Account, Category, Member, Permissions, SavingsGoal, Trip, TripPerson, WorkSettings } from "@/lib/db/types";
+import type { Wallet } from "@/lib/finance/travel";
 
 export interface Lookups {
   mode: "supabase" | "local";
@@ -16,6 +17,8 @@ export interface Lookups {
   role: "owner" | "member";
   permissions: Permissions;
   icoActive: boolean;
+  /** Probíhající a brzy začínající cesty (pro rychlý zápis výdaje). */
+  activeTrips?: { trip: Trip; people: TripPerson[]; wallets: Wallet[] }[];
 }
 
 const Ctx = createContext<Lookups | null>(null);

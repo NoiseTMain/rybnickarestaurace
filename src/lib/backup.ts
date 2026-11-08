@@ -95,6 +95,20 @@ export async function restoreBackup(ctx: AppContext, backup: Backup): Promise<{ 
     return out;
   };
   const prepared = Object.fromEntries(HOUSEHOLD_TABLES.map((t) => [t, (src[t] ?? []).map((r) => remap(t, r))])) as Record<HouseholdTable, Record<string, unknown>[]>;
+  // odkazy na tabulky, které se vkládají až později (např. fotka člena → dokument, dokument → cesta):
+  // nejdřív vložit bez odkazu, po vložení všeho doplnit
+  const order = new Map<string, number>(HOUSEHOLD_TABLES.map((t, i) => [t, i]));
+  const deferred: { table: HouseholdTable; id: string; values: Record<string, unknown> }[] = [];
+  for (const t of HOUSEHOLD_TABLES) {
+    for (const ref of REFS[t] ?? []) {
+      if ((order.get(ref.table) ?? -1) <= (order.get(t) ?? 0)) continue;
+      for (const row of prepared[t]) {
+        if (row[ref.column] == null) continue;
+        deferred.push({ table: t, id: String(row.id), values: { [ref.column]: row[ref.column] } });
+        row[ref.column] = null;
+      }
+    }
+  }
   if (prepared.household_settings.length > 1 || prepared.work_settings.length > 1) throw new DbError("check", "Poškozená záloha (nastavení).");
   // transakce bez platného účtu nelze obnovit
   if (prepared.transactions.some((t) => t.account_id == null)) throw new DbError("check", "Záloha obsahuje transakce bez účtu.");
@@ -111,6 +125,7 @@ export async function restoreBackup(ctx: AppContext, backup: Backup): Promise<{ 
   try {
     await wipe();
     for (const t of HOUSEHOLD_TABLES) if (prepared[t].length) await ctx.store.insert(t, prepared[t] as never);
+    for (const d of deferred) await ctx.store.update(d.table, { id: d.id, household_id: hid } as never, d.values as never);
   } catch (e) {
     // vrácení původního stavu
     await wipe().catch(() => undefined);

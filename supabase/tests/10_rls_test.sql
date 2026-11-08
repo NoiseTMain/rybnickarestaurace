@@ -302,3 +302,51 @@ do $$ begin
   assert (select count(*) from public.trips) = 0, 'cizí uživatel vidí cesty';
 end $$;
 reset role;
+
+\echo '12) Cestování 2: účastníci, hotovost, seznam, program, upozornění'
+select pg_temp.as_user(:alice);
+insert into public.trip_people (id, household_id, trip_id, name) values ('77777777-0000-0000-0000-0000000000a1', '11111111-0000-0000-0000-000000000001', '77777777-0000-0000-0000-000000000001', 'Alice');
+insert into public.trip_cash_moves (household_id, trip_id, kind, currency, amount_original, amount, rate, date) values ('11111111-0000-0000-0000-000000000001', '77777777-0000-0000-0000-000000000001', 'buy', 'EUR', 10000, 252000, 25.2, '2026-12-10');
+insert into public.trip_checklist (household_id, trip_id, text) values ('11111111-0000-0000-0000-000000000001', '77777777-0000-0000-0000-000000000001', 'Pas');
+insert into public.trip_plan_items (household_id, trip_id, kind, title) values ('11111111-0000-0000-0000-000000000001', '77777777-0000-0000-0000-000000000001', 'stay', 'Hotel');
+update public.trip_expenses set paid_by = '77777777-0000-0000-0000-0000000000a1', split_among = array['77777777-0000-0000-0000-0000000000a1']::uuid[], from_cash = true where description = 'Řízek';
+do $$
+declare ok boolean;
+begin
+  begin
+    insert into public.trip_cash_moves (household_id, trip_id, kind, currency, amount_original, amount, rate, date) values ('11111111-0000-0000-0000-000000000001', '77777777-0000-0000-0000-000000000001', 'buy', 'CZK', 1, 1, 1, '2026-12-10');
+    ok := false;
+  exception when check_violation then ok := true;
+  end;
+  assert ok, 'hotovost v CZK prošla';
+  begin
+    insert into public.trip_notifications (household_id, trip_id, kind, date) values ('11111111-0000-0000-0000-000000000001', '77777777-0000-0000-0000-000000000001', 'departure', '2026-12-09');
+    ok := false;
+  exception when insufficient_privilege then ok := true;
+  end;
+  assert ok, 'uživatel zapsal záznam o upozornění (smí jen server)';
+end $$;
+reset role;
+select pg_temp.as_user(:bob);
+do $$
+declare ok boolean;
+begin
+  assert (select count(*) from public.trip_people where trip_id = '77777777-0000-0000-0000-000000000001') = 1, 'člen nevidí účastníky';
+  begin
+    insert into public.trip_checklist (household_id, trip_id, text) values ('11111111-0000-0000-0000-000000000001', '77777777-0000-0000-0000-000000000001', 'Bob');
+    ok := false;
+  exception when insufficient_privilege then ok := true;
+  end;
+  assert ok, 'člen jen pro čtení přidal do seznamu';
+end $$;
+reset role;
+select pg_temp.as_user('cccccccc-cccc-cccc-cccc-cccccccccccc');
+do $$ begin
+  assert (select count(*) from public.trip_cash_moves) + (select count(*) from public.trip_plan_items) + (select count(*) from public.trip_people) = 0, 'cizí uživatel vidí data cesty';
+end $$;
+reset role;
+-- smazání účastníka vynuluje plátce
+delete from public.trip_people where id = '77777777-0000-0000-0000-0000000000a1';
+do $$ begin
+  assert (select paid_by from public.trip_expenses where description = 'Řízek') is null, 'plátce nezůstal po smazání účastníka prázdný';
+end $$;

@@ -201,3 +201,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(0.85) sepia(0.3);
   opacity: 0.7;
 }
+
+/* mapa trasy: tmavé pozadí, než se načtou dlaždice */
+.leaflet-container { background: #1b1b1d; }

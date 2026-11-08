@@ -171,18 +171,38 @@ export async function seedDemo(store: Store, user: AppUser, hid: string, today: 
     { household_id: hid, trip_id: next.id, mode: "ferry", carrier: "Jadrolinija", from_place: "Split", to_place: "Hvar", depart_date: addDays(nextStart, 3), depart_time: "09:15", arrive_date: null, arrive_time: null, price: 60_000, distance_km: null, booking_ref: null, url: null, note: null, from_lat: 43.5081, from_lon: 16.4402, to_lat: 43.1729, to_lon: 16.4411, sort: 1 },
   ]);
   const eur = (cents: number, rate = 25.2) => ({ currency: "EUR", amount_original: cents, rate, amount: Math.round(cents * rate) });
+  const [pp, pt, np, nt] = await store.insert("trip_people", [
+    { household_id: hid, trip_id: past.id, name: "Petra", member_id: a.id, sort: 0 },
+    { household_id: hid, trip_id: past.id, name: "Tomáš", member_id: b.id, sort: 1 },
+    { household_id: hid, trip_id: next.id, name: "Petra", member_id: a.id, sort: 0 },
+    { household_id: hid, trip_id: next.id, name: "Tomáš", member_id: b.id, sort: 1 },
+  ]);
+  await store.insert("trip_cash_moves", [{ household_id: hid, trip_id: past.id, kind: "buy", currency: "EUR", amount_original: 10_000, amount: 253_000, rate: 25.3, date: pastStart, transaction_id: null, note: "bankomat na nádraží (demo)" }]);
+  const cashEur = (cents: number) => ({ currency: "EUR", amount_original: cents, rate: 25.3, amount: Math.round(cents * 25.3), from_cash: true });
+  const payer = new Map<string, string>([["Vlak Praha → Vídeň", pp.id], ["Hotel 2 noci", pp.id], ["Bus Vídeň → Praha", pt.id], ["Řízek a pivo", pt.id], ["Schönbrunn – vstupné", pp.id], ["MHD 72h jízdenka", pt.id], ["Apartmán – záloha", np.id]]);
+  void nt;
+  await store.insert("trip_checklist", [
+    ["Občanský průkaz / pas", "Doklady", true], ["Cestovní pojištění", "Doklady", true], ["Kartička zdravotní pojišťovny (EHIC)", "Doklady", false],
+    ["Dálniční známky / mýto na trase", "Auto", false], ["Zelená karta (pojištění auta)", "Auto", true], ["Opalovací krém", "Moře", false], ["Boty do vody", "Moře", false],
+    ["Zalít květiny, vynést koš", "Doma", false],
+  ].map(([text, category, done], i) => ({ household_id: hid, trip_id: next.id, text: text as string, category: category as string, done: done as boolean, sort: i })));
+  await store.insert("trip_plan_items", [
+    { household_id: hid, trip_id: next.id, kind: "stay", date: nextStart, end_date: addDays(nextStart, 7), time: "16:00", title: "Apartmán Ivana (demo)", address: "Put Firula 12, Split", url: null, note: "klíče v schránce, kód 1234" },
+    { household_id: hid, trip_id: next.id, kind: "activity", date: addDays(nextStart, 3), end_date: null, time: "10:30", title: "Hvar – procházka a koupání", address: "Hvar", url: null, note: null },
+    { household_id: hid, trip_id: next.id, kind: "activity", date: addDays(nextStart, 5), end_date: null, time: "09:00", title: "Národní park Krka", address: "Krka, Chorvatsko", url: "https://www.npkrka.hr", note: "vstupné ~40 EUR/os." },
+  ]);
   await store.insert("trip_expenses", [
     { trip_id: past.id, leg_id: pastLeg1.id, status: "paid", kind: "transport", description: "Vlak Praha → Vídeň", place: "Praha", date: pastStart, amount: 79_800, currency: "CZK", amount_original: null, rate: null },
     { trip_id: past.id, leg_id: pastLeg2.id, status: "paid", kind: "transport", description: "Bus Vídeň → Praha", place: "Vídeň", date: addDays(pastStart, 2), amount: 49_800, currency: "CZK", amount_original: null, rate: null },
     { trip_id: past.id, leg_id: null, status: "paid", kind: "accommodation", description: "Hotel 2 noci", place: "Vídeň", date: pastStart, ...eur(18_000) },
     { trip_id: past.id, leg_id: null, status: "paid", kind: "food", description: "Řízek a pivo", place: "Figlmüller", date: pastStart, ...eur(4_640) },
     { trip_id: past.id, leg_id: null, status: "paid", kind: "activities", description: "Schönbrunn – vstupné", place: "Schönbrunn", date: addDays(pastStart, 1), ...eur(4_400) },
-    { trip_id: past.id, leg_id: null, status: "paid", kind: "food", description: "Kafe a dort", place: "Café Sacher", date: addDays(pastStart, 1), ...eur(2_380) },
-    { trip_id: past.id, leg_id: null, status: "paid", kind: "shopping", description: "Suvenýry", place: "Naschmarkt", date: addDays(pastStart, 2), ...eur(1_950) },
+    { trip_id: past.id, leg_id: null, status: "paid", kind: "food", description: "Kafe a dort", place: "Café Sacher", date: addDays(pastStart, 1), paid_by: pp.id, ...cashEur(2_380) },
+    { trip_id: past.id, leg_id: null, status: "paid", kind: "shopping", description: "Suvenýry", place: "Naschmarkt", date: addDays(pastStart, 2), paid_by: pp.id, split_among: [pp.id], ...cashEur(1_950) },
     { trip_id: past.id, leg_id: null, status: "paid", kind: "transport", description: "MHD 72h jízdenka", place: "Vídeň", date: pastStart, ...eur(3_400) },
     { trip_id: next.id, leg_id: null, status: "paid", kind: "accommodation", description: "Apartmán – záloha", place: "Split", date: addDays(today, -10), ...eur(30_000, 25.1) },
     { trip_id: next.id, leg_id: null, status: "planned", kind: "accommodation", description: "Apartmán – doplatek", place: "Split", date: nextStart, ...eur(42_000, 25.1) },
-  ].map((e) => ({ household_id: hid, transaction_id: null, ...e } as never)));
+  ].map((e) => ({ household_id: hid, transaction_id: null, paid_by: payer.get(e.description) ?? null, split_among: null, from_cash: false, document_id: null, ...e } as never)));
 
   await store.update("household_settings", { household_id: hid }, {
     safety_buffer: 500_000, onboarded_at: new Date().toISOString(), billing_ico: "00000027", ico_activated_at: new Date().toISOString(), ico_changed_at: null,

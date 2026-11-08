@@ -488,15 +488,16 @@ await page.getByText("Za poslední 3 měsíce zatím nemám žádná data").firs
 await page.getByText("Poslední 3 měsíce", { exact: true }).first().waitFor();
 await page.getByText("Neobvyklé věci").waitFor();
 
-step("cestování: cesta, úsek vlakem, platba, výdaj v eurech, souhrn");
+step("cestování: cesta, účastníci, hotovost, trasa, program, výdaje, vyrovnání, příprava, kopie");
 {
   const iso = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague" }).format(d);
   const t0 = iso(new Date());
   const t2 = iso(new Date(Date.now() + 2 * 86400000));
+  const dlg = page.locator("[role=dialog]");
+  const tab = async (name) => { await page.getByRole("button", { name: new RegExp(`^${name}`) }).click(); await page.waitForURL(new RegExp(name === "Přehled" ? "/cestovani/[0-9a-f-]{36}$" : "tab=")); };
   await page.goto(B + "/cestovani");
   await page.getByText("Žádná naplánovaná cesta").waitFor();
   await page.getByRole("button", { name: "Nová cesta" }).click();
-  const dlg = page.locator("[role=dialog]");
   await dlg.getByLabel("Název cesty").fill("Test Vídeň");
   await dlg.getByLabel("Kam").fill("Vídeň");
   await dlg.getByLabel("Země").fill("Rakousko");
@@ -506,7 +507,27 @@ step("cestování: cesta, úsek vlakem, platba, výdaj v eurech, souhrn");
   await dlg.getByLabel("Osob").fill("2");
   await modalSubmit("Vytvořit cestu");
   await page.waitForURL(/\/cestovani\/[0-9a-f-]{36}$/, { timeout: 20000 });
+  const tripUrl = page.url();
   await page.getByText("Právě jste na cestě").waitFor();
+
+  // účastníci
+  for (const n of ["Jana", "Petr"]) {
+    await page.getByLabel("Jméno účastníka").fill(n);
+    await page.getByRole("button", { name: "Přidat", exact: true }).first().click();
+    await toast("Účastník přidán");
+    await page.locator("span", { hasText: new RegExp(`^${n}$`) }).first().waitFor();
+  }
+  // hotovost v eurech
+  await page.getByRole("button", { name: "Výměna / bankomat" }).click();
+  await dlg.getByLabel("Částka (EUR)").fill("100");
+  await dlg.getByLabel(/Kurz/).fill("25");
+  await dlg.getByText("= 2 500 Kč").waitFor();
+  await modalSubmit("Zapsat");
+  await toast("Hotovost zapsána");
+  await page.getByText("100 EUR").first().waitFor();
+
+  // trasa a program
+  await tab("Trasa a program");
   await page.getByRole("button", { name: "Přidat úsek" }).click();
   await dlg.getByLabel("Odkud").fill("Praha");
   await dlg.getByLabel("Kam").fill("Vídeň");
@@ -514,40 +535,98 @@ step("cestování: cesta, úsek vlakem, platba, výdaj v eurech, souhrn");
   await dlg.getByLabel("Cena (Kč)").fill("798");
   await modalSubmit("Přidat úsek");
   await toast("Úsek přidán");
-  await page.getByText("RegioJet").first().waitFor();
   await page.getByRole("link", { name: /IDOS/ }).waitFor();
   await page.getByText("nezaplaceno").waitFor();
   await page.getByRole("button", { name: "Zaplaceno" }).click();
+  assert.equal(await dlg.getByLabel("Kdo platil").inputValue() !== "", true, "plátce předvyplněn");
   await modalSubmit("Zapsat výdaj");
   await toast("Výdaj zapsán k cestě i do výdajů domácnosti");
   await page.getByText("zaplaceno", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Přidat", exact: true }).click();
+  await dlg.getByLabel("Ubytování").fill("Hotel Sacher");
+  await dlg.getByLabel("Adresa").fill("Philharmoniker Str. 4, Wien");
+  await modalSubmit("Přidat");
+  await toast("Přidáno do programu");
+  await page.getByText("Hotel Sacher").waitFor();
+  await page.getByText("1. den", { exact: false }).first().waitFor();
+
+  // výdaje: kartou v eurech (Jana) a z hotovosti (Petr)
+  await tab("Výdaje");
   await page.getByRole("button", { name: "Výdaj", exact: true }).click();
   await dlg.getByLabel("Za co").fill("Řízek");
   await dlg.getByLabel("Částka (EUR)").fill("23,20");
-  const rate = dlg.getByLabel(/Kurz/);
   await page.waitForFunction(() => /kurz ČNB/.test(document.querySelector("[role=dialog]")?.textContent ?? ""), null, { timeout: 15000 });
-  await rate.fill("25,2");
+  await dlg.getByLabel(/Kurz \(Kč/).fill("25,2");
   await dlg.getByText(/584,64/).waitFor();
+  await dlg.getByLabel("Kdo platil").selectOption({ label: "Jana" });
   await modalSubmit("Zapsat výdaj");
   await toast("Výdaj zapsán");
-  await page.getByText("Zatím utraceno").waitFor();
+  await page.getByRole("button", { name: "Výdaj", exact: true }).click();
+  await dlg.getByLabel("Za co").fill("Kafe");
+  await dlg.getByLabel("Částka (EUR)").fill("10");
+  await dlg.getByText("Placeno z hotovosti v EUR").click();
+  await dlg.getByText("= 250 Kč").waitFor();
+  await dlg.getByLabel("Kdo platil").selectOption({ label: "Petr" });
+  await modalSubmit("Zapsat výdaj");
+  await page.locator('[role=status]', { hasText: /^Výdaj zapsán k cestě$/ }).first().waitFor({ timeout: 15000 });
+  await page.getByText(/z hotovosti · platil\(a\) Petr/).waitFor();
+
+  // přehled: vyrovnání a peněženka
+  await tab("Přehled");
+  await page.getByText("90 EUR").first().waitFor();
+  const ov = await page.locator("main").innerText();
+  assert.match(ov, /Petr\s*Jana\s*566,32\s*Kč/, "Petr dluží Janě (798 + 584,64 − 250) / 2");
   await page.getByText(/je teď drženo stranou jako rezerva na cestu/).waitFor();
-  await page.getByText(/23,2 EUR/).first().waitFor();
-  const body = await page.locator("main").innerText();
-  assert.match(body, /1\s383\s*Kč/, "zaplaceno celkem 798 + 584,64 Kč");
   await page.screenshot({ path: `${SHOTS}/30-cesta.png`, fullPage: true });
+
+  // souhrn
+  await tab("Souhrn");
+  assert.match(await page.locator("main").innerText(), /1\s633\s*Kč/, "utraceno 798 + 584,64 + 250");
+
+  // příprava
+  await tab("Příprava");
+  await page.getByRole("button", { name: "Doplnit podle typu cesty" }).click();
+  await toast("podle typu cesty");
+  await page.getByRole("button", { name: "Cestovní pojištění" }).click();
+  await page.getByText(/Hotovo 1 z/).waitFor();
+
+  // výdaje v příjmech a výdajích: výměna jednou, kafe z hotovosti ne
   await page.goto(B + "/transakce");
   await page.getByText("Test Vídeň: Řízek").first().waitFor();
-  await page.goBack();
+  await page.getByText(/Test Vídeň: výměna \/ výběr 100 EUR/).first().waitFor();
+  assert.equal(await page.getByText("Test Vídeň: Kafe").count(), 0, "platba z hotovosti se neodečítá znovu");
+
+  // smazání výdaje stornuje platbu
+  await page.goto(tripUrl + "?tab=vydaje");
   page.once("dialog", (d) => d.accept());
   await page.locator("li", { hasText: "Řízek" }).getByRole("button").last().click();
   await toast("Výdaj smazán a platba stornována");
-  await page.goto(B + "/cestovani?tab=navstivene");
-  await page.getByText("Zatím žádná dokončená cesta").waitFor();
+
+  // rychlé + během cesty
   await page.goto(B + "/");
   await page.getByText("Dnes můžete utratit").waitFor();
   await page.getByText(/Test Vídeň – 1\. den z 3/).waitFor();
   await page.getByRole("heading", { name: "Cestování" }).waitFor();
+  await page.getByRole("button", { name: "Rychle přidat" }).first().click();
+  await page.getByRole("menuitem", { name: "Výdaj na cestě" }).click();
+  await dlg.getByLabel("Za co").fill("Voda");
+  await dlg.getByLabel("Měna").selectOption("CZK");
+  await dlg.getByLabel("Částka (Kč)").fill("30");
+  await modalSubmit("Zapsat výdaj");
+  await toast("Výdaj zapsán");
+
+  // kopie cesty
+  await page.goto(tripUrl);
+  await page.getByRole("button", { name: "Kopie" }).click();
+  await modalSubmit("Zkopírovat");
+  await page.waitForURL((u) => /\/cestovani\/[0-9a-f-]{36}$/.test(u.pathname) && u.href !== tripUrl, { timeout: 20000 });
+  await page.getByText("Zatím jen nápad").waitFor();
+  await tab("Trasa a program");
+  await page.getByText("RegioJet").first().waitFor();
+  await page.getByText("Hotel Sacher").waitFor();
+
+  await page.goto(B + "/cestovani?tab=navstivene");
+  await page.getByText("Zatím žádná dokončená cesta").waitFor();
 }
 
 step("vzhled: interiér na pozadí (DEMO)");

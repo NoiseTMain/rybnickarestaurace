@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { requireContext } from "@/lib/context";
 import { loadData } from "@/lib/data";
-import { todayISO } from "@/lib/dates";
+import { addDays, todayISO } from "@/lib/dates";
+import { wallets } from "@/lib/finance/travel";
 import { localModeBlocked } from "@/lib/env";
 import { LookupsProvider } from "@/components/Lookups";
 import { Shell } from "@/components/shell/Shell";
@@ -34,6 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         icoActive: Boolean(data.settings?.billing_ico && data.settings.ico_activated_at),
         goals: data.goals,
         workSettings: data.workSettings,
+        activeTrips: activeTrips(data, todayISO()),
       }}
     >
       <Shell email={ctx.user.email} household={ctx.household} households={ctx.households} mode={ctx.store.mode}>
@@ -41,4 +43,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </Shell>
     </LookupsProvider>
   );
+}
+
+/** Cesty, ke kterým má smysl rychle zapisovat výdaje: probíhající a začínající do 3 dnů. */
+function activeTrips(data: Awaited<ReturnType<typeof loadData>>, today: string) {
+  return data.travel.trips
+    .filter((t) => t.start_date && t.start_date <= addDays(today, 3) && (t.end_date ?? t.start_date) >= addDays(today, -1))
+    .sort((a, b) => (a.start_date ?? "").localeCompare(b.start_date ?? ""))
+    .map((trip) => ({
+      trip,
+      people: data.travel.people.filter((p) => p.trip_id === trip.id),
+      wallets: wallets(data.travel.cash.filter((c) => c.trip_id === trip.id), data.travel.expenses.filter((e) => e.trip_id === trip.id)),
+    }));
 }

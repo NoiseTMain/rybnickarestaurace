@@ -10,7 +10,7 @@ import type { ActionResult } from "./result";
 
 /** Části domácnosti, které lze vynulovat. Pořadí = bezpečné pořadí mazání (kvůli vazbám). */
 const RESET_PARTS = {
-  travel: { tables: ["trip_expenses", "trip_legs", "trips"] },
+  travel: { tables: ["trip_cash_moves", "trip_expenses", "trip_plan_items", "trip_checklist", "trip_legs", "trip_people", "trips"] },
   transactions: { tables: ["transactions", "occurrence_marks"] },
   planning: { tables: ["shopping_items", "shopping_lists", "price_history", "purchases"] },
   savings: { tables: ["savings_contributions", "savings_goals"] },

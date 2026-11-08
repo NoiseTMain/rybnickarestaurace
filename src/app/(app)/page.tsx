@@ -15,7 +15,6 @@ import { LinkButton } from "@/components/ui/Button";
 import { BalanceChart, CategoryDonut, IncomeExpenseChart } from "@/components/charts/Charts";
 import { CardLink, InsightItem, KV, Stat } from "@/components/dashboard/bits";
 import { PayOccurrenceButton } from "@/components/forms/PaymentForms";
-import { loadTravel } from "@/lib/travel-data";
 import { effectiveExpenses, summarizeTrip } from "@/lib/finance/travel";
 import { OngoingTripBanner, TravelCard } from "@/components/dashboard/TravelCard";
 
@@ -23,10 +22,11 @@ export const metadata = { title: "Přehled" };
 
 export default async function DashboardPage() {
   const ctx = await requireContext();
-  const [{ data, snapshot: s, today }, travel] = await Promise.all([loadSnapshot(ctx), loadTravel(ctx).catch(() => null)]);
-  const trips = (travel?.trips ?? []).map((trip) => {
-    const legs = travel!.legs.filter((l) => l.trip_id === trip.id);
-    return { trip, legs, s: summarizeTrip(trip, legs, effectiveExpenses(travel!.expenses.filter((e) => e.trip_id === trip.id), data.transactions), today) };
+  const { data, snapshot: s, today } = await loadSnapshot(ctx);
+  const travel = data.travel;
+  const trips = travel.trips.map((trip) => {
+    const legs = travel.legs.filter((l) => l.trip_id === trip.id);
+    return { trip, legs, s: summarizeTrip(trip, legs, effectiveExpenses(travel.expenses.filter((e) => e.trip_id === trip.id), data.transactions), today, travel.cash.filter((c) => c.trip_id === trip.id)) };
   });
   const ongoing = trips.find((t) => t.s.status === "ongoing");
   const catName = (id: string | null) => data.categories.find((c) => c.id === id)?.name ?? "Bez kategorie";

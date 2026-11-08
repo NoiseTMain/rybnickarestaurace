@@ -2,7 +2,6 @@ import Link from "next/link";
 import { CalendarDays, Globe2, MapPin, Users } from "lucide-react";
 import { requireContext } from "@/lib/context";
 import { loadSnapshot } from "@/lib/data";
-import { loadTravel } from "@/lib/travel-data";
 import { effectiveExpenses, STATUS_LABEL, summarizeTrip, type TripSummary } from "@/lib/finance/travel";
 import { formatDate } from "@/lib/dates";
 import { formatMoney, sum } from "@/lib/money";
@@ -16,6 +15,8 @@ import { FilterTabs } from "@/components/lists/Filters";
 import { TripButton } from "@/components/travel/TripForms";
 import { MODE_ICON } from "@/components/travel/icons";
 import { TripMap } from "@/components/travel/TripMap";
+import { TripCompareChart } from "@/components/charts/Charts";
+import { divFloor } from "@/lib/money";
 
 export const metadata = { title: "Cestování" };
 
@@ -54,12 +55,14 @@ function TripCard({ trip, s, legs }: { trip: Trip; s: TripSummary; legs: TripLeg
 export default async function TravelPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const sp = await searchParams;
   const ctx = await requireContext();
-  const [{ data, today }, tr] = await Promise.all([loadSnapshot(ctx), loadTravel(ctx)]);
+  const { data, today } = await loadSnapshot(ctx);
+  const tr = data.travel;
   const all = tr.trips.map((t) => {
     const legs = tr.legs.filter((l) => l.trip_id === t.id);
     const ex = effectiveExpenses(tr.expenses.filter((e) => e.trip_id === t.id), data.transactions);
-    return { trip: t, legs, s: summarizeTrip(t, legs, ex, today) };
+    return { trip: t, legs, s: summarizeTrip(t, legs, ex, today, tr.cash.filter((c) => c.trip_id === t.id)) };
   });
+  const ppd = (x: (typeof all)[number]) => (x.s.days ? divFloor(x.s.paid, x.s.days * Math.max(1, x.trip.travelers)) : null);
   const tab = sp.tab ?? "";
   const active = all.filter((x) => x.s.status !== "finished").sort((a, b) => (a.trip.start_date ?? "9999").localeCompare(b.trip.start_date ?? "9999"));
   const finished = all.filter((x) => x.s.status === "finished");
@@ -88,10 +91,15 @@ export default async function TravelPage({ searchParams }: { searchParams: Promi
               <Card className="!p-4"><p className="text-[11px] uppercase tracking-wider text-ink-3">Zemí</p><p className="text-xl font-semibold">{countries.size}</p></Card>
               <Card className="!p-4"><p className="text-[11px] uppercase tracking-wider text-ink-3">Utraceno celkem</p><Money value={totalSpent} decimals="never" className="gold-text text-xl font-semibold" /></Card>
             </div>
+            {finished.length >= 2 && (
+              <Card title="Srovnání cest" subtitle="Útrata na osobu a den – která cesta vyšla nejdráž">
+                <TripCompareChart data={[...finished].reverse().map((x) => ({ label: `${x.trip.destination} ${x.trip.start_date?.slice(2, 4) ?? ""}`, perPersonDay: ppd(x) ?? 0, total: x.s.paid }))} />
+              </Card>
+            )}
             {points.length > 0 && <Card title="Mapa navštívených míst"><TripMap points={points} lines={[]} height={340} /></Card>}
             <Card title="Navštívené destinace" bodyClassName="overflow-x-auto">
-              <table className="w-full min-w-[520px] text-sm">
-                <thead className="text-xs text-ink-3"><tr><th className="py-1 text-left font-medium">Kam</th><th className="text-left font-medium">Kdy</th><th className="text-right font-medium">Dní</th><th className="text-right font-medium">Utraceno</th><th className="text-right font-medium">Za den</th><th className="text-right font-medium">Rozpočet</th></tr></thead>
+              <table className="w-full min-w-[600px] text-sm">
+                <thead className="text-xs text-ink-3"><tr><th className="py-1 text-left font-medium">Kam</th><th className="text-left font-medium">Kdy</th><th className="text-right font-medium">Dní</th><th className="text-right font-medium">Utraceno</th><th className="text-right font-medium">Za den</th><th className="text-right font-medium">Osoba/den</th><th className="text-right font-medium">Rozpočet</th></tr></thead>
                 <tbody>
                   {finished.map(({ trip, s }) => (
                     <tr key={trip.id} className="border-t border-white/[0.06]">
@@ -100,6 +108,7 @@ export default async function TravelPage({ searchParams }: { searchParams: Promi
                       <td className="num text-right">{s.days ?? "—"}</td>
                       <td className="num text-right">{formatMoney(s.paid, { decimals: "never" })}</td>
                       <td className="num text-right">{s.perDayActual != null ? formatMoney(s.perDayActual, { decimals: "never" }) : "—"}</td>
+                      <td className="num text-right">{ppd({ trip, s, legs: [] }) != null ? formatMoney(ppd({ trip, s, legs: [] })!, { decimals: "never" }) : "—"}</td>
                       <td className={`num text-right ${s.budget != null && s.paid > s.budget ? "text-neg" : "text-ink-2"}`}>{s.budget != null ? formatMoney(s.budget, { decimals: "never" }) : "—"}</td>
                     </tr>
                   ))}

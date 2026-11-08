@@ -1,6 +1,6 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowDownLeft, ArrowUpRight, Briefcase, PiggyBank, Plus, Receipt, ShoppingBag } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Briefcase, Plane, PiggyBank, Plus, Receipt, ShoppingBag } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { TransactionForm } from "@/components/forms/TransactionForm";
@@ -11,6 +11,7 @@ import { ContributionForm } from "@/components/forms/SavingsForms";
 import { cn } from "@/components/ui/cn";
 import { useLookups } from "@/components/Lookups";
 import Link from "next/link";
+import { ExpenseForm } from "@/components/travel/TripForms";
 
 function NeedIco({ onClose }: { onClose: () => void }) {
   return (
@@ -21,7 +22,25 @@ function NeedIco({ onClose }: { onClose: () => void }) {
   );
 }
 
+function TripExpenseQuick({ onDone }: { onDone: () => void }) {
+  const { activeTrips = [] } = useLookups();
+  const [id, setId] = useState(activeTrips[0]?.trip.id ?? "");
+  const t = activeTrips.find((x) => x.trip.id === id) ?? activeTrips[0];
+  if (!t) return null;
+  return (
+    <div className="space-y-4">
+      {activeTrips.length > 1 && (
+        <select className="field" aria-label="Cesta" value={id} onChange={(e) => setId(e.target.value)}>
+          {activeTrips.map((x) => <option key={x.trip.id} value={x.trip.id}>{x.trip.name}</option>)}
+        </select>
+      )}
+      <ExpenseForm key={t.trip.id} trip={t.trip} onDone={onDone} people={t.people} wallets={t.wallets} />
+    </div>
+  );
+}
+
 const ITEMS = [
+  { key: "trip", label: "Výdaj na cestě", icon: Plane },
   { key: "income", label: "Přidat příjem", icon: ArrowDownLeft },
   { key: "expense", label: "Přidat výdaj", icon: ArrowUpRight },
   { key: "invoice", label: "Přidat fakturu", icon: Receipt },
@@ -31,7 +50,8 @@ const ITEMS = [
 ] as const;
 
 type Key = (typeof ITEMS)[number]["key"];
-const TITLES: Record<Key, string> = { income: "Nový příjem", expense: "Nový výdaj", invoice: "Nová faktura", purchase: "Nový nákup", shift: "Nová směna", saving: "Vklad na spoření" };
+const TITLES: Record<Key, string> = {
+  trip: "Výdaj na cestě", income: "Nový příjem", expense: "Nový výdaj", invoice: "Nová faktura", purchase: "Nový nákup", shift: "Nová směna", saving: "Vklad na spoření" };
 
 /** Rychlé tlačítko + (na mobilu plovoucí, na desktopu v horní liště). */
 export function QuickAdd({ floating }: { floating?: boolean }) {
@@ -39,7 +59,7 @@ export function QuickAdd({ floating }: { floating?: boolean }) {
   const [form, setForm] = useState<Key | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setForm(null), []);
-  const { icoActive } = useLookups();
+  const { icoActive, activeTrips = [] } = useLookups();
   useEffect(() => {
     if (!menu) return;
     const h = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setMenu(false); };
@@ -70,7 +90,7 @@ export function QuickAdd({ floating }: { floating?: boolean }) {
             className={cn("glass-strong absolute z-50 w-64 rounded-2xl p-1.5", floating ? "bottom-16 right-0" : "right-0 top-12")}
             role="menu"
           >
-            {ITEMS.map((i) => (
+            {ITEMS.filter((i) => i.key !== "trip" || activeTrips.length > 0).map((i) => (
               <button key={i.key} role="menuitem" type="button" onClick={() => { setMenu(false); setForm(i.key); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-white/[0.07]">
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] text-gold"><i.icon className="h-4 w-4" /></span>
                 {i.label}
@@ -80,6 +100,7 @@ export function QuickAdd({ floating }: { floating?: boolean }) {
         )}
       </AnimatePresence>
       <Modal open={form != null} onClose={close} title={form ? TITLES[form] : ""}>
+        {form === "trip" && <TripExpenseQuick onDone={close} />}
         {form === "income" && <TransactionForm defaultType="income" onDone={close} />}
         {form === "expense" && <TransactionForm defaultType="expense" onDone={close} />}
         {form === "invoice" && (icoActive ? <InvoiceForm onDone={close} /> : <NeedIco onClose={close} />)}

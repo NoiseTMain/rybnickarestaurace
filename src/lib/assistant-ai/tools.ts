@@ -10,7 +10,7 @@ import { invoiceStatusLabel } from "@/lib/finance/obligations";
 import { buildInsights, type ExpenseDraft } from "@/lib/assistant";
 import { guessCategoryName } from "@/lib/categorize";
 import type { TravelData } from "@/lib/travel-data";
-import { effectiveExpenses, KIND_LABEL, MODE_LABEL, summarizeTrip } from "@/lib/finance/travel";
+import { effectiveExpenses, KIND_LABEL, MODE_LABEL, settle, summarizeTrip, wallets } from "@/lib/finance/travel";
 
 /**
  * Nástroje, kterými AI asistent čte data domácnosti. Všechny počítá aplikace
@@ -308,12 +308,20 @@ function listRecords(what: string, env: ToolEnv, n: { catName: (id: string | nul
       return tr.trips.map((t) => {
         const legs = tr.legs.filter((l) => l.trip_id === t.id);
         const ex = effectiveExpenses(tr.expenses.filter((e) => e.trip_id === t.id), d.transactions);
-        const x = summarizeTrip(t, legs, ex, today);
+        const cash = (tr.cash ?? []).filter((c) => c.trip_id === t.id);
+        const people = (tr.people ?? []).filter((p) => p.trip_id === t.id);
+        const x = summarizeTrip(t, legs, ex, today, cash);
+        const st = people.length >= 2 ? settle(people, ex) : null;
         return {
           name: t.name, destination: t.destination, country: t.country, start: t.start_date, end: t.end_date, days: x.days, status: x.status, travelers: t.travelers,
           budget_czk: kc(t.budget), paid_czk: kc(x.paid), still_to_pay_czk: kc(x.plannedExpenses + x.unpaidLegs), spending_money_left_czk: kc(x.spendingMoney), per_day_allowance_czk: kc(x.perDayAllowance),
           per_day_actual_czk: kc(x.perDayActual), due_this_month_czk: kc(x.dueThisMonth), reserved_now_in_planner_czk: kc(x.reserveNow), add_to_reserve_monthly_czk: kc(x.monthlyAdd),
           route: legs.map((l) => ({ mode: MODE_LABEL[l.mode], carrier: l.carrier, from: l.from_place, to: l.to_place, depart: [l.depart_date, l.depart_time].filter(Boolean).join(" ") || null, price_czk: kc(l.price), km: l.distance_km })),
+          people: people.map((p) => p.name),
+          settlement: st ? st.transfers.map((tt) => `${tt.fromName} → ${tt.toName}: ${(tt.amount / 100).toFixed(2)} Kč`) : null,
+          cash_wallets: wallets(cash, ex).map((w) => ({ currency: w.currency, left: w.left / 100, left_czk: kc(w.leftCzk) })),
+          checklist_open: (tr.checklist ?? []).filter((c) => c.trip_id === t.id && !c.done).map((c) => c.text),
+          program: (tr.plan ?? []).filter((p) => p.trip_id === t.id).map((p) => ({ date: p.date, time: p.time, kind: p.kind, title: p.title, address: p.address })),
           spent_by_kind: x.byKind.map((k) => ({ kind: k.label, czk: kc(k.amount) })),
           spent_by_place: x.byPlace.slice(0, 10).map((p) => ({ place: p.place, czk: kc(p.amount) })),
           expenses: ex.slice(0, 60).map((e) => ({ date: e.date, status: e.status, kind: KIND_LABEL[e.kind], description: e.description, place: e.place, czk: kc(e.value), original: e.currency !== "CZK" && e.amount_original != null ? `${e.amount_original / 100} ${e.currency}` : null })),

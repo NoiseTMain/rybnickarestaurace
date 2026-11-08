@@ -8,7 +8,7 @@ import { computeSnapshot } from "@/lib/finance/snapshot";
 import { todayISO } from "@/lib/dates";
 
 export interface FullData extends FinanceData {
-  travel: NonNullable<FinanceData["travel"]>;
+  travel: Required<NonNullable<FinanceData["travel"]>>;
   workSettings: WorkSettings | null;
   documents: DocumentRow[];
 }
@@ -21,13 +21,14 @@ export const loadData = cache(async (ctx: AppContext): Promise<FullData> => load
 /** Načtení dat libovolné domácnosti přes zadané úložiště (např. pro plánované souhrny). */
 export async function loadHouseholdData(s: Store, householdId: string): Promise<FullData> {
   const h = { household_id: householdId };
-  const [settings, members, accounts, categories, transactions, recurring, incomeSources, budgets, goals, contributions, invoices, payouts, shifts, purchases, marks, workSettings, documents, trips, tripLegs, tripExpenses] =
+  const [settings, members, accounts, categories, transactions, recurring, incomeSources, budgets, goals, contributions, invoices, payouts, shifts, purchases, marks, workSettings, documents, trips, tripLegs, tripExpenses, tripPeople, tripCash, tripChecklist, tripPlan] =
     await Promise.all([
       s.select("household_settings", h), s.select("members", h), s.select("accounts", h), s.select("categories", h),
       s.select("transactions", h), s.select("recurring_payments", h), s.select("income_sources", h), s.select("budgets", h),
       s.select("savings_goals", h), s.select("savings_contributions", h), s.select("invoices", h), s.select("payouts", h),
       s.select("work_shifts", h), s.select("purchases", h), s.select("occurrence_marks", h), s.select("work_settings", h),
       s.select("documents", h), s.select("trips", h), s.select("trip_legs", h), s.select("trip_expenses", h),
+      s.select("trip_people", h), s.select("trip_cash_moves", h), s.select("trip_checklist", h), s.select("trip_plan_items", h),
     ]);
   return {
     settings: (settings[0] as HouseholdSettings | undefined) ?? null,
@@ -46,6 +47,10 @@ export async function loadHouseholdData(s: Store, householdId: string): Promise<
       trips: trips.sort((a, b) => (b.start_date ?? "9999").localeCompare(a.start_date ?? "9999")),
       legs: tripLegs.sort((a, b) => a.sort - b.sort || a.created_at.localeCompare(b.created_at)),
       expenses: tripExpenses.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "") || b.created_at.localeCompare(a.created_at)),
+      people: tripPeople.sort((a, b) => a.sort - b.sort || a.created_at.localeCompare(b.created_at)),
+      cash: tripCash.sort((a, b) => a.date.localeCompare(b.date) || a.created_at.localeCompare(b.created_at)),
+      checklist: tripChecklist.sort((a, b) => a.sort - b.sort || a.created_at.localeCompare(b.created_at)),
+      plan: tripPlan.sort((a, b) => (a.date ?? "9999").localeCompare(b.date ?? "9999") || (a.time ?? "").localeCompare(b.time ?? "")),
     },
   };
 }

@@ -1,9 +1,10 @@
 "use server";
 import { z } from "zod";
 import { canEdit, type AppContext } from "@/lib/context";
-import { checkbox, date, enumOf, int, optionalDate, optionalMoney, optionalUuid, optText, text, url, uuid } from "@/lib/validation";
-import type { Transaction, Trip, TripExpense, TripExpenseKind, TripLeg } from "@/lib/db/types";
-import { todayISO } from "@/lib/dates";
+import { checkbox, date, enumOf, int, money, optionalDate, optionalMoney, optionalUuid, optText, text, url, uuid } from "@/lib/validation";
+import type { SavingsGoal, Transaction, Trip, TripCashMove, TripExpense, TripExpenseKind, TripLeg } from "@/lib/db/types";
+import { addDays, diffDays, todayISO } from "@/lib/dates";
+import { checklistTemplate, effectiveExpenses, guessKind, suggestTripTransactions, summarizeTrip, wallets } from "@/lib/finance/travel";
 import { done, fail, own, parse, withContext } from "./helpers";
 import type { ActionResult } from "./result";
 
@@ -87,8 +88,25 @@ const legSchema = z.object({
   id: optionalUuid(), trip_id: uuid(), mode: enumOf(MODES), carrier: optText(80), from_place: text(120), to_place: text(120),
   depart_date: optionalDate(), depart_time: time(), arrive_date: optionalDate(), arrive_time: time(), price: optionalMoney(),
   distance_km: z.preprocess((v) => (v === "" || v == null ? null : Number(String(v).replace(",", "."))), z.union([z.null(), z.number().int("Celé km").min(0).max(50000)])),
-  booking_ref: optText(80), url: url(), note: optText(1000),
+  booking_ref: optText(80), url: url(), note: optText(1000), document_id: optionalUuid(),
 });
+
+/** Trasa po silnici (OSRM, bez klíče): lomená čára a vzdálenost. Při nedostupnosti null. */
+async function roadRoute(mode: string, from: { lat: number; lon: number } | null, to: { lat: number; lon: number } | null) {
+  if (!from || !to || (mode !== "car" && mode !== "bike")) return null;
+  try {
+    const profile = mode === "bike" ? "cycling" : "driving";
+    const r = await fetch(`https://router.project-osrm.org/route/v1/${profile}/${from.lon},${from.lat};${to.lon},${to.lat}?overview=simplified&geometries=polyline`, {
+      headers: { "User-Agent": "HomeOS/1.0 (rodinne finance; cestovani)" }, signal: AbortSignal.timeout(6000),
+    });
+    if (!r.ok) return null;
+    const j = (await r.json()) as { routes?: { geometry?: string; distance?: number }[] };
+    const route = j.routes?.[0];
+    return route?.geometry && route.geometry.length <= 20000 ? { polyline: route.geometry, km: Math.round((route.distance ?? 0) / 1000) } : null;
+  } catch {
+    return null;
+  }
+}
 
 export async function saveLeg(_: ActionResult, fd: FormData): Promise<ActionResult> {
   return withContext(async (ctx) => {
@@ -102,7 +120,12 @@ export async function saveLeg(_: ActionResult, fd: FormData): Promise<ActionResu
       !old || old.from_place !== row.from_place ? geo(row.from_place) : Promise.resolve(old.from_lat != null ? { lat: old.from_lat, lon: old.from_lon! } : null),
       !old || old.to_place !== row.to_place ? geo(row.to_place) : Promise.resolve(old.to_lat != null ? { lat: old.to_lat, lon: old.to_lon! } : null),
     ]);
+    if (row.document_id) await own(ctx, "documents", row.document_id);
     const coords = { from_lat: from?.lat ?? null, from_lon: from?.lon ?? null, to_lat: to?.lat ?? null, to_lon: to?.lon ?? null };
+    const sameRoute = old && old.from_place === row.from_place && old.to_place === row.to_place && old.mode === row.mode && old.route_polyline;
+    const road = sameRoute ? { polyline: old!.route_polyline!, km: old!.distance_km ?? 0 } : await roadRoute(row.mode, from, to);
+    Object.assign(coords, { route_polyline: road?.polyline ?? null });
+    if (row.distance_km == null && road?.km) row.distance_km = road.km;
     if (old) {
       await ctx.store.update("trip_legs", { id: old.id, household_id: h }, { ...row, ...coords });
       return done("Úsek upraven", old.id);
@@ -143,13 +166,15 @@ const expenseSchema = z.object({
   amount: optionalMoney(), amount_original: optionalMoney(),
   rate: z.preprocess((v) => (v === "" || v == null ? null : Number(String(v).replace(",", "."))), z.union([z.null(), z.number().positive("Kurz musí být kladný").max(100000)])),
   record_tx: checkbox(), account_id: optionalUuid(), payment_method: enumOf(["card", "cash", "transfer", "other"] as const),
+  paid_by: optionalUuid(), from_cash: checkbox(), document_id: optionalUuid(),
 }).superRefine((e, c) => {
+  if (e.from_cash && e.currency === "CZK") c.addIssue({ code: "custom", path: ["from_cash"], message: "Z hotovosti v cizí měně lze platit jen v cizí měně" });
   if (e.currency === "CZK" && e.amount == null) c.addIssue({ code: "custom", path: ["amount"], message: "Zadejte částku" });
   if (e.currency !== "CZK") {
     if (e.amount_original == null) c.addIssue({ code: "custom", path: ["amount_original"], message: "Zadejte částku v cizí měně" });
-    if (e.rate == null && e.amount == null) c.addIssue({ code: "custom", path: ["rate"], message: "Zadejte kurz nebo částku v Kč" });
+    if (e.rate == null && e.amount == null && !(e.from_cash && e.status === "paid")) c.addIssue({ code: "custom", path: ["rate"], message: "Zadejte kurz nebo částku v Kč" });
   }
-  if (e.status === "paid" && e.record_tx && !e.account_id) c.addIssue({ code: "custom", path: ["account_id"], message: "Vyberte účet" });
+  if (e.status === "paid" && e.record_tx && !e.from_cash && !e.account_id) c.addIssue({ code: "custom", path: ["account_id"], message: "Vyberte účet" });
 });
 
 function czkAmount(e: z.infer<typeof expenseSchema>): number {
@@ -166,14 +191,28 @@ export async function saveTripExpense(_: ActionResult, fd: FormData): Promise<Ac
     const h = ctx.household.id;
     const trip = (await own(ctx, "trips", e.trip_id)) as Trip;
     if (e.leg_id) await own(ctx, "trip_legs", e.leg_id);
+    if (e.document_id) await own(ctx, "documents", e.document_id);
+    const people = await ctx.store.select("trip_people", { household_id: h, trip_id: trip.id });
+    if (e.paid_by && !people.some((x) => x.id === e.paid_by)) return fail("Neplatný plátce.");
+    const split = fd.getAll("split_among").map(String).filter((id) => people.some((x) => x.id === id));
+    const split_among = split.length && split.length < people.length ? split : null;
+    if (e.from_cash && e.status === "paid") {
+      // hodnota v Kč podle průměrného kurzu, za který jste hotovost koupili
+      const [cash, exps] = await Promise.all([ctx.store.select("trip_cash_moves", { household_id: h, trip_id: trip.id }), ctx.store.select("trip_expenses", { household_id: h, trip_id: trip.id })]);
+      const w = wallets(cash, exps.filter((x) => x.id !== e.id)).find((x) => x.currency === e.currency);
+      if (!w?.avgRate) return fail(`Nemáte zapsanou hotovost v ${e.currency} – nejdřív zapište výměnu nebo výběr z bankomatu.`, { from_cash: "Chybí výměna" });
+      e.rate = w.avgRate;
+      e.amount = null;
+    }
     const amount = czkAmount(e);
     if (amount <= 0) return fail("Částka musí být větší než 0.", { amount: "Zadejte částku" });
     const row = {
       trip_id: trip.id, leg_id: e.leg_id, status: e.status, kind: e.kind as TripExpenseKind, description: e.description, place: e.place,
       date: e.date ?? (e.status === "paid" ? todayISO() : null), amount, currency: e.currency,
       amount_original: e.currency === "CZK" ? null : e.amount_original, rate: e.currency === "CZK" ? null : e.rate ?? amount / e.amount_original!,
+      paid_by: e.paid_by, split_among, from_cash: e.status === "paid" && e.from_cash, document_id: e.document_id,
     };
-    const wantTx = e.status === "paid" && e.record_tx;
+    const wantTx = e.status === "paid" && e.record_tx && !e.from_cash;
     if (wantTx && !canEdit(ctx, "finance")) return fail("Nemáte oprávnění zapisovat výdaje domácnosti – vypněte „Zapsat i do výdajů“.");
 
     if (e.id) {
@@ -225,7 +264,7 @@ export async function linkTransactionToTrip(tripId: string, transactionId: strin
     if (t.type !== "expense" || t.status !== "posted") return fail("Přiřadit lze jen platný výdaj.");
     await ctx.store.insert("trip_expenses", [{
       household_id: ctx.household.id, trip_id: tripId, leg_id: null, transaction_id: t.id, status: "paid", kind, description: t.description.slice(0, 200),
-      place: null, date: t.date, amount: t.amount, currency: "CZK", amount_original: null, rate: null,
+      place: null, date: t.date, amount: t.amount, currency: "CZK", amount_original: null, rate: null, paid_by: null, split_among: null, from_cash: false, document_id: null,
     }]);
     return done("Přiřazeno k cestě");
   });
@@ -238,4 +277,304 @@ export async function getExchangeRate(code: string, day: string): Promise<{ rate
   const d = date().safeParse(day);
   const { cnbRate } = await import("@/lib/travel-services");
   return cnbRate(c, d.success ? d.data : todayISO()).catch(() => null);
+}
+
+// ---------------------------------------------------------------------------
+// Účastníci cesty
+
+export async function addTripPerson(tripId: string, name: string, memberId: string | null = null): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    await own(ctx, "trips", tripId);
+    const n = String(name).trim().slice(0, 60);
+    if (!n) return fail("Zadejte jméno.");
+    if (memberId) await own(ctx, "members", memberId);
+    const existing = await ctx.store.select("trip_people", { household_id: ctx.household.id, trip_id: tripId });
+    if (existing.some((p) => p.name.toLowerCase() === n.toLowerCase())) return fail("Tento účastník už na cestě je.");
+    await ctx.store.insert("trip_people", [{ household_id: ctx.household.id, trip_id: tripId, name: n, member_id: memberId, sort: existing.length }]);
+    await syncTravelers(ctx, tripId);
+    return done("Účastník přidán");
+  });
+}
+
+/** Přidá všechny členy domácnosti jako účastníky. */
+export async function addMembersToTrip(tripId: string): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    await own(ctx, "trips", tripId);
+    const h = ctx.household.id;
+    const [members, existing] = await Promise.all([ctx.store.select("members", { household_id: h }), ctx.store.select("trip_people", { household_id: h, trip_id: tripId })]);
+    const add = members.filter((m) => m.is_active && !existing.some((p) => p.member_id === m.id || p.name.toLowerCase() === m.name.toLowerCase()));
+    if (!add.length) return done("Všichni členové už na cestě jsou");
+    await ctx.store.insert("trip_people", add.map((m, i) => ({ household_id: h, trip_id: tripId, name: m.name.slice(0, 60), member_id: m.id, sort: existing.length + i })));
+    await syncTravelers(ctx, tripId);
+    return done(`Přidáno ${add.length}`);
+  });
+}
+
+export async function deleteTripPerson(id: string): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    const p = await own(ctx, "trip_people", id);
+    await ctx.store.remove("trip_people", { id, household_id: ctx.household.id });
+    // odebrat ze sdílení výdajů
+    const exps = await ctx.store.select("trip_expenses", { household_id: ctx.household.id, trip_id: p!.trip_id });
+    for (const e of exps.filter((x) => x.split_among?.includes(id))) {
+      const rest = e.split_among!.filter((x) => x !== id);
+      await ctx.store.update("trip_expenses", { id: e.id, household_id: ctx.household.id }, { split_among: rest.length ? rest : null });
+    }
+    await syncTravelers(ctx, p!.trip_id);
+    return done("Účastník odebrán");
+  });
+}
+
+async function syncTravelers(ctx: AppContext, tripId: string) {
+  const n = (await ctx.store.select("trip_people", { household_id: ctx.household.id, trip_id: tripId })).length;
+  if (n > 0) await ctx.store.update("trips", { id: tripId, household_id: ctx.household.id }, { travelers: Math.min(50, n) });
+}
+
+// ---------------------------------------------------------------------------
+// Hotovost v cizí měně
+
+const cashSchema = z.object({
+  trip_id: uuid(), kind: enumOf(["buy", "return"] as const), currency: currency(), amount_original: money({ min: 1 }),
+  rate: z.preprocess((v) => (v === "" || v == null ? null : Number(String(v).replace(",", "."))), z.number({ error: "Zadejte kurz" }).positive("Kurz musí být kladný").max(100000)),
+  date: date(), record_tx: checkbox(), account_id: optionalUuid(), note: optText(300),
+}).superRefine((c, x) => {
+  if (c.currency === "CZK") x.addIssue({ code: "custom", path: ["currency"], message: "Vyberte cizí měnu" });
+  if (c.record_tx && !c.account_id) x.addIssue({ code: "custom", path: ["account_id"], message: "Vyberte účet" });
+});
+
+export async function saveCashMove(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    const p = parse(cashSchema, fd);
+    if (!p.ok) return p.result;
+    const c = p.data;
+    const h = ctx.household.id;
+    const trip = (await own(ctx, "trips", c.trip_id)) as Trip;
+    const amount = Math.round(c.amount_original * c.rate);
+    if (c.kind === "return") {
+      const [cash, exps] = await Promise.all([ctx.store.select("trip_cash_moves", { household_id: h, trip_id: trip.id }), ctx.store.select("trip_expenses", { household_id: h, trip_id: trip.id })]);
+      const w = wallets(cash, exps).find((x) => x.currency === c.currency);
+      if (!w || c.amount_original > w.left) return fail(`V hotovosti máte jen ${((w?.left ?? 0) / 100).toLocaleString("cs-CZ")} ${c.currency}.`, { amount_original: "Více, než máte" });
+    }
+    let transaction_id: string | null = null;
+    if (c.record_tx) {
+      if (!canEdit(ctx, "finance")) return fail("Nemáte oprávnění zapisovat do příjmů a výdajů – vypněte zápis na účet.");
+      await own(ctx, "accounts", c.account_id);
+      const label = `${(c.amount_original / 100).toLocaleString("cs-CZ")} ${c.currency}`;
+      const [t] = await ctx.store.insert("transactions", [{
+        household_id: h, type: c.kind === "buy" ? "expense" : "income", status: "posted", amount, date: c.date, account_id: c.account_id!, transfer_account_id: null,
+        category_id: c.kind === "buy" ? await travelCategory(ctx) : null,
+        description: `${trip.name}: ${c.kind === "buy" ? "výměna / výběr" : "vrácení zbytku"} ${label}`.slice(0, 200), member_id: null, scope: "shared",
+        is_recurring: false, payment_method: c.kind === "buy" ? "cash" : "cash", source: "trip", cancelled_at: null, note: c.note,
+      }]);
+      transaction_id = t.id;
+    }
+    await ctx.store.insert("trip_cash_moves", [{ household_id: h, trip_id: trip.id, kind: c.kind, currency: c.currency, amount_original: c.amount_original, amount, rate: c.rate, date: c.date, transaction_id, note: c.note }]);
+    return done(c.kind === "buy" ? "Hotovost zapsána" : "Vrácení zapsáno");
+  });
+}
+
+export async function deleteCashMove(id: string): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    const m = (await own(ctx, "trip_cash_moves", id)) as TripCashMove;
+    const h = ctx.household.id;
+    await ctx.store.remove("trip_cash_moves", { id, household_id: h });
+    if (m.transaction_id && canEdit(ctx, "finance")) await ctx.store.update("transactions", { id: m.transaction_id, household_id: h, status: "posted" }, { status: "cancelled", cancelled_at: new Date().toISOString() });
+    return done(m.transaction_id ? "Smazáno a platba stornována" : "Smazáno");
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Co vyřídit a sbalit
+
+export async function addChecklistItem(tripId: string, text_: string, category: string | null = null): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    await own(ctx, "trips", tripId);
+    const t = String(text_).trim().slice(0, 120);
+    if (!t) return fail("Zadejte, co vyřídit nebo sbalit.");
+    const n = (await ctx.store.select("trip_checklist", { household_id: ctx.household.id, trip_id: tripId })).length;
+    await ctx.store.insert("trip_checklist", [{ household_id: ctx.household.id, trip_id: tripId, text: t, category: category?.slice(0, 40) ?? null, done: false, sort: n }]);
+    return done("");
+  });
+}
+
+export async function fillChecklist(tripId: string): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    const trip = (await own(ctx, "trips", tripId)) as Trip;
+    const h = ctx.household.id;
+    const [legs, existing] = await Promise.all([ctx.store.select("trip_legs", { household_id: h, trip_id: tripId }), ctx.store.select("trip_checklist", { household_id: h, trip_id: tripId })]);
+    const have = new Set(existing.map((x) => x.text.toLowerCase()));
+    const add = checklistTemplate(trip, legs).filter((x) => !have.has(x.text.toLowerCase()));
+    if (!add.length) return done("Seznam už je kompletní");
+    await ctx.store.insert("trip_checklist", add.map((x, i) => ({ household_id: h, trip_id: tripId, text: x.text, category: x.category, done: false, sort: existing.length + i })));
+    return done(`Přidáno ${add.length} položek podle typu cesty`);
+  });
+}
+
+export async function toggleChecklistItem(id: string, doneFlag: boolean): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    await own(ctx, "trip_checklist", id);
+    await ctx.store.update("trip_checklist", { id, household_id: ctx.household.id }, { done: doneFlag });
+    return done("");
+  });
+}
+
+export async function deleteChecklistItem(id: string): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    await own(ctx, "trip_checklist", id);
+    await ctx.store.remove("trip_checklist", { id, household_id: ctx.household.id });
+    return done("");
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Program po dnech
+
+const planSchema = z.object({
+  id: optionalUuid(), trip_id: uuid(), kind: enumOf(["stay", "activity", "note"] as const), date: optionalDate(), end_date: optionalDate(), time: time(),
+  title: text(120), address: optText(200), url: url(), note: optText(1000),
+}).refine((p) => !p.end_date || !p.date || p.end_date >= p.date, { message: "Konec musí být po začátku", path: ["end_date"] });
+
+export async function savePlanItem(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    const p = parse(planSchema, fd);
+    if (!p.ok) return p.result;
+    const { id, ...row } = p.data;
+    await own(ctx, "trips", row.trip_id);
+    if (id) {
+      await own(ctx, "trip_plan_items", id);
+      await ctx.store.update("trip_plan_items", { id, household_id: ctx.household.id }, row);
+      return done("Upraveno");
+    }
+    await ctx.store.insert("trip_plan_items", [{ ...row, household_id: ctx.household.id }]);
+    return done("Přidáno do programu");
+  });
+}
+
+export async function deletePlanItem(id: string): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    await own(ctx, "trip_plan_items", id);
+    await ctx.store.remove("trip_plan_items", { id, household_id: ctx.household.id });
+    return done("Smazáno");
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Dokumenty cesty
+
+export async function attachDocumentToTrip(tripId: string, documentId: string): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    await Promise.all([own(ctx, "trips", tripId), own(ctx, "documents", documentId)]);
+    await ctx.store.update("documents", { id: documentId, household_id: ctx.household.id }, { trip_id: tripId } as never);
+    return done("Dokument přiložen k cestě");
+  });
+}
+
+export async function detachDocumentFromTrip(documentId: string): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    await own(ctx, "documents", documentId);
+    await ctx.store.update("documents", { id: documentId, household_id: ctx.household.id }, { trip_id: null } as never);
+    return done("Odebráno z cesty (dokument zůstal v Dokumentech)");
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Kopie cesty
+
+export async function duplicateTrip(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    const p = parse(z.object({ id: uuid(), start_date: optionalDate(), name: text(120) }), fd);
+    if (!p.ok) return p.result;
+    const h = ctx.household.id;
+    const src = (await own(ctx, "trips", p.data.id)) as Trip;
+    const shift = p.data.start_date && src.start_date ? diffDays(src.start_date, p.data.start_date) : null;
+    // data se posunou o stejný počet dní jako odjezd; bez nového termínu zůstanou prázdná
+    const mv = (d: string | null) => (d && shift != null ? addDays(d, shift) : null);
+    const [legs, people, checklist, plan, exps] = await Promise.all([
+      ctx.store.select("trip_legs", { household_id: h, trip_id: src.id }), ctx.store.select("trip_people", { household_id: h, trip_id: src.id }),
+      ctx.store.select("trip_checklist", { household_id: h, trip_id: src.id }), ctx.store.select("trip_plan_items", { household_id: h, trip_id: src.id }),
+      ctx.store.select("trip_expenses", { household_id: h, trip_id: src.id }),
+    ]);
+    const start = p.data.start_date;
+    const end = start && src.start_date && src.end_date ? addDays(start, diffDays(src.start_date, src.end_date)) : start;
+    const [t] = await ctx.store.insert("trips", [{
+      household_id: h, name: p.data.name, destination: src.destination, country: src.country, start_date: start, end_date: end, travelers: src.travelers,
+      budget: src.budget, currency: src.currency, lat: src.lat, lon: src.lon, note: src.note, goal_id: null,
+    }]);
+    const personMap = new Map<string, string>();
+    if (people.length) {
+      const ins = await ctx.store.insert("trip_people", people.map((x) => ({ household_id: h, trip_id: t.id, name: x.name, member_id: x.member_id, sort: x.sort })));
+      people.forEach((x, i) => personMap.set(x.id, ins[i].id));
+    }
+    if (legs.length) await ctx.store.insert("trip_legs", legs.map((l) => ({
+      household_id: h, trip_id: t.id, mode: l.mode, carrier: l.carrier, from_place: l.from_place, to_place: l.to_place, depart_date: mv(l.depart_date), depart_time: l.depart_time,
+      arrive_date: mv(l.arrive_date), arrive_time: l.arrive_time, price: l.price, distance_km: l.distance_km, booking_ref: null, url: null, note: l.note,
+      from_lat: l.from_lat, from_lon: l.from_lon, to_lat: l.to_lat, to_lon: l.to_lon, document_id: null, route_polyline: l.route_polyline, sort: l.sort,
+    })));
+    if (checklist.length) await ctx.store.insert("trip_checklist", checklist.map((c) => ({ household_id: h, trip_id: t.id, text: c.text, category: c.category, done: false, sort: c.sort })));
+    if (plan.length) await ctx.store.insert("trip_plan_items", plan.map((x) => ({ household_id: h, trip_id: t.id, kind: x.kind, date: mv(x.date), end_date: mv(x.end_date), time: x.time, title: x.title, address: x.address, url: x.url, note: x.note })));
+    // zaplacené i plánované výdaje (kromě dopravy z úseků) jako plán nové cesty
+    const planned = exps.filter((e) => !e.leg_id && !e.from_cash && (e.kind === "accommodation" || e.status === "planned"));
+    if (planned.length) await ctx.store.insert("trip_expenses", planned.map((e) => ({
+      household_id: h, trip_id: t.id, leg_id: null, transaction_id: null, status: "planned", kind: e.kind, description: e.description, place: e.place, date: mv(e.date),
+      amount: e.amount, currency: e.currency, amount_original: e.amount_original, rate: e.rate, paid_by: e.paid_by ? personMap.get(e.paid_by) ?? null : null,
+      split_among: e.split_among?.map((x) => personMap.get(x)).filter((x): x is string => Boolean(x)) ?? null, from_cash: false, document_id: null,
+    })));
+    return done("Cesta zkopírována", t.id);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Cíl ve Spoření pro cestu
+
+export async function createGoalForTrip(tripId: string): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    if (!canEdit(ctx, "savings")) return fail("Nemáte oprávnění upravovat Spoření.");
+    const h = ctx.household.id;
+    const trip = (await own(ctx, "trips", tripId)) as Trip;
+    if (trip.goal_id) return fail("Cesta už má cíl ve Spoření.");
+    const d = (await import("@/lib/data")).loadData;
+    const data = await d(ctx);
+    const today = todayISO();
+    const legs = data.travel.legs.filter((l) => l.trip_id === tripId);
+    const s = summarizeTrip(trip, legs, effectiveExpenses(data.travel.expenses.filter((e) => e.trip_id === tripId), data.transactions), today, data.travel.cash.filter((c) => c.trip_id === tripId));
+    const target = Math.max(s.toCover - s.cashLeft, 0);
+    if (target <= 0) return fail("Na cestu už není potřeba nic odkládat.");
+    const [g] = await ctx.store.insert("savings_goals", [{
+      household_id: h, name: `Cesta: ${trip.name}`.slice(0, 120), kind: "vacation", target_amount: target, target_date: trip.start_date, monthly_contribution: null,
+      account_id: null, color: "#4fc3f7", priority: 2, status: "active", note: "Založeno z Cestování – rezervu na cestu teď drží tento cíl.",
+    } as Omit<SavingsGoal, "id" | "created_at">]);
+    await ctx.store.update("trips", { id: tripId, household_id: h }, { goal_id: g.id });
+    return done("Cíl ve Spoření založen – vklady na něj odkládejte skutečné peníze", g.id);
+  });
+}
+
+export async function unlinkGoal(tripId: string): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    await own(ctx, "trips", tripId);
+    await ctx.store.update("trips", { id: tripId, household_id: ctx.household.id }, { goal_id: null });
+    return done("Cíl odpojen – rezervu znovu počítá plánovač (cíl ve Spoření zůstal)");
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Hromadné přiřazení navržených plateb z účtu
+
+export async function linkSuggestedTransactions(tripId: string): Promise<ActionResult> {
+  return withContext(async (ctx) => {
+    const trip = (await own(ctx, "trips", tripId)) as Trip;
+    const h = ctx.household.id;
+    const [txs, exps, cats, cash] = await Promise.all([
+      ctx.store.select("transactions", { household_id: h }), ctx.store.select("trip_expenses", { household_id: h }), ctx.store.select("categories", { household_id: h }),
+      ctx.store.select("trip_cash_moves", { household_id: h }),
+    ]);
+    const linked = new Set([...exps.map((e) => e.transaction_id), ...cash.map((c) => c.transaction_id)].filter((x): x is string => Boolean(x)));
+    const list = suggestTripTransactions(trip, txs, linked).filter((x) => x.suggested);
+    if (!list.length) return done("Nic dalšího k přiřazení");
+    await ctx.store.insert("trip_expenses", list.map(({ tx }) => ({
+      household_id: h, trip_id: trip.id, leg_id: null, transaction_id: tx.id, status: "paid", kind: guessKind(cats.find((c) => c.id === tx.category_id)?.name ?? null, tx.description),
+      description: tx.description.slice(0, 200), place: null, date: tx.date, amount: tx.amount, currency: "CZK", amount_original: null, rate: null,
+      paid_by: null, split_among: null, from_cash: false, document_id: null,
+    })));
+    return done(`Přiřazeno ${list.length} plateb`);
+  });
 }

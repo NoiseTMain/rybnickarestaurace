@@ -5,7 +5,6 @@ import { loadSnapshot } from "@/lib/data";
 import { aiEnabled } from "@/lib/ai";
 import { friendlyError, runChat, systemPrompt, type ChatMessage } from "@/lib/assistant-ai/chat";
 import type { ToolEnv } from "@/lib/assistant-ai/tools";
-import { loadTravel } from "@/lib/travel-data";
 
 export const maxDuration = 60;
 
@@ -48,7 +47,8 @@ export async function POST(req: Request) {
   if (!history.length || history[history.length - 1].role !== "user") return Response.json({ error: "Chybí otázka" }, { status: 400 });
   if (limited(ctx.user.id)) return Response.json({ error: "Příliš mnoho dotazů, zkuste to za pár minut." }, { status: 429 });
 
-  const [{ data, snapshot, today }, travel] = await Promise.all([loadSnapshot(ctx), loadTravel(ctx).catch(() => undefined)]);
+  const { data, snapshot, today } = await loadSnapshot(ctx);
+  const travel = data.travel;
   const env: ToolEnv = { data, snapshot, today, travel, drafts: [] };
   const me = data.members.find((m) => m.user_id === ctx.user.id)?.name ?? ctx.user.email.split("@")[0];
   const system = systemPrompt(env, ctx.household.name, me);

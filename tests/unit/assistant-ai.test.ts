@@ -38,7 +38,7 @@ const data: FinanceData = {
 const today = "2026-11-06";
 const s = computeSnapshot(data, today);
 
-const env = (): ToolEnv => ({ data: { ...data, workSettings: null, documents: [], travel: { trips: [], legs: [], expenses: [] } }, snapshot: s, today, drafts: [] });
+const env = (): ToolEnv => ({ data: { ...data, workSettings: null, documents: [], travel: { trips: [], legs: [], expenses: [], people: [], cash: [], checklist: [], plan: [] } }, snapshot: s, today, drafts: [] });
 
 describe("AI nástroje", () => {
   it("všechny nástroje mají striktní schéma bez dalších vlastností", () => {

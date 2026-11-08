@@ -2,7 +2,7 @@ import type { Cents } from "@/lib/money";
 import { divFloor, sum } from "@/lib/money";
 import { addDays, diffDays, endOfMonth } from "@/lib/dates";
 import type { PaymentOccurrence } from "./obligations";
-import type { Transaction, Trip, TripExpense, TripExpenseKind, TripLeg, TripLegMode } from "@/lib/db/types";
+import type { Transaction, Trip, TripCashMove, TripChecklistItem, TripExpense, TripExpenseKind, TripLeg, TripLegMode, TripPerson, TripPlanItem } from "@/lib/db/types";
 
 /** Cestování: stav cesty, rozpočet, kolik lze utratit na místě, souhrny po návratu. */
 
@@ -111,6 +111,10 @@ export interface TripSummary {
   monthlyAdd: Cents | null;
   /** Celých kalendářních měsíců do měsíce odjezdu. */
   monthsLeft: number | null;
+  /** Nevyužitá hotovost v cizí měně přepočtená na Kč (už odečtená z účtu při výměně). */
+  cashLeft: Cents;
+  /** Rezervu drží cíl ve Spoření. */
+  goalLinked: boolean;
 }
 
 /** Pořadové číslo kalendářního měsíce (pro počítání měsíců bez ohledu na den). */
@@ -121,7 +125,7 @@ function dueDate(trip: Trip, own: string | null): string | null {
   return own ?? trip.start_date;
 }
 
-export function summarizeTrip(trip: Trip, legs: TripLeg[], expenses: EffectiveExpense[], today: string): TripSummary {
+export function summarizeTrip(trip: Trip, legs: TripLeg[], expenses: EffectiveExpense[], today: string, cash: TripCashMove[] = []): TripSummary {
   const status = tripStatus(trip, today);
   const days = tripDays(trip);
   const paidList = expenses.filter((e) => e.status === "paid");
@@ -166,7 +170,9 @@ export function summarizeTrip(trip: Trip, legs: TripLeg[], expenses: EffectiveEx
   const dueThisMonth = status === "ongoing" || status === "upcoming"
     ? sum(tripObligationItems(trip, legs, expenses, today).filter((o) => o.date <= monthEnd), (o) => o.amount)
     : 0;
-  const need = Math.max(0, toCover - dueThisMonth);
+  const cashLeft = sum(wallets(cash, expenses), (w) => Math.max(0, w.leftCzk));
+  const goalLinked = Boolean(trip.goal_id);
+  const need = goalLinked ? 0 : Math.max(0, toCover - dueThisMonth - cashLeft);
   let reserveNow = 0;
   let monthlyAdd: Cents | null = null;
   let monthsLeft: number | null = null;
@@ -200,6 +206,8 @@ export function summarizeTrip(trip: Trip, legs: TripLeg[], expenses: EffectiveEx
     reserveNow,
     monthlyAdd,
     monthsLeft,
+    cashLeft,
+    goalLinked,
   };
 }
 
@@ -227,6 +235,10 @@ export interface TravelInput {
   trips: Trip[];
   legs: TripLeg[];
   expenses: TripExpense[];
+  people?: TripPerson[];
+  cash?: TripCashMove[];
+  checklist?: TripChecklistItem[];
+  plan?: TripPlanItem[];
 }
 
 /**
@@ -244,7 +256,7 @@ export function travelCommitments(travel: TravelInput | undefined, transactions:
   for (const trip of travel.trips) {
     const legs = travel.legs.filter((l) => l.trip_id === trip.id);
     const ex = effectiveExpenses(travel.expenses.filter((e) => e.trip_id === trip.id), transactions);
-    const s = summarizeTrip(trip, legs, ex, today);
+    const s = summarizeTrip(trip, legs, ex, today, (travel.cash ?? []).filter((c) => c.trip_id === trip.id));
     reserve += s.reserveNow;
     monthlyAdd += s.monthlyAdd ?? 0;
     for (const o of tripObligationItems(trip, legs, ex, today)) {
@@ -287,3 +299,189 @@ const CARRIER_SITES: Record<string, string> = {
   Ryanair: "https://www.ryanair.com", "Wizz Air": "https://wizzair.com", easyJet: "https://www.easyjet.com",
 };
 export const carrierSite = (c: string | null) => (c ? CARRIER_SITES[c] ?? null : null);
+
+// ---------------------------------------------------------------------------
+// Hotovost v cizí měně („peněženka“)
+
+export interface Wallet {
+  currency: string;
+  /** Koupeno / vybráno (v setinách měny) a kolik to stálo v Kč. */
+  bought: number;
+  boughtCzk: Cents;
+  returned: number;
+  spent: number;
+  left: number;
+  /** Průměrný kurz nákupu (Kč za 1 jednotku). */
+  avgRate: number | null;
+  leftCzk: Cents;
+}
+
+export function wallets(cash: TripCashMove[], expenses: Pick<TripExpense, "from_cash" | "currency" | "amount_original" | "status">[]): Wallet[] {
+  const map = new Map<string, Wallet>();
+  const w = (c: string) => {
+    if (!map.has(c)) map.set(c, { currency: c, bought: 0, boughtCzk: 0, returned: 0, spent: 0, left: 0, avgRate: null, leftCzk: 0 });
+    return map.get(c)!;
+  };
+  for (const m of cash) {
+    const x = w(m.currency);
+    if (m.kind === "buy") { x.bought += m.amount_original; x.boughtCzk += m.amount; } else x.returned += m.amount_original;
+  }
+  for (const e of expenses) if (e.from_cash && e.status === "paid" && e.amount_original != null && e.currency !== "CZK") w(e.currency).spent += e.amount_original;
+  for (const x of map.values()) {
+    x.left = x.bought - x.returned - x.spent;
+    x.avgRate = x.bought > 0 ? x.boughtCzk / x.bought : null;
+    x.leftCzk = x.avgRate ? Math.round(x.left * x.avgRate) : 0;
+  }
+  return [...map.values()];
+}
+
+// ---------------------------------------------------------------------------
+// Kdo co platil a vyrovnání
+
+export interface Settlement {
+  balances: { personId: string; name: string; paid: Cents; share: Cents; balance: Cents }[];
+  transfers: { from: string; to: string; fromName: string; toName: string; amount: Cents }[];
+  /** Výdaje bez uvedeného plátce (do vyrovnání se nepočítají). */
+  unassigned: Cents;
+}
+
+export function settle(people: TripPerson[], expenses: EffectiveExpense[]): Settlement {
+  const ids = new Set(people.map((p) => p.id));
+  const paid = new Map<string, number>();
+  const share = new Map<string, number>();
+  let unassigned = 0;
+  for (const e of expenses) {
+    if (e.status !== "paid") continue;
+    if (!e.paid_by || !ids.has(e.paid_by)) { unassigned += e.value; continue; }
+    paid.set(e.paid_by, (paid.get(e.paid_by) ?? 0) + e.value);
+    const among = (e.split_among?.filter((x) => ids.has(x)).length ? e.split_among.filter((x) => ids.has(x)) : people.map((p) => p.id));
+    // rozdělení na haléře: zbytek dostanou první v pořadí
+    const base = Math.floor(e.value / among.length);
+    let rest = e.value - base * among.length;
+    for (const id of among) {
+      share.set(id, (share.get(id) ?? 0) + base + (rest > 0 ? 1 : 0));
+      if (rest > 0) rest--;
+    }
+  }
+  const balances = people.map((p) => ({ personId: p.id, name: p.name, paid: paid.get(p.id) ?? 0, share: share.get(p.id) ?? 0, balance: (paid.get(p.id) ?? 0) - (share.get(p.id) ?? 0) }));
+  // minimum převodů: největší dlužník platí největšímu věřiteli
+  const debtors = balances.filter((b) => b.balance < 0).map((b) => ({ ...b, left: -b.balance })).sort((a, b) => b.left - a.left);
+  const creditors = balances.filter((b) => b.balance > 0).map((b) => ({ ...b, left: b.balance })).sort((a, b) => b.left - a.left);
+  const transfers: Settlement["transfers"] = [];
+  let i = 0, j = 0;
+  while (i < debtors.length && j < creditors.length) {
+    const amount = Math.min(debtors[i].left, creditors[j].left);
+    if (amount > 0) transfers.push({ from: debtors[i].personId, to: creditors[j].personId, fromName: debtors[i].name, toName: creditors[j].name, amount });
+    debtors[i].left -= amount;
+    creditors[j].left -= amount;
+    if (debtors[i].left === 0) i++;
+    if (creditors[j].left === 0) j++;
+  }
+  return { balances, transfers, unassigned };
+}
+
+// ---------------------------------------------------------------------------
+// Seznam věcí k vyřízení a sbalení podle typu cesty
+
+const SEA = ["chorvat", "itali", "reck", "španěl", "spanel", "turec", "egypt", "bulhar", "černá hora", "cerna hora", "portugal", "kypr", "malt", "albán", "alban", "tunis", "francie"];
+const PLUGS_OTHER = ["británie", "britanie", "anglie", "irsko", "skotsko", "malta", "kypr", "švýcarsko", "svycarsko", "usa", "spojené státy", "kanada", "japonsko", "thajsko", "spojené arabské", "dubaj"];
+const EU = ["rakousko", "německo", "nemecko", "slovensko", "polsko", "maďarsko", "madarsko", "chorvatsko", "itálie", "italie", "slovinsko", "francie", "španělsko", "spanelsko", "portugalsko", "řecko", "recko", "nizozemsko", "belgie", "dánsko", "švédsko", "finsko", "irsko", "bulharsko", "rumunsko", "kypr", "malta", "lucembursko", "estonsko", "lotyšsko", "litva", "česko"];
+
+export function checklistTemplate(trip: Pick<Trip, "country" | "destination">, legs: Pick<TripLeg, "mode">[]): { text: string; category: string }[] {
+  const where = `${trip.country ?? ""} ${trip.destination}`.toLowerCase();
+  const modes = new Set(legs.map((l) => l.mode));
+  const sea = SEA.some((k) => where.includes(k)) || modes.has("ferry");
+  const abroad = trip.country != null && !/česk|cesk|čr\b/i.test(trip.country);
+  const inEu = EU.some((k) => where.includes(k));
+  const out: { text: string; category: string }[] = [
+    { text: abroad && !inEu ? "Cestovní pas (platnost aspoň 6 měsíců)" : "Občanský průkaz / pas", category: "Doklady" },
+    { text: "Cestovní pojištění", category: "Doklady" },
+    ...(inEu && abroad ? [{ text: "Kartička zdravotní pojišťovny (EHIC)", category: "Doklady" }] : []),
+    ...(abroad && !inEu ? [{ text: "Ověřit vízum / vstupní podmínky", category: "Doklady" }] : []),
+    { text: "Jízdenky, rezervace ubytování", category: "Doklady" },
+    { text: "Platební karta (+ záložní)", category: "Peníze" },
+    ...(abroad ? [{ text: "Hotovost v místní měně", category: "Peníze" }] : []),
+    { text: "Nabíječky a powerbanka", category: "Elektronika" },
+    ...(PLUGS_OTHER.some((k) => where.includes(k)) ? [{ text: "Adaptér do zásuvky", category: "Elektronika" }] : []),
+    { text: "Léky a lékárnička", category: "Zdraví" },
+    { text: "Oblečení a hygiena", category: "Sbalit" },
+  ];
+  if (modes.has("car")) out.push(
+    { text: "Řidičský průkaz a technický průkaz", category: "Auto" },
+    { text: "Dálniční známky / mýto na trase", category: "Auto" },
+    { text: "Zelená karta (pojištění auta)", category: "Auto" },
+    { text: "Povinná výbava (vesta, trojúhelník, lékárnička)", category: "Auto" },
+    { text: "Kontrola pneumatik a oleje", category: "Auto" },
+  );
+  if (modes.has("plane")) out.push(
+    { text: "Online check-in a palubenka v mobilu", category: "Letadlo" },
+    { text: "Tekutiny do 100 ml v sáčku", category: "Letadlo" },
+    { text: "Zkontrolovat rozměry a váhu zavazadel", category: "Letadlo" },
+  );
+  if (modes.has("train") || modes.has("bus")) out.push({ text: "Jízdenky v mobilu / vytištěné", category: "Doprava" });
+  if (sea) out.push(
+    { text: "Plavky a ručník", category: "Moře" },
+    { text: "Opalovací krém", category: "Moře" },
+    { text: "Boty do vody", category: "Moře" },
+  );
+  out.push(
+    { text: "Zalít květiny, vynést koš", category: "Doma" },
+    { text: "Vypnout spotřebiče, zavřít okna, zamknout", category: "Doma" },
+  );
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Návrh plateb z účtu, které patří k cestě
+
+const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+export function suggestTripTransactions<T extends Pick<Transaction, "id" | "date" | "type" | "status" | "description" | "note" | "recurring_payment_id" | "invoice_id" | "payout_id" | "contribution_id" | "shopping_list_id" | "purchase_id">>(
+  trip: Pick<Trip, "start_date" | "end_date" | "destination" | "country" | "currency">, txs: T[], linked: Set<string>,
+): { tx: T; suggested: boolean; reason: string | null }[] {
+  if (!trip.start_date) return [];
+  const end = trip.end_date ?? trip.start_date;
+  const from = addDays(trip.start_date, -2);
+  const to = addDays(end, 1);
+  const words = [trip.destination, trip.country ?? ""].map(norm).filter((w) => w.length >= 3);
+  const cur = trip.currency !== "CZK" ? trip.currency.toLowerCase() : null;
+  const out: { tx: T; suggested: boolean; reason: string | null }[] = [];
+  for (const t of txs) {
+    if (t.type !== "expense" || t.status !== "posted" || linked.has(t.id) || t.date < from || t.date > to) continue;
+    if (t.recurring_payment_id || t.invoice_id || t.payout_id || t.contribution_id || t.shopping_list_id || t.purchase_id) continue;
+    const text = norm(`${t.description} ${t.note ?? ""}`);
+    const reason = words.find((w) => text.includes(w)) ? "místo cesty v popisu"
+      : cur && new RegExp(`\\b${cur}\\b`).test(text) ? `platba v ${trip.currency}`
+      : /\b(booking|airbnb|hotel|hostel|regiojet|flixbus|ryanair|wizz|smartwings|easyjet|cd\.cz|leo express|omv|shell|mol|vignette|maut|autostrada)\b/.test(text) ? "cestovní obchodník"
+      : t.date >= trip.start_date && t.date <= end ? "v termínu cesty" : null;
+    out.push({ tx: t, suggested: reason != null, reason });
+  }
+  return out.sort((a, b) => Number(b.suggested) - Number(a.suggested) || a.tx.date.localeCompare(b.tx.date));
+}
+
+/** Odhad druhu výdaje z kategorie a popisu. */
+export function guessKind(categoryName: string | null, description: string): TripExpenseKind {
+  const t = norm(`${categoryName ?? ""} ${description}`);
+  if (/booking|airbnb|hotel|hostel|ubytovan|apartm|penzion/.test(t)) return "accommodation";
+  if (/doprav|auto|benzin|nafta|omv|shell|mol|regiojet|flixbus|ryanair|wizz|vlak|letenk|parkov|myto|vignette|dalnic/.test(t)) return "transport";
+  if (/restaura|potravin|kavarn|cafe|bistro|pizza|bar\b|jidlo/.test(t)) return "food";
+  if (/zabav|vstup|muzeum|vylet|ticket|tour/.test(t)) return "activities";
+  if (/suvenyr|obchod|nakup|shop/.test(t)) return "shopping";
+  return "other";
+}
+
+/** Dekódování lomené čáry (Google polyline, přesnost 5) pro mapu. */
+export function decodePolyline(str: string): [number, number][] {
+  const out: [number, number][] = [];
+  let i = 0, lat = 0, lon = 0;
+  while (i < str.length) {
+    for (const which of [0, 1]) {
+      let shift = 0, result = 0, b: number;
+      do { b = str.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+      const d = result & 1 ? ~(result >> 1) : result >> 1;
+      if (which === 0) lat += d; else lon += d;
+    }
+    out.push([lat / 1e5, lon / 1e5]);
+  }
+  return out;
+}
