@@ -1,4 +1,5 @@
 "use server";
+import { buildCategoryHints, suggestCategory } from "@/lib/finance/category-hints";
 import { z } from "zod";
 import { checkbox, date, enumOf, money, optionalUuid, optText, uuid } from "@/lib/validation";
 import { fingerprint } from "@/lib/csv";
@@ -144,6 +145,7 @@ export async function analyzeBankImport(payload: string): Promise<ImportAnalysis
       ctx.store.select("categories", { household_id: ctx.household.id }),
     ]);
     const imported = new Set(txs.map((t) => t.external_id).filter(Boolean));
+    const hints = buildCategoryHints(await ctx.store.select("transactions", { household_id: ctx.household.id }));
     const manual = txs.filter((t) => t.status === "posted" && !t.external_id);
     const ids = rowIds(account_id, rows);
     const out: NonNullable<ImportAnalysis["rows"]> = rows.map((r, index) => {
@@ -151,7 +153,8 @@ export async function analyzeBankImport(payload: string): Promise<ImportAnalysis
       const text = `${r.description} ${r.counterparty}`;
       const isIncome = r.amount > 0;
       const rule = RULES.find(([re, name]) => re.test(text) && categories.some((c) => c.name === name && c.kind === (isIncome ? "income" : "expense")));
-      const categoryId = rule ? categories.find((c) => c.name === rule[1])!.id : null;
+      const learned = suggestCategory(hints, r.description || r.counterparty, isIncome ? "income" : "expense");
+      const categoryId = learned && categories.some((c) => c.id === learned) ? learned : rule ? categories.find((c) => c.name === rule[1])!.id : null;
       if (imported.has(externalId)) return { index, externalId, status: "imported", categoryId };
       const match = manual.find((t) => t.amount === Math.abs(r.amount) && t.type === (isIncome ? "income" : "expense") && t.date >= addDays(r.date, -3) && t.date <= addDays(r.date, 3));
       if (match) return { index, externalId, status: "possible_duplicate", categoryId: match.category_id ?? categoryId, matchDescription: `${match.date} ${match.description}` };

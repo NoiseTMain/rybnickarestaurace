@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isSupabaseConfigured, localModeBlocked, publicEnv } from "@/lib/env";
 
-const PUBLIC = ["/prihlaseni", "/registrace", "/obnova-hesla", "/auth/confirm", "/konfigurace", "/api/cron", "/api/billing/webhook", "/api/log-error", "/vitejte", "/podminky", "/soukromi", "/sdilene", "/kalkulacky", "/clanky", "/robots.txt", "/sitemap.xml"];
+const PUBLIC = ["/prihlaseni", "/registrace", "/obnova-hesla", "/auth/confirm", "/konfigurace", "/api/cron", "/api/billing/webhook", "/api/log-error", "/api/widget", "/vitejte", "/podminky", "/soukromi", "/sdilene", "/kalkulacky", "/clanky", "/robots.txt", "/sitemap.xml"];
 
 /**
  * První vrstva ochrany: obnovení relace Supabase a přesměrování nepřihlášených.

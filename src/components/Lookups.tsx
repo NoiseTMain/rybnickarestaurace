@@ -22,6 +22,8 @@ export interface Lookups {
   isAdmin?: boolean;
   /** Sekce skryté uživatelem (podle životní situace nebo ručně). */
   hiddenSections?: string[];
+  /** Naučené kategorie (obchodník → kategorie). */
+  categoryHints?: Record<string, string>;
   profile?: import("@/lib/db/types").LifeProfile | null;
   locale?: import("@/lib/db/types").Locale;
   /** Probíhající a brzy začínající cesty (pro rychlý zápis výdaje). */

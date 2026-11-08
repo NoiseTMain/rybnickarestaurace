@@ -66,6 +66,10 @@ export interface AdminBackend {
   recordLogin(key: string, ok: boolean): Promise<void>;
   /** Vrátí true, když se upozornění s tímto klíčem dnes ještě neposlalo (a zaznamená ho). */
   notifyOnce(key: string, date: string): Promise<boolean>;
+  /** Widget na plochu: uložení (nahradí starý), vyhledání podle hashe tokenu, zrušení. */
+  widgetSet(userId: string, householdId: string, hash: string): Promise<void>;
+  widgetGet(hash: string): Promise<{ user_id: string; household_id: string } | null>;
+  widgetDelete(userId: string): Promise<void>;
   /** Doporučení: kód uživatele (vytvoří, když chybí), zápis doporučení, seznam. */
   referralCode(userId: string): Promise<string>;
   userByReferralCode(code: string): Promise<string | null>;
@@ -186,6 +190,19 @@ function supabaseBackend(): AdminBackend {
     async recordLogin(key, ok) {
       await db.from("login_attempts").insert({ key, ok });
       if (ok) await db.from("login_attempts").delete().eq("key", key).eq("ok", false);
+    },
+    async widgetSet(userId, householdId, hash) {
+      await db.from("widget_tokens").delete().eq("user_id", userId);
+      const { error } = await db.from("widget_tokens").insert({ token_hash: hash, user_id: userId, household_id: householdId });
+      if (error) throw new Error(error.message);
+    },
+    async widgetGet(hash) {
+      const { data } = await db.from("widget_tokens").select("user_id,household_id").eq("token_hash", hash).maybeSingle();
+      if (data) await db.from("widget_tokens").update({ last_used_at: new Date().toISOString() }).eq("token_hash", hash);
+      return (data as { user_id: string; household_id: string } | null) ?? null;
+    },
+    async widgetDelete(userId) {
+      await db.from("widget_tokens").delete().eq("user_id", userId);
     },
     async notifyOnce(key, date) {
       const { error } = await db.from("notification_log").insert({ key: key.slice(0, 200), date });
@@ -315,6 +332,9 @@ async function localBackend(): Promise<AdminBackend> {
       if (ok) (d.tables as Any).login_attempts = l.filter((r) => r.key !== key);
       else l.push({ id: randomUUID(), key, ok, created_at: new Date().toISOString() });
     }),
+    widgetSet: (userId, householdId, hash) => writeLocal((d) => { const l = t(d as never, "widget_tokens"); (d.tables as Any).widget_tokens = l.filter((r) => r.user_id !== userId); t(d as never, "widget_tokens").push({ token_hash: hash, user_id: userId, household_id: householdId, created_at: new Date().toISOString() }); }),
+    widgetGet: (hash) => readLocal((d) => { const r = t(d as never, "widget_tokens").find((x) => x.token_hash === hash); return r ? { user_id: r.user_id as string, household_id: r.household_id as string } : null; }),
+    widgetDelete: (userId) => writeLocal((d) => { (d.tables as Any).widget_tokens = t(d as never, "widget_tokens").filter((r) => r.user_id !== userId); }),
     notifyOnce: (key, date) => writeLocal((d) => { const l = t(d as never, "notification_log"); if (l.some((r) => r.key === key && r.date === date)) return false; l.push({ key, date, created_at: new Date().toISOString() }); return true; }),
     referralCode: (userId) => writeLocal((d) => { const l = t(d as never, "referral_codes"); const f = l.find((r) => r.user_id === userId); if (f) return f.code as string; const code = refCode(); l.push({ user_id: userId, code, created_at: new Date().toISOString() }); return code; }),
     userByReferralCode: (code) => readLocal((d) => (t(d as never, "referral_codes").find((r) => r.code === code.toUpperCase())?.user_id as string | undefined) ?? null),
@@ -327,7 +347,7 @@ async function localBackend(): Promise<AdminBackend> {
     setBanned: (userId, banned) => writeLocal((d) => { const u = d.users.find((x) => x.id === userId) as unknown as Any | undefined; if (u) u.banned = banned; }),
     deleteUser: (userId) => writeLocal((d) => {
       d.users = d.users.filter((u) => u.id !== userId);
-      for (const name of ["subscriptions", "ai_usage", "push_subscriptions"]) (d.tables as Any)[name] = t(d as never, name).filter((r) => r.user_id !== userId);
+      for (const name of ["subscriptions", "ai_usage", "push_subscriptions", "widget_tokens"]) (d.tables as Any)[name] = t(d as never, name).filter((r) => r.user_id !== userId);
       const owned = t(d as never, "household_users").filter((r) => r.user_id === userId).map((r) => r.household_id as string);
       (d.tables as Any).household_users = t(d as never, "household_users").filter((r) => r.user_id !== userId);
       for (const hid of owned) {

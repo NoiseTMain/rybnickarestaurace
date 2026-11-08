@@ -86,6 +86,7 @@ export function AssistantChat({ aiEnabled }: { aiEnabled: boolean }) {
     end.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [msgs]);
   const [ai, setAi] = useState(aiEnabled);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [streaming, setStreaming] = useState(false);
   const busy = pending || streaming;
 
@@ -105,6 +106,8 @@ export function AssistantChat({ aiEnabled }: { aiEnabled: boolean }) {
     const patch = (f: (m: AiMsg) => Partial<AiMsg>) => setMsgs((all) => all.map((m, i) => (i === idx && m.role === "ai" ? { ...m, ...f(m) } : m)));
     setStreaming(true);
     setMsgs((m) => [...m, { role: "ai", text: "", status: "Přemýšlím…", drafts: [], error: null, done: false }]);
+    // když AI selže, odpoví aplikace sama ze svých výpočtů a znalostní báze (1000+ otázek)
+    const fallback = () => { setMsgs((all) => all.filter((_, i) => i !== idx)); askRules(text); };
     try {
       const res = await fetch("/api/assistant/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: history }) });
       if (res.status === 501 || res.status === 402) {
@@ -115,9 +118,11 @@ export function AssistantChat({ aiEnabled }: { aiEnabled: boolean }) {
       }
       if (!res.ok || !res.body) {
         const err = (await res.json().catch(() => ({}))) as { error?: string };
-        patch(() => ({ error: err.error ?? "Asistent je teď nedostupný.", status: null }));
+        if (res.status === 429) { patch(() => ({ error: err.error ?? "Asistent je teď nedostupný.", status: null })); return; }
+        fallback(); // AI nedostupná → odpoví aplikace sama (výpočty + znalostní báze)
         return;
       }
+      let failed = false;
       const reader = res.body.getReader();
       const dec = new TextDecoder();
       let buf = "";
@@ -134,11 +139,12 @@ export function AssistantChat({ aiEnabled }: { aiEnabled: boolean }) {
           if (ev.t === "text") patch((m) => ({ text: m.text + (ev.text ?? ""), status: null }));
           else if (ev.t === "status") patch(() => ({ status: ev.text ?? null }));
           else if (ev.t === "draft" && ev.draft) patch((m) => ({ drafts: [...m.drafts, ev.draft!] }));
-          else if (ev.t === "error") patch(() => ({ error: ev.text ?? "Chyba", status: null }));
+          else if (ev.t === "error") { failed = true; }
         }
       }
+      if (failed) fallback();
     } catch {
-      patch(() => ({ error: "Spojení se přerušilo.", status: null }));
+      fallback();
     } finally {
       patch(() => ({ done: true, status: null }));
       setStreaming(false);
@@ -202,8 +208,8 @@ export function AssistantChat({ aiEnabled }: { aiEnabled: boolean }) {
         <div ref={end} />
       </div>
       <form onSubmit={(e) => { e.preventDefault(); ask(q); }} className="flex gap-2 border-t border-white/[0.06] pt-3">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Např. Můžeme si dovolit pračku za 9 990 Kč?" className="field flex-1" aria-label="Otázka pro asistenta" maxLength={ai ? 4000 : 500} />
-        <VoiceButton onText={(t) => setQ(t)} />
+        <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Např. Můžeme si dovolit pračku za 9 990 Kč?" className="field flex-1" aria-label="Otázka pro asistenta" maxLength={ai ? 4000 : 500} />
+        <VoiceButton onText={(t) => setQ(t)} inputRef={inputRef} />
         <button type="submit" disabled={busy || !q.trim()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gold text-[#1b1407] disabled:opacity-40" aria-label="Odeslat"><ArrowUp className="h-5 w-5" /></button>
       </form>
       <p className="mt-2 text-[11px] text-ink-3">{ai ? "AI asistent (Claude) – čísla bere jen z vašich dat přes výpočty aplikace; nic neuloží bez potvrzení." : "Odpovědi počítá aplikace z vašich dat (AI není zapnutá – chybí ANTHROPIC_API_KEY)."}</p>

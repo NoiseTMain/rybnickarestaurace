@@ -68,6 +68,8 @@ export async function POST(req: Request) {
         for await (const ev of runChat(client!, env, system, history)) send(ev);
       } catch (e) {
         console.warn("AI chat:", e instanceof Anthropic.APIError ? e.status : e);
+        const { logAppError } = await import("@/lib/errors-log");
+        await logAppError({ message: `AI chat: ${e instanceof Anthropic.APIError ? `${e.status} ${e.message}` : e instanceof Error ? e.message : String(e)}`, path: "/api/assistant/chat", userId: ctx.user.id });
         send({ t: "error", text: friendlyError(e) });
       }
       controller.close();

@@ -21,3 +21,14 @@ describe("detekce předplatných", () => {
     expect(detectSubscriptions(txs, [], "2026-11-01").candidates).toHaveLength(0);
   });
 });
+
+import { buildCategoryHints, suggestCategory } from "@/lib/finance/category-hints";
+describe("chytré kategorie", () => {
+  it("naučí se kategorii podle obchodníka", () => {
+    const txs = [tx("2026-10-01", 50_000, "Albert Praha"), tx("2026-10-08", 40_000, "ALBERT"), tx("2026-10-09", 9_000, "Albert")].map((t, i) => ({ ...t, category_id: i < 2 ? "food" : "drug" }));
+    const h = buildCategoryHints(txs);
+    expect(suggestCategory(h, "Albert hypermarket", "expense")).toBe("food");
+    expect(suggestCategory(h, "Albert", "income")).toBeNull();
+    expect(suggestCategory(h, "Neznámý obchod", "expense")).toBeNull();
+  });
+});

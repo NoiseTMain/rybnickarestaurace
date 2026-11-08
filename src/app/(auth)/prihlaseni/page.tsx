@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth";
 import { appMode } from "@/lib/env";
 import { AuthCard } from "../AuthCard";
-import { LoginForm } from "../AuthForms";
+import { oauthProviders } from "@/lib/oauth";
+import { LoginForm, OAuthButtons } from "../AuthForms";
 import { getT } from "@/lib/i18n/server";
 
 export const metadata = { title: "Přihlášení" };
@@ -20,6 +21,7 @@ export default async function LoginPage() {
     >
       {appMode() === "local" && <p className="mb-4 rounded-xl bg-info/10 px-3 py-2 text-xs text-info">Běží lokální vývojový režim (bez Supabase). Účty a data se ukládají do souboru <code>.data/homeos.json</code>.</p>}
       <LoginForm />
+      <OAuthButtons providers={oauthProviders()} />
     </AuthCard>
   );
 }

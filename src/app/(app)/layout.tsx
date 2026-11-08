@@ -9,6 +9,7 @@ import { getPrefs } from "@/lib/prefs";
 import { PremiumPromo } from "@/components/premium/PremiumPromo";
 import { Tour } from "@/components/Tour";
 import { TOUR_COOKIE } from "@/lib/tour";
+import { buildCategoryHints } from "@/lib/finance/category-hints";
 import { localModeBlocked } from "@/lib/env";
 import { LookupsProvider } from "@/components/Lookups";
 import { Shell } from "@/components/shell/Shell";
@@ -47,6 +48,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         premium: premium.household,
         isAdmin: premium.isAdmin,
         hiddenSections: prefs.hidden_sections,
+        categoryHints: buildCategoryHints(data.transactions),
         profile: prefs.profile,
         locale: prefs.locale,
       }}

@@ -2,6 +2,7 @@
 import { useToast } from "@/components/ui/Toast";
 import { queueIfOffline } from "@/lib/offline-queue";
 import { useState } from "react";
+import { suggestCategory } from "@/lib/finance/category-hints";
 import { Pencil, Plus } from "lucide-react";
 import { saveTransaction } from "@/lib/actions/transactions";
 import { toInputValue } from "@/lib/money";
@@ -17,6 +18,14 @@ export function TransactionForm({ initial, defaultType = "expense", onDone }: { 
   const lk = useLookups();
   const toast = useToast();
   const [type, setType] = useState<TxType>(initial?.type ?? defaultType);
+  const [cat, setCat] = useState(initial?.category_id ?? "");
+  const [catTouched, setCatTouched] = useState(Boolean(initial?.category_id));
+  const [suggested, setSuggested] = useState(false);
+  const onDescription = (text: string) => {
+    if (catTouched || type === "transfer") return;
+    const s = suggestCategory(lk.categoryHints, text, type === "income" ? "income" : "expense");
+    if (s && lk.categories.some((c) => c.id === s && !c.is_archived)) { setCat(s); setSuggested(true); }
+  };
   const { state, formAction, pending, fe } = useFormAction(saveTransaction, onDone);
   const firstAccount = lk.accounts.find((a) => a.is_active && a.include_in_available)?.id ?? lk.accounts[0]?.id;
   if (!lk.accounts.length) {
@@ -31,11 +40,14 @@ export function TransactionForm({ initial, defaultType = "expense", onDone }: { 
         <Input name="date" type="date" label="Datum" defaultValue={initial?.date ?? lk.today} error={fe("date")} required />
       </div>
       {type !== "transfer" ? (
-        <Select name="category_id" label="Kategorie" defaultValue={initial?.category_id ?? ""} error={fe("category_id")}>
-          <CategoryOptions kind={type === "income" ? "income" : "expense"} current={initial?.category_id} />
-        </Select>
+        <div>
+          <Select name="category_id" label="Kategorie" value={cat} onChange={(e) => { setCat(e.target.value); setCatTouched(true); setSuggested(false); }} error={fe("category_id")}>
+            <CategoryOptions kind={type === "income" ? "income" : "expense"} current={initial?.category_id} />
+          </Select>
+          {suggested && <p className="mt-1 text-xs text-gold" data-testid="category-suggested">✨ Navrženo podle vašich dřívějších zápisů</p>}
+        </div>
       ) : null}
-      <Input name="description" label="Popis" placeholder={type === "expense" ? "např. Nákup v Albertu" : type === "income" ? "např. Výplata" : "např. Na spořicí účet"} defaultValue={initial?.description ?? ""} error={fe("description")} maxLength={200} />
+      <Input name="description" label="Popis" placeholder={type === "expense" ? "např. Nákup v Albertu" : type === "income" ? "např. Výplata" : "např. Na spořicí účet"} defaultValue={initial?.description ?? ""} error={fe("description")} maxLength={200} onChange={(e) => onDescription(e.target.value)} />
       <div className="grid grid-cols-2 gap-3">
         <Select name="account_id" label={type === "transfer" ? "Z účtu" : type === "income" ? "Na účet" : "Z účtu"} defaultValue={initial?.account_id ?? firstAccount} error={fe("account_id")}>
           <AccountOptions />

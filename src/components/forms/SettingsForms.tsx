@@ -113,6 +113,7 @@ export function PasswordForm() {
       <Input name="password" type="password" label="Nové heslo" autoComplete="new-password" error={fe("password")} className="min-w-56 flex-1" />
       <Button type="submit" loading={pending}>Změnit heslo</Button>
       <FormError error={state.ok ? undefined : state.error} />
+      <p className="w-full text-xs text-ink-3">Přihlašujete se přes Google nebo Apple? Nastavte si tu heslo – budete ho potřebovat k potvrzení citlivých akcí (reset, smazání účtu, vypnutí 2FA).</p>
     </form>
   );
 }

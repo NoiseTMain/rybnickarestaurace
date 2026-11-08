@@ -958,6 +958,62 @@ step("výzvy a můj rok v číslech");
   await page.getByTestId("year-tiles").getByText("zapsaných pohybů").waitFor();
 }
 
+step("chytré kategorie, widget, podklady pro účetní, menu na mobilu, znalostní báze asistenta");
+{
+  await page.goto(B + "/transakce");
+  const catValue = await page.evaluate(() => null);
+  for (let i = 0; i < 2; i++) {
+    await page.getByRole("button", { name: "Výdaj", exact: true }).click();
+    await page.locator("[role=dialog] input[name=amount]").fill("123");
+    const opt = await page.locator("[role=dialog] select[name=category_id] option", { hasText: "Drogerie" }).first().getAttribute("value");
+    await page.locator("[role=dialog] select[name=category_id]").selectOption(opt);
+    await page.locator("[role=dialog] input[name=description]").fill("DM drogerie Chodov");
+    await modalSubmitOn(page, "Výdaj uložen");
+  }
+  await page.getByRole("button", { name: "Výdaj", exact: true }).click();
+  await page.locator("[role=dialog] input[name=description]").fill("DM drogerie");
+  await page.getByTestId("category-suggested").waitFor();
+  const chosen = await page.locator("[role=dialog] select[name=category_id] option:checked").innerText();
+  assert.match(chosen, /Drogerie/);
+  await page.keyboard.press("Escape");
+  void catValue;
+  // widget
+  await page.goto(B + "/nastaveni#widget");
+  await page.getByRole("button", { name: "Vytvořit odkaz pro widget" }).click();
+  const wurl = (await page.getByTestId("widget-url").innerText()).trim();
+  const wtext = await (await page.request.get(wurl.replace(/^https?:\/\/[^/]+/, B))).text();
+  assert.match(wtext, /Dnes můžete utratit|Pozor: do konce měsíce chybí/);
+  const anonW = await browser.newContext();
+  assert.equal((await anonW.request.get(wurl.replace(/^https?:\/\/[^/]+/, B))).ok(), true, "widget funguje bez přihlášení");
+  assert.equal((await anonW.request.get(B + "/api/widget/neplatnytokenneplatnytoken")).status(), 404);
+  await anonW.close();
+  // daně: DPH a podklady
+  await page.goto(B + "/dane");
+  await page.getByTestId("vat").getByText("Obrat vůči limitu DPH", { exact: false }).count();
+  await page.getByTestId("vat").waitFor();
+  await page.goto(B + "/tisk/dane");
+  await page.getByRole("heading", { name: /Podklady pro účetní/ }).waitFor();
+  // znalostní báze (bez AI)
+  await page.goto(B + "/asistent");
+  await page.getByPlaceholder(/Můžeme si dovolit pračku/).fill("Co je RPSN?");
+  await page.getByRole("button", { name: "Odeslat" }).click();
+  await page.getByText(/RPSN/).nth(1).waitFor();
+  // menu na mobilu: posouvá se menu, ne stránka
+  const mob = await browser.newContext({ viewport: { width: 390, height: 600 }, isMobile: true, hasTouch: true, storageState: await page.context().storageState() });
+  const mpg = await mob.newPage();
+  await mpg.goto(B + "/transakce");
+  await mpg.evaluate(() => window.scrollTo(0, 300));
+  await mpg.getByRole("button", { name: "Otevřít menu" }).click();
+  const nav = mpg.getByTestId("drawer-nav");
+  await nav.waitFor();
+  assert.equal(await mpg.evaluate(() => document.body.style.position), "fixed", "stránka pod menu je zamčená");
+  await nav.evaluate((el) => { el.scrollTop = 400; });
+  assert.ok((await nav.evaluate((el) => el.scrollTop)) > 0, "menu se dá posouvat");
+  await mpg.getByRole("button", { name: "Zavřít menu" }).click();
+  assert.equal(await mpg.evaluate(() => document.body.style.position), "", "po zavření se stránka odemkne");
+  await mob.close();
+}
+
 step("doporuč kamarádovi: odkaz s kódem, registrace přes doporučení");
 {
   await op.goto(B + "/premium#doporuc");

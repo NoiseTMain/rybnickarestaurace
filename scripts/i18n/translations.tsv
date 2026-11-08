@@ -3338,3 +3338,70 @@ zázvor	=	ginger
 žampiony	šampiňóny	mushrooms
 anglicky (in English)	=	=
 Paella	=	=
+(IČO {0})	(IČO {0})	(ID {0})
+(nebo „Zobrazit oznámení“).	(alebo „Zobraziť oznámenie“).	(or "Show Notification").
+(nová zkratka) → pojmenujte ji „HomeOS“.	(nová skratka) → pomenujte ju „HomeOS“.	(new shortcut) → name it "HomeOS".
+Blížíte se k limitu – zvažte, jak se k DPH postavíte (registrace, rozložení zakázek). Poraďte se s účetní.	Blížite sa k limitu – zvážte, ako sa k DPH postavíte (registrácia, rozloženie zákaziek). Poraďte sa s účtovníkom.	You're approaching the limit – consider how you'll handle VAT (registration, spreading jobs). Talk to your accountant.
+Do limitu zbývá {0}.	Do limitu zostáva {0}.	{0} left until the limit.
+Hlasové zadávání tady prohlížeč nepovoluje – klepněte do pole a použijte mikrofon 🎤 na klávesnici telefonu.	Hlasové zadávanie tu prehliadač nepovoľuje – ťuknite do poľa a použite mikrofón 🎤 na klávesnici telefónu.	Voice input isn't allowed here by the browser – tap the field and use the 🎤 microphone on your phone keyboard.
+Jste v bezpečí pod limitem.	Ste bezpečne pod limitom.	You're safely below the limit.
+Limit pro DPH	Limit pre DPH	VAT threshold
+Na ploše podržte prst →	Na ploche podržte prst →	Long-press the home screen →
+Na ploše telefonu uvidíte	Na ploche telefónu uvidíte	On your phone's home screen you'll see
+Nainstalujte aplikaci pro widgety z webu (např. „HTTP Request Widget“ nebo KWGT) a jako adresu zadejte zkopírovaný odkaz. Rychlé zástupce (Zapsat výdaj, Platby…) máte také po podržení ikony HomeOS na ploše.	Nainštalujte aplikáciu na widgety z webu (napr. „HTTP Request Widget“ alebo KWGT) a ako adresu zadajte skopírovaný odkaz. Rýchle skratky (Zapísať výdavok, Platby…) máte aj po podržaní ikony HomeOS na ploche.	Install a web widget app (e.g. "HTTP Request Widget" or KWGT) and use the copied link as the address. Quick shortcuts (Record expense, Payments…) are also available by long-pressing the HomeOS icon.
+Neuhrazené faktury	Neuhradené faktúry	Unpaid invoices
+Nic jsem neslyšel – zkuste to znovu a mluvte hned po pípnutí.	Nič som nepočul – skúste to znova a hovorte hneď po pípnutí.	I didn't hear anything – try again and speak right after the beep.
+Obrat pro limit DPH (2 000 000 Kč)	Obrat pre limit DPH (2 000 000 Kč)	Turnover towards VAT threshold (2,000,000 CZK)
+Obrat vůči limitu DPH	Obrat voči limitu DPH	Turnover vs. VAT threshold
+Obrat z vystavených faktur za rok {0} · limit {1}	Obrat z vystavených faktúr za rok {0} · limit {1}	Turnover from issued invoices in {0} · threshold {1}
+Odkaz je tajný – kdo ho má, uvidí tato souhrnná čísla. Nikomu ho neposílejte. Ukáže se jen teď.	Odkaz je tajný – kto ho má, uvidí tieto súhrnné čísla. Nikomu ho neposielajte. Ukáže sa len teraz.	The link is secret – anyone who has it sees these summary numbers. Don't share it. It's shown only now.
+Odkaz widgetu zrušen	Odkaz widgetu zrušený	Widget link revoked
+Orientační přehled z evidence v HomeOS. Doklady (PDF faktur) najdete v sekci Dokumenty. Nejde o daňové poradenství.	Orientačný prehľad z evidencie v HomeOS. Doklady (PDF faktúr) nájdete v sekcii Dokumenty. Nejde o daňové poradenstvo.	Indicative overview from HomeOS records. Documents (invoice PDFs) are in the Documents section. Not tax advice.
+Otevřete aplikaci	Otvorte aplikáciu	Open the app
+Po měsících	Po mesiacoch	By month
+Podklady pro účetní	Podklady pre účtovníka	Accountant's report
+Podklady pro účetní (PDF)	Podklady pre účtovníka (PDF)	Accountant's report (PDF)
+Podklady pro účetní – rok	Podklady pre účtovníka – rok	Accountant's report – year
+Pokračovat přes Apple	Pokračovať cez Apple	Continue with Apple
+Pokračovat přes Google	Pokračovať cez Google	Continue with Google
+Pokračováním souhlasíte s	Pokračovaním súhlasíte s	By continuing you agree to the
+Poslouchám…	Počúvam…	Listening…
+Povolte mikrofon v nastavení prohlížeče (u adresy stránky).	Povoľte mikrofón v nastaveniach prehliadača (pri adrese stránky).	Allow the microphone in your browser settings (next to the address).
+Počítá se jen z faktur zapsaných v HomeOS. Limity jsou orientační – ověřte je na financnisprava.cz.	Počíta sa len z faktúr zapísaných v HomeOS. Limity sú orientačné – overte ich.	Only invoices recorded in HomeOS are counted. Thresholds are indicative – check them at financnisprava.cz.
+Překročili jste 2 536 500 Kč: plátcem DPH jste už ode dne následujícího po překročení. Kontaktujte účetní co nejdřív.	Prekročili ste 2 536 500 Kč: platiteľom DPH ste už odo dňa nasledujúceho po prekročení. Kontaktujte účtovníka čo najskôr.	You've exceeded 2,536,500 CZK: you're a VAT payer from the day after. Contact your accountant as soon as possible.
+Překročili jste limit 2 000 000 Kč: plátcem DPH se stáváte od 1. ledna příštího roku. Registraci podejte do 10 pracovních dnů po konci měsíce, kdy jste limit překročili.	Prekročili ste limit 2 000 000 Kč: platiteľom DPH sa stávate od 1. januára budúceho roka. Registráciu podajte do 10 pracovných dní po konci mesiaca, keď ste limit prekročili.	You've exceeded 2,000,000 CZK: you become a VAT payer from 1 January next year. File the registration within 10 working days after the end of the month you exceeded it.
+Přidat widget	Pridať widget	Add widget
+Přidejte akci	Pridajte akciu	Add the action
+Přihlašujete se přes Google nebo Apple? Nastavte si tu heslo – budete ho potřebovat k potvrzení citlivých akcí (reset, smazání účtu, vypnutí 2FA).	Prihlasujete sa cez Google alebo Apple? Nastavte si tu heslo – budete ho potrebovať na potvrdenie citlivých akcií (reset, zmazanie účtu, vypnutie 2FA).	Signing in with Google or Apple? Set a password here – you'll need it to confirm sensitive actions (reset, account deletion, turning off 2FA).
+Přihlášení se nepodařilo zahájit. Zkuste to prosím znovu.	Prihlásenie sa nepodarilo spustiť. Skúste to prosím znova.	Sign-in couldn't start. Please try again.
+Přijaté faktury (	Prijaté faktúry (	Received invoices (
+Přijaté faktury (výdaje)	Prijaté faktúry (výdavky)	Received invoices (expenses)
+Tento způsob přihlášení zatím není zapnutý.	Tento spôsob prihlásenia zatiaľ nie je zapnutý.	This sign-in method isn't enabled yet.
+Tip: v Zkratkách → Automatizace můžete nastavit, ať se vám částka každé ráno ukáže sama.	Tip: v Skratkách → Automatizácia môžete nastaviť, nech sa vám suma každé ráno ukáže sama.	Tip: in Shortcuts → Automation you can have the amount shown every morning.
+Tisk / uložit jako PDF	Tlač / uložiť ako PDF	Print / save as PDF
+V lokálním režimu není přihlášení přes Google/Apple dostupné.	V lokálnom režime nie je prihlásenie cez Google/Apple dostupné.	Google/Apple sign-in isn't available in local mode.
+Vystavené faktury (	Vystavené faktúry (	Issued invoices (
+Vystavené faktury (příjmy)	Vystavené faktúry (príjmy)	Issued invoices (income)
+Vytvořit odkaz pro widget	Vytvoriť odkaz pre widget	Create widget link
+Widget	=	=
+Widget na plochu telefonu	Widget na plochu telefónu	Home screen widget
+Widget zatím není na serveru dostupný.	Widget zatiaľ nie je na serveri dostupný.	The widget isn't available on the server yet.
+Zkratky	Skratky	Shortcuts
+Zobrazit výsledek	Zobraziť výsledok	Show Result
+Zrušit dosavadní odkaz widgetu	Zrušiť doterajší odkaz widgetu	Revoke the current widget link
+Získat obsah URL	Získať obsah URL	Get Contents of URL
+a kolik zbývá do konce měsíce – bez otevírání aplikace.	a koľko zostáva do konca mesiaca – bez otvárania aplikácie.	and what's left until month end – without opening the app.
+a vložte zkopírovaný odkaz.	a vložte skopírovaný odkaz.	and paste the copied link.
+podmínkami	podmienkami	terms
+v aplikaci HomeOS	v aplikácii HomeOS	in the HomeOS app
+zásadami ochrany osobních údajů	zásadami ochrany osobných údajov	privacy policy
+získáno	získané	earned
+{0} · IČO {1}{2} · {3}	{0} · IČO {1}{2} · {3}	{0} · ID {1}{2} · {3}
+· vytvořeno	· vytvorené	· created
+„Dnes můžete utratit …“	„Dnes môžete minúť …“	"You can spend today …"
+„Dnes můžete utratit…“ na ploše iPhonu i Androidu	„Dnes môžete minúť…“ na ploche iPhonu aj Androidu	"You can spend today…" on your iPhone or Android home screen
+← Zpět	← Späť	← Back
+→ vyberte „HomeOS“. Klepnutím na widget uvidíte aktuální částku.	→ vyberte „HomeOS“. Ťuknutím na widget uvidíte aktuálnu sumu.	→ choose "HomeOS". Tap the widget to see the current amount.
+✨ Navrženo podle vašich dřívějších zápisů	✨ Navrhnuté podľa vašich skorších zápisov	✨ Suggested from your previous entries
+📱 iPhone – návod (2 minuty)	📱 iPhone – návod (2 minúty)	📱 iPhone – how-to (2 minutes)
+🤖 Android – návod	🤖 Android – návod	🤖 Android – how-to

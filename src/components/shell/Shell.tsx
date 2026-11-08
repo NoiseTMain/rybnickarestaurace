@@ -9,7 +9,7 @@ import type { Key } from "@/lib/i18n/dict";
 import { sectionOfHref } from "@/lib/profiles";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { useState, useTransition, type ReactNode } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { signOut } from "@/lib/actions/auth";
 import { switchHousehold } from "@/lib/actions/household";
 import { cn } from "@/components/ui/cn";
@@ -106,6 +106,14 @@ export function Shell({ children, email, household, households, mode }: ShellPro
   const path = usePathname();
   const { t } = useT();
   const [drawer, setDrawer] = useState(false);
+  // otevřené menu: stránka pod ním se nesmí posouvat (iOS potřebuje position: fixed)
+  useEffect(() => {
+    if (!drawer) return;
+    const y = window.scrollY, b = document.body.style;
+    const prev = { position: b.position, top: b.top, width: b.width, overflow: b.overflow };
+    Object.assign(b, { position: "fixed", top: `-${y}px`, width: "100%", overflow: "hidden" });
+    return () => { Object.assign(b, prev); window.scrollTo(0, y); };
+  }, [drawer]);
   const footer = (
     <div className="space-y-2 border-t border-white/[0.06] pt-3">
       {mode === "local" && <p className="rounded-xl bg-info/10 px-3 py-2 text-[11px] leading-snug text-info">Lokální režim – data jsou v souboru na tomto počítači. Pro produkci nastavte Supabase.</p>}
@@ -137,11 +145,11 @@ export function Shell({ children, email, household, households, mode }: ShellPro
         {drawer && (
           <div className="fixed inset-0 z-50 lg:hidden">
             <motion.div className="absolute inset-0 bg-black/60 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setDrawer(false)} />
-            <motion.aside className="glass-strong absolute inset-y-0 right-0 flex w-[min(20rem,88vw)] flex-col gap-4 p-4 pt-[max(1rem,env(safe-area-inset-top))]"
+            <motion.aside className="glass-strong absolute inset-y-0 right-0 flex h-dvh w-[min(20rem,88vw)] flex-col gap-4 overflow-hidden p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]"
               initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", damping: 30, stiffness: 300 }}>
               <div className="flex items-center justify-between"><Logo /><button type="button" onClick={() => setDrawer(false)} className="rounded-full p-2 hover:bg-white/10" aria-label="Zavřít menu"><X className="h-5 w-5" /></button></div>
               <HouseholdSwitcher household={household} households={households} />
-              <div className="scroll-thin flex-1 overflow-y-auto"><NavList path={path} onNavigate={() => setDrawer(false)} /></div>
+              <div className="scroll-thin min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain" data-testid="drawer-nav"><NavList path={path} onNavigate={() => setDrawer(false)} /></div>
               {footer}
             </motion.aside>
           </div>

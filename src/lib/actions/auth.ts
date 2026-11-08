@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { appMode } from "@/lib/env";
+import { oauthProviders } from "@/lib/oauth";
 import { createLocalSession, hashPassword, LOCAL_SESSION_COOKIE, verifyPassword } from "@/lib/auth";
 import { HOUSEHOLD_COOKIE } from "@/lib/context";
 import { createSessionClient } from "@/lib/supabase/server";
@@ -149,4 +150,16 @@ export async function changePassword(_: ActionResult, fd: FormData): Promise<Act
     if (error) return fail(`Změna hesla selhala: ${error.message}`);
   }
   return { ok: true, message: "Heslo bylo změněno.", at: Date.now() };
+}
+
+/** Přihlášení/registrace přes Google nebo Apple (Supabase OAuth). Povolené poskytovatele určuje NEXT_PUBLIC_OAUTH_PROVIDERS. */
+export async function signInWithProvider(provider: "google" | "apple"): Promise<{ error?: string }> {
+  if (appMode() === "local") return { error: "V lokálním režimu není přihlášení přes Google/Apple dostupné." };
+  if (!oauthProviders().includes(provider)) return { error: "Tento způsob přihlášení zatím není zapnutý." };
+  const h = await headers();
+  const origin = process.env.APP_URL || process.env.NEXT_PUBLIC_SITE_URL || `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
+  const supabase = await createSessionClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: `${origin}/auth/confirm?next=/` } });
+  if (error || !data.url) return { error: "Přihlášení se nepodařilo zahájit. Zkuste to prosím znovu." };
+  redirect(data.url);
 }

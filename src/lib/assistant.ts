@@ -1,4 +1,5 @@
 import { searchKb, type KbEntry } from "@/lib/assistant-kb";
+import { buildCategoryHints, suggestCategory } from "@/lib/finance/category-hints";
 import { abs, divFloor, divRound, formatMoney as fm, parseMoney, sub, type Cents } from "@/lib/money";
 import { diffDays, endOfMonth, endOfWeek, formatDate, minDate, monthName } from "@/lib/dates";
 import type { FinanceData, Snapshot } from "@/lib/finance/snapshot";
@@ -378,7 +379,8 @@ export function parseExpenseDraft(question: string, d: FinanceData, today: strin
     .replace(/\b(zapiš|zapis|přidej|pridej|přidat|zaznamenej|výdaj|vydaj|kartou|hotově|hotove|hotovostí|převodem|prevodem|za)\b/gi, " ")
     .replace(/\s+/g, " ").trim().slice(0, 120) || "Výdaj";
   const catName = guessCategoryName(description);
-  const categoryId = catName ? d.categories.find((c) => c.kind === "expense" && c.name === catName)?.id ?? null : null;
+  const learned = suggestCategory(buildCategoryHints(d.transactions), description, "expense");
+  const categoryId = (learned && d.categories.some((c) => c.id === learned) ? learned : null) ?? (catName ? d.categories.find((c) => c.kind === "expense" && c.name === catName)?.id ?? null : null);
   return { amount, description: description.charAt(0).toUpperCase() + description.slice(1), categoryId, paymentMethod, date: today };
 }
 
