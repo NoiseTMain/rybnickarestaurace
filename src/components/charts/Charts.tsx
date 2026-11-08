@@ -247,3 +247,51 @@ export function TripCompareChart({ data }: { data: { label: string; perPersonDay
     </div>
   );
 }
+
+/** Vývoj čistého jmění po měsících. */
+export function NetWorthChart({ data }: { data: { month: string; net: number; assets: number; liabilities: number }[] }) {
+  const { gold } = useAccent();
+  return (
+    <div className="h-52 w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>
+          <defs>
+            <linearGradient id="nwFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={gold} stopOpacity={0.35} />
+              <stop offset="100%" stopColor={gold} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
+          <XAxis dataKey="month" {...AXIS} tickFormatter={(m: string) => `${Number(m.slice(5))}/${m.slice(2, 4)}`} />
+          <YAxis {...AXIS} width={52} tickFormatter={compact} />
+          <Tooltip cursor={{ stroke: "rgba(244,239,230,0.3)" }} content={({ active, payload }) => active && payload?.length ? (
+            <TooltipBox title={payload[0].payload.month} rows={[{ label: "Čisté jmění", value: payload[0].payload.net }, { label: "Majetek", value: payload[0].payload.assets }, { label: "Dluhy", value: payload[0].payload.liabilities }]} />
+          ) : null} />
+          <Area type="monotone" dataKey="net" stroke={gold} strokeWidth={2} fill="url(#nwFill)" dot={{ r: 3 }} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+/** Zbývající dluh po měsících – dvě strategie. */
+export function DebtPayoffChart({ data }: { data: { month: number; avalanche: number; snowball: number }[] }) {
+  const { gold } = useAccent();
+  return (
+    <div className="h-48 w-full">
+      <Legend items={[{ label: "Lavina (nejdražší první)", color: gold }, { label: "Sněhová koule (nejmenší první)", color: EXPENSE, dashed: true }]} />
+      <ResponsiveContainer width="100%" height="85%">
+        <LineChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>
+          <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
+          <XAxis dataKey="month" {...AXIS} tickFormatter={(m: number) => `${m}. m`} minTickGap={30} />
+          <YAxis {...AXIS} width={52} tickFormatter={compact} />
+          <Tooltip content={({ active, payload }) => active && payload?.length ? (
+            <TooltipBox title={`${payload[0].payload.month}. měsíc`} rows={[{ label: "Lavina", value: payload[0].payload.avalanche, color: gold }, { label: "Sněhová koule", value: payload[0].payload.snowball, color: EXPENSE }]} />
+          ) : null} />
+          <Line type="monotone" dataKey="avalanche" stroke={gold} strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="snowball" stroke={EXPENSE} strokeWidth={2} strokeDasharray="4 3" dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}

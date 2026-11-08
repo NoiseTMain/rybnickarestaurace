@@ -12,6 +12,7 @@ import { MonthPicker } from "@/components/lists/Filters";
 import { TxRow } from "@/components/lists/TxRow";
 import { TransactionButton } from "@/components/forms/TransactionForm";
 import { SetupButton } from "@/components/forms/SetupForms";
+import { RecurringButton } from "@/components/forms/PaymentForms";
 import { CategoryDonut } from "@/components/charts/Charts";
 
 export const metadata = { title: "Domácnost" };
@@ -43,10 +44,38 @@ export default async function HouseholdPage({ searchParams }: { searchParams: Pr
       income: sum(data.transactions.filter((t) => t.status === "posted" && t.type === "income" && t.member_id === m.id && t.date >= from && t.date <= to), (t) => t.amount) };
   }).filter((m) => m.shared + m.personal + m.income > 0 || m.id);
 
+  const children = data.members.filter((m) => m.is_child && m.is_active).map((m) => ({
+    m,
+    spent: sum(expenses.filter((t) => t.member_id === m.id), (t) => t.amount),
+    goals: data.goals.filter((g) => g.member_id === m.id && g.status === "active").map((g) => ({ g, saved: sum(data.contributions.filter((c) => c.goal_id === g.id), (c) => c.amount) })),
+  }));
+
   return (
     <div className="space-y-4">
       <ReadOnlyNotice ctx={ctx} section="finance" />
       <PageHeader title="Domácnost" subtitle={`Rodinný rozpočet · ${monthName(from)}`} actions={<><MonthPicker value={month} /><TransactionButton defaultType="expense" label="Přidat výdaj" variant="primary" /></>} />
+
+      {children.length > 0 && (
+        <Card title="Děti" subtitle="Kapesné, výdaje na děti tento měsíc a jejich spořicí cíle" data-testid="kids">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {children.map((k) => (
+              <div key={k.m.id} className="rounded-2xl bg-black/25 p-3">
+                <div className="flex items-center gap-2"><Avatar member={k.m} size={28} /><b className="text-sm">{k.m.name}</b></div>
+                <div className="mt-2 space-y-1 text-sm">
+                  <div className="flex justify-between"><span className="text-ink-2">Kapesné</span><span>{k.m.pocket_money ? <><Money value={k.m.pocket_money} decimals="never" /> / {k.m.pocket_frequency === "weekly" ? "týden" : "měsíc"}</> : <span className="text-ink-3">nenastaveno</span>}</span></div>
+                  {k.m.pocket_frequency === "weekly" && k.m.pocket_money ? <div className="flex justify-between text-xs text-ink-3"><span>měsíčně cca</span><Money value={Math.round((k.m.pocket_money * 52) / 12)} decimals="never" /></div> : null}
+                  <div className="flex justify-between"><span className="text-ink-2">Výdaje na dítě</span><Money value={k.spent} decimals="never" /></div>
+                  {k.goals.map((g) => <div key={g.g.id}><div className="flex justify-between text-xs"><span>🎯 {g.g.name}</span><span><Money value={g.saved} decimals="never" /> / <Money value={g.g.target_amount} decimals="never" /></span></div><Progress value={percent(g.saved, g.g.target_amount || 1)} label={g.g.name} /></div>)}
+                </div>
+                {k.m.pocket_money && !data.recurring.some((r) => r.is_active && r.name === `Kapesné – ${k.m.name}`) ? (
+                  <div className="mt-2"><RecurringButton label="Hlídat kapesné v plánu" prefill={{ name: `Kapesné – ${k.m.name}`, amount: k.m.pocket_money, frequency: k.m.pocket_frequency === "weekly" ? "weekly" : "monthly", start_date: todayISO(), member_id: k.m.id, payment_method: "cash" }} /></div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-ink-3">Tip: dítěti založte spořicí cíl (Spoření → Nový cíl → Pro koho) – naučí se, že na větší věc se šetří.</p>
+        </Card>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card title="Domácí výdaje" subtitle={`${household.length} výdajů`}>

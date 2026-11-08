@@ -9,6 +9,8 @@ import { addDays, todayISO } from "@/lib/dates";
 import { travelAlerts } from "@/lib/finance/travel-alerts";
 import { monthlyClosing } from "@/lib/finance/closing";
 import { addMonths, startOfMonth } from "@/lib/dates";
+import { REMINDER_KIND, dueReminders } from "@/lib/finance/networth";
+import { adminBackend } from "@/lib/admin";
 
 /**
  * Denní upozornění (Vercel Cron, večer): den před odjezdem rozpis cesty,
@@ -38,6 +40,18 @@ export async function GET(req: Request) {
             sent++;
           } catch { /* neplatný odběr se smaže při dalších upozorněních */ }
         }
+      }
+    }
+    // hlídač termínů: upozornění v den „notify_days“ předem a v den termínu (každé jen jednou)
+    const backend = await adminBackend();
+    for (const r of dueReminders(await store.select("reminders", { household_id: hid }), today)) {
+      if (r.daysLeft !== r.notify_days && r.daysLeft !== 0) continue;
+      if (!(await backend.notifyOnce(`rem:${r.id}:${r.due_date}:${r.daysLeft}`, today))) continue;
+      for (const s of list) {
+        try {
+          await sendPush(s, { title: `${REMINDER_KIND[r.kind].emoji} ${r.title}`, body: r.daysLeft === 0 ? "Termín je dnes." : `Termín ${r.due_date.split("-").reverse().join(". ")} – za ${r.daysLeft} dní.`, url: "/majetek#terminy" });
+          sent++;
+        } catch { /* neplatný odběr */ }
       }
     }
     const sentBefore = await store.select("trip_notifications", { household_id: hid });

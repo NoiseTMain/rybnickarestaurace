@@ -204,6 +204,21 @@ export async function seedDemo(store: Store, user: AppUser, hid: string, today: 
     { trip_id: next.id, leg_id: null, status: "planned", kind: "accommodation", description: "Apartmán – doplatek", place: "Split", date: nextStart, ...eur(42_000, 25.1) },
   ].map((e) => ({ household_id: hid, transaction_id: null, paid_by: payer.get(e.description) ?? null, split_among: null, from_cash: false, document_id: null, ...e } as never)));
 
+  await store.insert("assets", [
+    { household_id: hid, name: "ETF portfolio (demo)", kind: "investment", value: 18_500_000, note: null },
+    { household_id: hid, name: "Škoda Octavia (demo)", kind: "vehicle", value: 21_000_000, note: "odhad prodejní ceny" },
+    { household_id: hid, name: "Penzijní spoření (demo)", kind: "pension", value: 9_600_000, note: null },
+  ]);
+  await store.insert("debts", [
+    { household_id: hid, name: "Kreditní karta (demo)", balance: 1_850_000, rate: 21.9, min_payment: 150_000, note: null },
+    { household_id: hid, name: "Půjčka na auto (demo)", balance: 12_400_000, rate: 6.9, min_payment: 480_000, note: null },
+  ]);
+  await store.insert("reminders", [
+    { household_id: hid, title: "STK Octavia (demo)", kind: "stk", due_date: addDays(today, 10), notify_days: 30, repeat_yearly: false, done: false, note: null },
+    { household_id: hid, title: "Povinné ručení – výročí (demo)", kind: "insurance", due_date: addDays(today, 45), notify_days: 60, repeat_yearly: true, done: false, note: "porovnat nabídky" },
+    { household_id: hid, title: "Záruka pračky (demo)", kind: "warranty", due_date: addDays(today, 200), notify_days: 30, repeat_yearly: false, done: false, note: null },
+  ]);
+
   await store.update("household_settings", { household_id: hid }, {
     safety_buffer: 500_000, onboarded_at: new Date().toISOString(), billing_ico: "00000027", ico_activated_at: new Date().toISOString(), ico_changed_at: null,
     ico_info: { ico: "00000027", name: "Ukázkový podnikatel (demo)", address: "Ukázková 1, Praha", legalForm: "Fyzická osoba podnikající (živnostník)", dic: null, established: null, verified: false, source: "manual", checkedAt: new Date().toISOString() },

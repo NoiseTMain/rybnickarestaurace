@@ -18,6 +18,7 @@ const goalSchema = z.object({
   status: enumOf(["active", "achieved", "archived"]).default("active"),
   note: optText(500),
   initial_amount: optionalMoney(),
+  member_id: optionalUuid(),
 });
 
 export async function saveGoal(_: ActionResult, fd: FormData): Promise<ActionResult> {
@@ -26,6 +27,7 @@ export async function saveGoal(_: ActionResult, fd: FormData): Promise<ActionRes
     if (!p.ok) return p.result;
     const { id, initial_amount, ...row } = p.data;
     await own(ctx, "accounts", row.account_id);
+    await own(ctx, "members", row.member_id);
     if (id) {
       await own(ctx, "savings_goals", id);
       await ctx.store.update("savings_goals", { id, household_id: ctx.household.id }, row);

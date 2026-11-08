@@ -13,6 +13,7 @@ import { AccountOptions, FormActions } from "./common";
 
 export function GoalForm({ initial, onDone }: { initial?: SavingsGoal; onDone?: () => void }) {
   const { state, formAction, pending, fe } = useFormAction(saveGoal, onDone);
+  const lk = useLookups();
   return (
     <form action={formAction} className="space-y-4">
       {initial && <input type="hidden" name="id" value={initial.id} />}
@@ -33,6 +34,12 @@ export function GoalForm({ initial, onDone }: { initial?: SavingsGoal; onDone?: 
       <MoneyInput name="monthly_contribution" label="Pravidelný měsíční vklad" hint="nepovinné" defaultValue={toInputValue(initial?.monthly_contribution ?? null)} error={fe("monthly_contribution")} />
       <p className="text-xs text-ink-3">Má-li cíl termín, aplikace sama spočítá, kolik je nutné odkládat měsíčně. Pravidelný vklad použije, je-li vyšší nebo termín chybí.</p>
       {!initial && <MoneyInput name="initial_amount" label="Už naspořeno" hint="nepovinné" error={fe("initial_amount")} />}
+      {lk.members.some((m) => m.is_child) && (
+        <Select name="member_id" label="Pro koho" defaultValue={initial?.member_id ?? ""}>
+          <option value="">Celá domácnost</option>
+          {lk.members.filter((m) => m.is_child).map((m) => <option key={m.id} value={m.id}>{m.name} (dítě)</option>)}
+        </Select>
+      )}
       <Select name="account_id" label="Kde jsou peníze uložené" defaultValue={initial?.account_id ?? ""}>
         <AccountOptions includeEmpty="Vyčleněno na běžném účtu (rezervace)" />
       </Select>

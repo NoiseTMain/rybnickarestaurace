@@ -2,8 +2,9 @@ import type { ReactNode } from "react";
 import { cn } from "./cn";
 
 export function Card({
-  title, subtitle, action, children, className, variant = "glass", id, bodyClassName,
+  title, subtitle, action, children, className, variant = "glass", id, bodyClassName, "data-testid": testId,
 }: {
+  "data-testid"?: string;
   title?: ReactNode;
   subtitle?: ReactNode;
   action?: ReactNode;
@@ -16,6 +17,7 @@ export function Card({
   return (
     <section
       id={id}
+      data-testid={testId}
       className={cn(
         "rounded-[var(--radius-card)] p-4 sm:p-5 min-w-0",
         variant === "glass" && "glass",

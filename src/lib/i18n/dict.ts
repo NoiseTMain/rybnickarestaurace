@@ -6,7 +6,7 @@ export const LOCALES: { key: Locale; label: string; flag: string }[] = [
 
 const cs = {
   "nav./": "Přehled", "nav./domacnost": "Domácnost", "nav./transakce": "Příjmy a výdaje", "nav./prace": "Práce", "nav./faktury": "Faktury",
-  "nav./nakupy": "Nákupy", "nav./planovani": "Plánování", "nav./recepty": "Recepty", "nav./cestovani": "Cestování", "nav./sporeni": "Spoření",
+  "nav./nakupy": "Nákupy", "nav./planovani": "Plánování", "nav./recepty": "Recepty", "nav./cestovani": "Cestování", "nav./majetek": "Majetek a dluhy", "nav./kalkulacky": "Kalkulačky", "nav./sporeni": "Spoření",
   "nav./rozpocty": "Rozpočty", "nav./platby": "Pravidelné platby", "nav./asistent": "Finanční asistent", "nav./dokumenty": "Dokumenty", "nav./nastaveni": "Nastavení",
   "nav.premium": "Premium", "nav.getPremium": "Získat Premium", "nav.admin": "Administrace",
   "tab./": "Přehled", "tab./transakce": "Pohyby", "tab./rozpocty": "Rozpočty", "tab./asistent": "Asistent", "tab.more": "Více",
@@ -58,7 +58,7 @@ export type Key = keyof typeof cs;
 
 const sk: Record<Key, string> = {
   "nav./": "Prehľad", "nav./domacnost": "Domácnosť", "nav./transakce": "Príjmy a výdavky", "nav./prace": "Práca", "nav./faktury": "Faktúry",
-  "nav./nakupy": "Nákupy", "nav./planovani": "Plánovanie", "nav./recepty": "Recepty", "nav./cestovani": "Cestovanie", "nav./sporeni": "Sporenie",
+  "nav./nakupy": "Nákupy", "nav./planovani": "Plánovanie", "nav./recepty": "Recepty", "nav./cestovani": "Cestovanie", "nav./majetek": "Majetok a dlhy", "nav./kalkulacky": "Kalkulačky", "nav./sporeni": "Sporenie",
   "nav./rozpocty": "Rozpočty", "nav./platby": "Pravidelné platby", "nav./asistent": "Finančný asistent", "nav./dokumenty": "Dokumenty", "nav./nastaveni": "Nastavenia",
   "nav.premium": "Premium", "nav.getPremium": "Získať Premium", "nav.admin": "Administrácia",
   "tab./": "Prehľad", "tab./transakce": "Pohyby", "tab./rozpocty": "Rozpočty", "tab./asistent": "Asistent", "tab.more": "Viac",
@@ -109,7 +109,7 @@ const sk: Record<Key, string> = {
 
 const en: Record<Key, string> = {
   "nav./": "Overview", "nav./domacnost": "Household", "nav./transakce": "Income & expenses", "nav./prace": "Work", "nav./faktury": "Invoices",
-  "nav./nakupy": "Purchases", "nav./planovani": "Planning", "nav./recepty": "Recipes", "nav./cestovani": "Travel", "nav./sporeni": "Savings",
+  "nav./nakupy": "Purchases", "nav./planovani": "Planning", "nav./recepty": "Recipes", "nav./cestovani": "Travel", "nav./majetek": "Wealth & debts", "nav./kalkulacky": "Calculators", "nav./sporeni": "Savings",
   "nav./rozpocty": "Budgets", "nav./platby": "Recurring payments", "nav./asistent": "Money assistant", "nav./dokumenty": "Documents", "nav./nastaveni": "Settings",
   "nav.premium": "Premium", "nav.getPremium": "Get Premium", "nav.admin": "Admin",
   "tab./": "Overview", "tab./transakce": "Activity", "tab./rozpocty": "Budgets", "tab./asistent": "Assistant", "tab.more": "More",

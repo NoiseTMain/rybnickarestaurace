@@ -49,7 +49,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
     <div className="space-y-4">
       <ReadOnlyNotice ctx={ctx} section="invoices" />
       <PageHeader title="Faktury" subtitle="Vystavené i přijaté faktury s archivem dokumentů. OCR údaje se ukládají až po vašem potvrzení."
-        actions={<><LinkButton href="/api/export/faktury" icon={<Download className="h-4 w-4" />}>Export CSV</LinkButton><InvoiceButton label="Nová faktura" variant="primary" size="md" /></>} />
+        actions={<><LinkButton href="/dane">Daně OSVČ</LinkButton><LinkButton href="/api/export/faktury" icon={<Download className="h-4 w-4" />}>Export CSV</LinkButton><InvoiceButton label="Nová faktura" variant="primary" size="md" /></>} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Card className="!p-4"><p className="text-[11px] uppercase tracking-wider text-ink-3">Dostanu (nezaplacené vystavené)</p><Money value={sum(unpaid.filter((i) => i.direction === "issued"), (i) => i.amount)} decimals="never" className="text-xl font-semibold text-pos" /></Card>

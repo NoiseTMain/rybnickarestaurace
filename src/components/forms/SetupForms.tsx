@@ -60,6 +60,7 @@ function AvatarPicker({ initial, name, color }: { initial: string | null; name: 
 export function MemberForm({ initial, onDone }: { initial?: Member; onDone?: () => void }) {
   const { state, formAction, pending, fe } = useFormAction(saveMember, onDone);
   const [name, setName] = useState(initial?.name ?? "");
+  const [child, setChild] = useState(Boolean(initial?.is_child));
   return (
     <form action={formAction} className="space-y-4">
       {initial && <input type="hidden" name="id" value={initial.id} />}
@@ -68,6 +69,16 @@ export function MemberForm({ initial, onDone }: { initial?: Member; onDone?: () 
       <Input name="phone" type="tel" label="Telefon" placeholder="+420 777 123 456" defaultValue={initial?.phone ?? ""} error={fe("phone")} autoComplete="tel" />
       <ColorPicker name="color" initial={initial?.color} />
       <Toggle name="is_active" label="Aktivní člen" defaultChecked={initial?.is_active ?? true} />
+      <Toggle name="is_child" label="Dítě" description="Kapesné, dětské spořicí cíle a přehled výdajů na děti" checked={child} onChange={(e) => setChild(e.target.checked)} />
+      {child && (
+        <div className="grid grid-cols-2 gap-3">
+          <MoneyInput name="pocket_money" label="Kapesné" hint="nepovinné" defaultValue={toInputValue(initial?.pocket_money ?? null)} error={fe("pocket_money")} />
+          <Select name="pocket_frequency" label="Jak často" defaultValue={initial?.pocket_frequency ?? "monthly"}>
+            <option value="weekly">každý týden</option>
+            <option value="monthly">každý měsíc</option>
+          </Select>
+        </div>
+      )}
       <FormError error={state.ok ? undefined : state.error} />
       <FormActions pending={pending} onCancel={onDone} />
     </form>

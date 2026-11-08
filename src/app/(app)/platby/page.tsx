@@ -17,6 +17,7 @@ import { PayOccurrenceButton, RecurringButton } from "@/components/forms/Payment
 import { SetupButton } from "@/components/forms/SetupForms";
 import { OccurrenceMenu } from "@/components/lists/OccurrenceActions";
 import { cn } from "@/components/ui/cn";
+import { detectSubscriptions } from "@/lib/finance/subscriptions";
 
 export const metadata = { title: "Pravidelné platby" };
 
@@ -46,11 +47,36 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   const firstDow = (weekday(month) + 6) % 7;
   const cells = Array.from({ length: firstDow + daysInMonth(p.y, p.m) }, (_, i) => (i < firstDow ? null : addDays(month, i - firstDow)));
   const cat = (id: string | null) => data.categories.find((c) => c.id === id)?.name;
+  const subs = detectSubscriptions(data.transactions, data.recurring, today);
 
   return (
     <div className="space-y-4">
       <ReadOnlyNotice ctx={ctx} section="finance" />
       <PageHeader title="Pravidelné platby a závazky" subtitle="Budoucí závazky se automaticky započítávají do finančního plánu." actions={<RecurringButton label="Nová platba" variant="primary" size="md" />} />
+
+      {(subs.unknown.length > 0 || subs.increases.length > 0) && (
+        <Card title="Hlídač předplatných" subtitle={`Z vašich plateb jsme našli ${subs.candidates.length} pravidelných – ročně ${formatMoney(subs.yearlyTotal, { decimals: "never" })}`} data-testid="subscriptions">
+          {subs.increases.length > 0 && (
+            <div className="mb-3 space-y-1">
+              {subs.increases.map((i) => <p key={i.key} className="text-sm">📈 <b>{i.name}</b> zdražilo z {formatMoney(i.from)} na <b>{formatMoney(i.to)}</b> ({formatDate(i.date)}) – ročně o <span className="text-neg">{formatMoney(i.yearlyImpact, { decimals: "never" })}</span> víc. {i.recurringId && <>Upravte částku v pravidelné platbě.</>}</p>)}
+            </div>
+          )}
+          {subs.unknown.length > 0 && (
+            <>
+              <p className="mb-1 text-xs text-ink-3">Tyto platby se opakují každý měsíc, ale nemáte je v pravidelných platbách. Přidejte je – plán s nimi bude počítat. Nepoužíváte je? Zrušte je a ušetříte.</p>
+              <ul className="divide-y divide-white/[0.06]">
+                {subs.unknown.map((c) => (
+                  <li key={c.key} className="flex items-center gap-2 py-2 text-sm">
+                    <span className="min-w-0 flex-1 truncate">{c.name} <span className="text-ink-3">· {c.count}× · naposledy {formatDate(c.lastDate)}</span></span>
+                    <span className="num">{formatMoney(c.amount)}/měs.</span>
+                    <RecurringButton label="Přidat" prefill={{ name: c.name, amount: c.amount, frequency: "monthly", start_date: addMonths(c.lastDate, 1), payment_method: "card" }} />
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Card className="!p-4"><p className="text-[11px] uppercase tracking-wider text-ink-3">Měsíčně v průměru</p><Money value={perMonth} decimals="never" className="text-xl font-semibold" /></Card>

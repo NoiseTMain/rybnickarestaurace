@@ -23,6 +23,11 @@ async function stat(label) {
 async function modalSubmit(text) {
   await page.locator('[role=dialog] button[type=submit]', { hasText: text }).click();
 }
+async function modalSubmitOp(text) {
+  await op.locator("[role=dialog] button[type=submit]").click();
+  await op.locator("[role=status]", { hasText: text }).first().waitFor();
+  await op.locator("[role=dialog]").waitFor({ state: "detached" });
+}
 async function toast(text) {
   try {
     await page.locator('[role=status]', { hasText: text }).first().waitFor({ timeout: 15000 });
@@ -831,6 +836,8 @@ await op.locator("[role=dialog] input[name=password]").fill("tajneheslo2");
 await op.locator("[role=dialog]").getByRole("button", { name: "Pokračovat" }).last().click();
 await op.getByRole("button", { name: "Ano, trvale smazat" }).click();
 await op.locator("[role=status]", { hasText: "Tovární reset dokončen" }).first().waitFor({ timeout: 20000 });
+await op.waitForURL((u) => !u.pathname.startsWith("/nastaveni"));
+await op.locator("[role=dialog]").waitFor({ state: "detached" });
 const after = await (await op.request.get(`${B}/api/zaloha`)).json();
 assert.equal(after.tables.transactions.length, 0);
 assert.equal(after.tables.accounts.length, 0);
@@ -866,6 +873,62 @@ await op.locator("aside nav").getByRole("link", { name: "Příjmy a výdaje" }).
   await sp.goto(B + "/vitejte");
   await sp.getByText("Viete, koľko si môžete dovoliť.").waitFor();
   await sk.close();
+}
+
+step("majetek: čisté jmění, plán splacení, hlídač termínů, daně OSVČ");
+{
+  await op.goto(B + "/majetek");
+  const before = num(await op.getByTestId("net-worth").innerText());
+  await op.getByRole("button", { name: "Majetek", exact: true }).click();
+  await op.locator("[role=dialog] input[name=name]").fill("ETF");
+  await op.locator("[role=dialog] input[name=value]").fill("100000");
+  await modalSubmitOp("Majetek přidán");
+  await op.getByRole("button", { name: "Dluh", exact: true }).click();
+  await op.locator("[role=dialog] input[name=name]").fill("Kreditka");
+  await op.locator("[role=dialog] input[name=balance]").fill("30000");
+  await op.locator("[role=dialog] input[name=rate]").fill("20");
+  await op.locator("[role=dialog] input[name=min_payment]").fill("1500");
+  await modalSubmitOp("Dluh přidán");
+  await op.getByRole("button", { name: "Dluh", exact: true }).click();
+  await op.locator("[role=dialog] input[name=name]").fill("Půjčka");
+  await op.locator("[role=dialog] input[name=balance]").fill("10000");
+  await op.locator("[role=dialog] input[name=rate]").fill("8");
+  await op.locator("[role=dialog] input[name=min_payment]").fill("1000");
+  await modalSubmitOp("Dluh přidán");
+  await op.getByTestId("net-worth").filter({ hasText: /\d/ }).waitFor();
+  await op.waitForFunction((b) => { const t = document.querySelector("[data-testid=net-worth]")?.textContent ?? ""; return Number(t.replace(/[^\d−-]/g, "").replace("−", "-")) === b + 100000 - 40000; }, before);
+  await op.getByTestId("plan-avalanche").getByText("Bez dluhů za").waitFor();
+  assert.match(await op.getByTestId("plan-snowball").innerText(), /1\. Půjčka/);
+  await op.getByRole("button", { name: "Termín", exact: true }).click();
+  await op.locator("[role=dialog] input[name=title]").fill("STK auto");
+  await op.locator("[role=dialog] select[name=kind]").selectOption("stk");
+  const soon = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10);
+  await op.locator("[role=dialog] input[name=due_date]").fill(soon);
+  await modalSubmitOp("Termín přidán");
+  await op.getByTestId("reminders").getByText("za 5 dní").waitFor();
+  await op.goto(B + "/");
+  await op.getByText("STK auto").first().waitFor();
+  await op.goto(B + "/dane");
+  await op.getByLabel("Příjmy za rok (Kč)").fill("1000000");
+  await op.getByTestId("tax-result").getByText(/29\s160/).first().waitFor();
+  // veřejné kalkulačky a články (bez přihlášení)
+  const anon = await browser.newContext();
+  const an = await anon.newPage();
+  await an.goto(B + "/kalkulacky");
+  await an.getByLabel("Výše úvěru").fill("4000000");
+  await an.getByLabel("Úrok").fill("5");
+  await an.getByLabel("Doba splácení").fill("30");
+  await an.getByText(/21\s473 Kč/).waitFor();
+  await an.getByRole("link", { name: "Články" }).first().click();
+  await an.getByRole("link", { name: /Kapesné pro děti/ }).click();
+  await an.getByRole("heading", { name: /Kapesné pro děti/ }).waitFor();
+  assert.match(await (await an.request.get(B + "/sitemap.xml")).text(), /clanky\/kapesne/);
+  assert.match(await (await an.request.get(B + "/robots.txt")).text(), /Sitemap:/);
+  await anon.close();
+  // úspěchy na podrobném přehledu
+  await op.context().addCookies([{ name: "homeos_dash", value: "detailed", url: B }]);
+  await op.goto(B + "/");
+  await op.getByTestId("badges").getByLabel("První zápis", { exact: true }).waitFor(); // po továrním resetu zatím nezískaný
 }
 
 step("zabezpečení: 2FA (TOTP), limit pokusů, záznam chyb");

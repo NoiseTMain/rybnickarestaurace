@@ -2,6 +2,9 @@ import Link from "next/link";
 import { AlertTriangle, CalendarClock, CircleCheck, Plane } from "lucide-react";
 import { requireContext } from "@/lib/context";
 import { loadSnapshot } from "@/lib/data";
+import { REMINDER_KIND, dueReminders } from "@/lib/finance/networth";
+import { badges } from "@/lib/finance/badges";
+import { resolveBudget } from "@/lib/finance/budgets";
 import { addDays, diffDays, formatDate, monthName } from "@/lib/dates";
 import { formatMoney, percent, sub } from "@/lib/money";
 import { balanceSeries } from "@/lib/finance/balances";
@@ -54,6 +57,15 @@ export default async function DashboardPage() {
   const householdCats = s.household.byCategory.slice(0, 6);
   const icoActive = Boolean(data.settings?.billing_ico && data.settings.ico_activated_at);
   const spentPct = s.month.income > 0 ? Math.round(percent(s.month.expense, s.month.income)) : null;
+  const lastStart = addM(som(today), -1);
+  const lastBudget = resolveBudget(data.budgets, "total", lastStart);
+  const debtRows = await ctx.store.select("debts", { household_id: ctx.household.id });
+  const ach = badges({
+    txs: data.transactions, goals: data.goals, contributions: data.contributions, trips: data.travel.trips, today, lastMonth: s.lastMonth,
+    monthlyExpenses: s.lastMonth.expense || s.month.expense, liquid: s.balance.liquid,
+    debtsLeft: debtRows.length ? debtRows.reduce((a, d) => a + d.balance, 0) : null,
+    budgetKept: lastBudget ? s.lastMonth.expense <= lastBudget.amount : null,
+  });
   const mode = (await cookies()).get(DASH_COOKIE)?.value === "detailed" ? "detailed" : "simple";
   const greetingBlock = (
     <div className="flex flex-wrap items-end justify-between gap-3">
@@ -76,6 +88,15 @@ export default async function DashboardPage() {
     </Card>
   );
   const closing = Number(today.slice(8)) <= 7 ? monthlyClosing(data, addM(som(today), -1)) : null;
+  const dueSoon = dueReminders(await ctx.store.select("reminders", { household_id: ctx.household.id }), today).slice(0, 4);
+  const remindersBlock = dueSoon.length > 0 && (
+    <Card className="!p-4" data-testid="due-reminders">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <span className="font-semibold">⏰ Blíží se:</span>
+        {dueSoon.map((r) => <Link key={r.id} href="/majetek#terminy" className="underline-offset-2 hover:underline">{REMINDER_KIND[r.kind].emoji} {r.title} <span className={r.daysLeft < 0 ? "text-neg" : "text-ink-3"}>{r.daysLeft < 0 ? `(${-r.daysLeft} d po termínu)` : r.daysLeft === 0 ? "(dnes)" : `(za ${r.daysLeft} d)`}</span></Link>)}
+      </div>
+    </Card>
+  );
   const closingBlock = closing && closing.txCount > 0 && (
     <Card className="!p-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -94,6 +115,8 @@ export default async function DashboardPage() {
         {ongoing && <OngoingTripBanner item={ongoing} today={today} />}
         {missingBlock}
         {closingBlock}
+      {remindersBlock}
+        {remindersBlock}
         <ProfileTips profile={prefs.profile} premium={premium.household} />
         <SimpleDashboard locale={locale} s={s} today={today} insights={insights} categories={s.month.byCategory.map((c) => ({ name: catName(c.categoryId), amount: c.amount }))}
           extra={premium.household && trips.some((t) => t.s.status === "upcoming" || t.s.status === "ongoing") ? <TravelCard items={trips} today={today} /> : null} />
@@ -290,6 +313,14 @@ export default async function DashboardPage() {
             <KV k="Zbývá odložit" v={<Money value={s.goals.remainingThisMonth} decimals="never" />} />
             <KV k="Můžete odložit až" v={<Money value={s.planner.canSave} decimals="never" className="text-gold" />} />
           </div>
+        </Card>
+
+        {/* Motivace */}
+        <Card title="Úspěchy" subtitle={ach.streak.current > 0 ? `🔥 ${ach.streak.current} ${ach.streak.current === 1 ? "den" : ach.streak.current < 5 ? "dny" : "dní"} v řadě${ach.streak.todayDone ? "" : " – dnes ještě nic nezapsáno"}` : "Zapisujte každý den a sbírejte odznaky"} data-testid="badges">
+          <div className="flex flex-wrap gap-1.5">
+            {ach.list.map((b) => <span key={b.key} title={`${b.title} – ${b.detail}${!b.earned && b.progress ? ` (${b.progress.value.toLocaleString("cs-CZ")}/${b.progress.target.toLocaleString("cs-CZ")})` : ""}`} className={`flex h-9 w-9 items-center justify-center rounded-xl text-lg ${b.earned ? "bg-gold/15 ring-1 ring-gold/40" : "bg-white/[0.04] opacity-35 grayscale"}`} aria-label={`${b.title}${b.earned ? " – získáno" : ""}`}>{b.emoji}</span>)}
+          </div>
+          <p className="mt-2 text-xs text-ink-3">{ach.list.filter((b) => b.earned).length} z {ach.list.length} odznaků{(() => { const next = ach.list.find((b) => !b.earned && b.progress); return next ? ` · další: ${next.title} (${next.progress!.value.toLocaleString("cs-CZ")}/${next.progress!.target.toLocaleString("cs-CZ")})` : ""; })()}</p>
         </Card>
 
         {/* Cestování */}

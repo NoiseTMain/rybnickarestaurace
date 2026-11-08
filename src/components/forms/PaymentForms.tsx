@@ -49,10 +49,10 @@ export function RecurringForm({ initial, onDone }: { initial?: RecurringPayment;
   );
 }
 
-export function RecurringButton({ initial, label, size = "sm", variant = "secondary" }: { initial?: RecurringPayment; label?: string; size?: "sm" | "md" | "icon"; variant?: "primary" | "secondary" | "ghost" }) {
+export function RecurringButton({ initial, prefill, label, size = "sm", variant = "secondary" }: { initial?: RecurringPayment; prefill?: Partial<RecurringPayment>; label?: string; size?: "sm" | "md" | "icon"; variant?: "primary" | "secondary" | "ghost" }) {
   return (
     <ModalButton label={label} size={size} variant={variant} icon={initial ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-      title={initial ? "Upravit platbu" : "Nová pravidelná platba"} render={(close) => <RecurringForm initial={initial} onDone={close} />} />
+      title={initial ? "Upravit platbu" : "Nová pravidelná platba"} render={(close) => <RecurringForm initial={initial ?? (prefill as RecurringPayment | undefined)} onDone={close} />} />
   );
 }
 

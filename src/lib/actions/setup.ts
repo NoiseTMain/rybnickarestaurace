@@ -1,6 +1,6 @@
 "use server";
 import { z } from "zod";
-import { checkbox, date, enumOf, money, optionalUuid, text, optText } from "@/lib/validation";
+import { checkbox, date, enumOf, money, optionalUuid, text, optText, optionalMoney } from "@/lib/validation";
 import { MEMBER_COLORS } from "@/lib/defaults";
 import { done, fail, own, parse, withContext } from "./helpers";
 import type { ActionResult } from "./result";
@@ -14,13 +14,17 @@ const memberSchema = z.object({
   is_active: checkbox(),
   phone: z.preprocess((v) => (typeof v === "string" && v.trim() ? v.replace(/[^\d+ ]/g, "").trim() : null), z.union([z.null(), z.string().regex(/^\+?[\d ]{6,20}$/, "Zadejte telefon, např. +420 777 123 456")])),
   avatar_document_id: optionalUuid(),
+  is_child: checkbox(),
+  pocket_money: optionalMoney(),
+  pocket_frequency: z.preprocess((v) => (v ? v : null), z.union([z.null(), enumOf(["weekly", "monthly"])])),
 });
 
 export async function saveMember(_: ActionResult, fd: FormData): Promise<ActionResult> {
   return withContext(async (ctx) => {
     const p = parse(memberSchema, fd);
     if (!p.ok) return p.result;
-    const { id, ...row } = p.data;
+    const { id, ...raw } = p.data;
+    const row = raw.is_child ? { ...raw, pocket_frequency: raw.pocket_money ? raw.pocket_frequency ?? "monthly" : null } : { ...raw, pocket_money: null, pocket_frequency: null };
     await own(ctx, "documents", row.avatar_document_id);
     if (id) {
       await own(ctx, "members", id);

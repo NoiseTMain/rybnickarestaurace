@@ -142,4 +142,4 @@ export const REFS: Partial<Record<TableName, Ref[]>> = {
   ],
 };
 
-export const TABLES_WITH_UPDATED_AT: TableName[] = ["transactions", "household_settings", "work_settings", "user_prefs"];
+export const TABLES_WITH_UPDATED_AT: TableName[] = ["transactions", "household_settings", "work_settings", "user_prefs", "assets"];
