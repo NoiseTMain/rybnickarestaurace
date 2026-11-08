@@ -1,3 +1,4 @@
+import { searchKb, type KbEntry } from "@/lib/assistant-kb";
 import { abs, divFloor, divRound, formatMoney as fm, parseMoney, sub, type Cents } from "@/lib/money";
 import { diffDays, endOfMonth, endOfWeek, formatDate, minDate, monthName } from "@/lib/dates";
 import type { FinanceData, Snapshot } from "@/lib/finance/snapshot";
@@ -516,6 +517,11 @@ export function answer(question: string, s: Snapshot, d: FinanceData, prev?: Ass
   }
   // navazující otázka: krátká, začíná „a …“, nebo jen částka/období
   const followUp = prev && prev.intent !== "unknown" && (/^(a|a co|a kdyz|a za|a pri|a minul|a letos|a za posledni)\b/.test(q) || q.split(" ").length <= 4);
+  // obecné otázky („Co je RPSN?“, „Jak přidám výdaj?“) – znalostní báze má přednost před výpočty
+  if (!forced && /^(co je|co jsou|co znamena|jak |kde |proc |muzu|mohu|lze|da se|je lepsi|vyplati se|mam narok|existuje|ahoj|dobry|diky|dekuji|kolik stoji|kolik bych|kolik bilkovin)/.test(q)) {
+    const kb = searchKb(question);
+    if (kb) return kbAnswer(kb);
+  }
   let intent = forced?.intent ?? detectIntent(q);
   const ctx: Partial<AssistantContext> = { ...(forced ?? {}) };
   if (!intent && followUp && prev) {
@@ -556,5 +562,13 @@ export function answer(question: string, s: Snapshot, d: FinanceData, prev?: Ass
     const r = categoryAnswer(question, s, d, ctx);
     if (r) return r;
   }
+  if (base.context?.intent === "unknown") {
+    const kb = searchKb(question);
+    if (kb) return kbAnswer(kb);
+  }
   return base;
+}
+
+function kbAnswer(kb: KbEntry): AssistantAnswer {
+  return { text: kb.a, tone: "neutral", needs: kb.href ? { message: kb.label ?? "Otevřít v aplikaci", href: kb.href } : undefined, context: { intent: "unknown" } };
 }

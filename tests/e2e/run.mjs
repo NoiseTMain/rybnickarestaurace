@@ -567,6 +567,10 @@ await ask("Můžeme si dovolit pračku za 9 000 Kč?");
 await page.getByText(/9\s000\s*Kč/).first().waitFor();
 await ask("A za 900 000?");
 await page.getByText(/Nákup za 900\s000\s*Kč teď ne/).waitFor();
+await ask("Co je RPSN?");
+await page.getByText(/RPSN je roční procentní sazba nákladů/).waitFor();
+await ask("Jak přidám pravidelnou platbu?");
+await page.getByText(/Pravidelné platby \(nájem, energie, předplatné\)/).first().waitFor();
 await ask("Jak jsme na tom za poslední 3 měsíce?");
 await page.getByText("Za poslední 3 měsíce zatím nemám žádná data").first().waitFor(); // evidence začala dnes
 await page.getByText("Poslední 3 měsíce", { exact: true }).first().waitFor();

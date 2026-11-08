@@ -39,7 +39,7 @@ export const PROFILES: ProfileDef[] = [
   { key: "single_parent", label: "Samoživitel/ka", emoji: "🤱", detail: "Výživné, přídavky a dávky jako příjmy, rozpočet na děti, rezerva.", hide: ["faktury"],
     tips: ["Výživné a dávky si zadejte jako pravidelné příjmy – aplikace ohlídá, jestli přišly.", "Ověřte si nárok na přídavek na dítě, příspěvek na bydlení a další dávky (MPSV – kalkulačka dávek).", "Když výživné nechodí, lze žádat o náhradní výživné (Úřad práce).", "Malá rezerva i 500 Kč měsíčně pomůže při nečekaných výdajích."] },
   { key: "student", label: "Student/ka", emoji: "🎓", detail: "Brigády, stipendia, kapesné, levné jídlo a spoření.", hide: ["faktury", "domacnost"],
-    tips: ["Brigády si evidujte v sekci Práce – uvidíte hodinovou mzdu.", "Do 26 let máte nárok na slevu na studenta u daně, pokud studujete (ověřte aktuální podmínky).", "Recepty s cenou porce pomohou vařit levně a zdravě."] },
+    tips: ["Brigády si evidujte v sekci Práce – uvidíte hodinovou mzdu.", "Při brigádě na DPP si hlídejte, ať u jednoho zaměstnavatele nepřekročíte limit, od kterého se platí pojištění (aktuální částku ověřte).", "Recepty s cenou porce pomohou vařit levně a zdravě."] },
   { key: "senior", label: "Senior/ka", emoji: "🧓", detail: "Důchod, léky, energie a jednoduchý přehled.", hide: ["faktury", "prace", "cestovani"],
     tips: ["Důchod si zadejte jako pravidelný příjem.", "Hlídejte zálohy na energie v Pravidelných platbách.", "Přehled stačí v jednoduchém režimu."] },
   { key: "entrepreneur", label: "Podnikatel / OSVČ", emoji: "💼", detail: "Faktury, IČO, zálohy na pojištění a daně, oddělení firmy a domácnosti.", hide: [],
