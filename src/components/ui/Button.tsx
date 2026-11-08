@@ -33,8 +33,11 @@ export function Button({ variant = "secondary", size = "md", loading, icon, clas
 }
 
 export function LinkButton({ href, variant = "secondary", size = "md", className, children, icon }: { href: string; variant?: keyof typeof variants; size?: keyof typeof sizes; className?: string; children?: ReactNode; icon?: ReactNode }) {
+  const cls = cn("inline-flex items-center rounded-full font-medium transition-all active:scale-[0.98]", variants[variant], sizes[size], className);
+  // API (exporty, zálohy) = stažení souboru: obyčejný odkaz, aby ho router nepřednačítal
+  if (href.startsWith("/api/")) return <a href={href} download className={cls}>{icon}{children}</a>;
   return (
-    <Link href={href} className={cn("inline-flex items-center rounded-full font-medium transition-all active:scale-[0.98]", variants[variant], sizes[size], className)}>
+    <Link href={href} className={cls}>
       {icon}
       {children}
     </Link>
