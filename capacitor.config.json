@@ -1,0 +1,14 @@
+{
+  "appId": "cz.homeos.app",
+  "appName": "HomeOS",
+  "webDir": "public",
+  "server": {
+    "url": "https://rybnickarestaurace-inky.vercel.app",
+    "cleartext": false,
+    "allowNavigation": ["rybnickarestaurace-inky.vercel.app", "*.supabase.co"]
+  },
+  "appendUserAgent": "HomeOSApp",
+  "backgroundColor": "#0a0a0b",
+  "ios": { "contentInset": "always", "limitsNavigationsToAppBoundDomains": true },
+  "android": { "allowMixedContent": false }
+}

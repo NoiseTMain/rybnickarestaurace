@@ -66,6 +66,18 @@ export async function signIn(_: ActionResult, fd: FormData): Promise<ActionResul
   redirect("/");
 }
 
+/** Zapíše doporučení (odměna se vyhodnotí později – viz lib/referrals). Chyby neblokují registraci. */
+async function recordReferral(ref: FormDataEntryValue | null, userId: string) {
+  if (typeof ref !== "string" || !/^[A-Za-z0-9]{6,12}$/.test(ref)) return;
+  try {
+    const { adminBackend, adminConfigured } = await import("@/lib/admin");
+    if (!adminConfigured()) return;
+    const b = await adminBackend();
+    const referrer = await b.userByReferralCode(ref);
+    if (referrer && referrer !== userId) await b.addReferral(referrer, userId);
+  } catch { /* doporučení je bonus, registrace musí projít */ }
+}
+
 export async function signUp(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const p = parseCreds(fd);
   if (!p.ok) return p.result;
@@ -82,6 +94,7 @@ export async function signUp(_: ActionResult, fd: FormData): Promise<ActionResul
       return id;
     });
     if (!id) return fail("Účet s tímto e-mailem už existuje.");
+    await recordReferral(fd.get("ref"), id);
     await createLocalSession(id);
     redirect("/uvod");
   }
@@ -90,6 +103,7 @@ export async function signUp(_: ActionResult, fd: FormData): Promise<ActionResul
   const origin = process.env.NEXT_PUBLIC_SITE_URL || `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
   const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${origin}/auth/confirm` } });
   if (error) return fail(error.message.includes("registered") ? "Účet s tímto e-mailem už existuje." : `Registrace selhala: ${error.message}`);
+  if (data.user) await recordReferral(fd.get("ref"), data.user.id);
   if (!data.session) return { ok: true, message: "Poslali jsme vám e-mail s potvrzovacím odkazem. Po potvrzení se přihlaste.", at: Date.now() };
   redirect("/uvod");
 }

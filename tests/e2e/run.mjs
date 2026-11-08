@@ -931,6 +931,26 @@ step("majetek: čisté jmění, plán splacení, hlídač termínů, daně OSVČ
   await op.getByTestId("badges").getByLabel("První zápis", { exact: true }).waitFor(); // po továrním resetu zatím nezískaný
 }
 
+step("doporuč kamarádovi: odkaz s kódem, registrace přes doporučení");
+{
+  await op.goto(B + "/premium#doporuc");
+  const link = (await op.getByTestId("referral-link").innerText()).trim();
+  assert.match(link, /\/registrace\?ref=[A-Z0-9]{6,12}$/);
+  const fr = await browser.newContext();
+  const fp = await fr.newPage();
+  await fp.goto(link.replace(/^https?:\/\/[^/]+/, B));
+  await fp.getByText("Registrujete se přes doporučení").waitFor();
+  await fp.fill("input[name=email]", "kamarad@example.cz");
+  await fp.fill("input[name=password]", "tajneheslo3");
+  await fp.fill("input[name=password2]", "tajneheslo3");
+  await fp.check("input[name=terms]");
+  await fp.click("button[type=submit]");
+  await fp.waitForURL(/\/uvod/);
+  await fr.close();
+  await op.reload();
+  await op.getByTestId("referral-stats").getByText("Čeká: 1").waitFor();
+}
+
 step("zabezpečení: 2FA (TOTP), limit pokusů, záznam chyb");
 {
   const { createHmac } = await import("node:crypto");

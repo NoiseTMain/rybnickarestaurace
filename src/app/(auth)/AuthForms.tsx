@@ -19,12 +19,13 @@ export function LoginForm() {
   );
 }
 
-export function RegisterForm() {
+export function RegisterForm({ referral }: { referral?: string }) {
   const [state, action, pending] = useActionState(signUp, initialResult);
   const { t } = useT();
   if (state.ok && state.message) return <p className="rounded-xl bg-gold/10 px-4 py-3 text-sm text-gold-bright">{state.message}</p>;
   return (
     <form action={action} className="space-y-4">
+      {referral && <><input type="hidden" name="ref" value={referral} /><p className="rounded-xl bg-gold/10 px-3 py-2 text-xs text-gold-bright">🎁 Registrujete se přes doporučení – po týdnu používání dostanete vy i kamarád měsíc Premium zdarma.</p></>}
       <Input name="email" type="email" label={t("auth.email")} autoComplete="email" required error={state.fieldErrors?.email} />
       <Input name="password" type="password" label={t("auth.password")} hint={t("auth.min8")} autoComplete="new-password" required minLength={8} error={state.fieldErrors?.password} />
       <Input name="password2" type="password" label={t("auth.password2")} autoComplete="new-password" required error={state.fieldErrors?.password2} />

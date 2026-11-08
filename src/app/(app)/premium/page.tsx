@@ -1,5 +1,7 @@
 import { Bell, Bot, Check, Crown, Palette, Plane, ScanText, ShieldCheck, Sparkles, Users, X } from "lucide-react";
+import { headers } from "next/headers";
 import { requireContext } from "@/lib/context";
+import { ReferralCard } from "@/components/premium/ReferralCard";
 import { getPremium } from "@/lib/premium";
 import { billingConfigured } from "@/lib/billing";
 import { trialEligible } from "@/lib/actions/billing";
@@ -51,6 +53,8 @@ export default async function PremiumPage({ searchParams }: { searchParams: Prom
   const [p, { data, snapshot: s }] = await Promise.all([getPremium(ctx), loadSnapshot(ctx)]);
   const sub = (await ctx.store.select("subscriptions", { user_id: ctx.user.id }))[0] ?? null;
   const enabled = billingConfigured();
+  // v nativní aplikaci (App Store / Google Play) se digitální předplatné nesmí prodávat mimo jejich platby
+  const nativeApp = /HomeOSApp/.test((await headers()).get("user-agent") ?? "");
   const trial = !p.household && enabled && (await trialEligible(ctx.user.id, ctx.user.email).catch(() => false));
   const cell = (v: string | boolean) => (v === true ? <Check className="mx-auto h-4 w-4 text-pos" /> : v === false ? <X className="mx-auto h-4 w-4 text-ink-3" /> : <span className="text-sm">{v}</span>);
   // motivace z vlastních dat (nic si nevymýšlíme)
@@ -77,7 +81,7 @@ export default async function PremiumPage({ searchParams }: { searchParams: Prom
                   {sub.status === "on_trial" && sub.renews_at ? ` · zkušební doba do ${formatDate(sub.renews_at.slice(0, 10))}, pak se začne platit` : sub.status === "cancelled" && sub.ends_at ? ` · zrušeno, platí do ${formatDate(sub.ends_at.slice(0, 10))}` : sub.renews_at ? ` · obnoví se ${formatDate(sub.renews_at.slice(0, 10))}` : sub.ends_at ? ` · platí do ${formatDate(sub.ends_at.slice(0, 10))}` : ""}
                 </p>
               )}
-              {sub?.portal_url && <a href={sub.portal_url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-gold underline">Spravovat předplatné (karta, zrušení, doklady)</a>}
+              {sub?.portal_url && !nativeApp && <a href={sub.portal_url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-gold underline">Spravovat předplatné (karta, zrušení, doklady)</a>}
             </div>
           </div>
         </Card>
@@ -87,12 +91,13 @@ export default async function PremiumPage({ searchParams }: { searchParams: Prom
             <p className="flex items-center gap-2 font-semibold"><Sparkles className="h-4 w-4 text-gold" />Proč právě vám</p>
             <ul className="mt-2 space-y-1.5 text-sm text-ink-2">{hooks.map((h) => <li key={h} className="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-gold" />{h}</li>)}</ul>
           </Card>
-          <Card title="Vyberte si"><CheckoutButtons enabled={enabled} trial={trial} /></Card>
+          {nativeApp ? <Card className="!p-4 text-sm text-ink-2">Premium si můžete aktivovat ve webové verzi HomeOS. Po aktivaci se projeví i v této aplikaci.</Card> : <Card title="Vyberte si"><CheckoutButtons enabled={enabled} trial={trial} /></Card>}
         </>
       )}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {FEATURES.map((f) => <Card key={f.title} className="!p-4"><f.icon className="h-6 w-6 text-gold" /><p className="mt-2 font-medium">{f.title}</p><p className="text-sm text-ink-2">{f.text}</p></Card>)}
       </div>
+      <Card id="doporuc" title="🎁 Doporuč kamarádovi – měsíc Premium oběma"><ReferralCard userId={ctx.user.id} /></Card>
       <Card title="Co je zdarma a co v Premium" bodyClassName="overflow-x-auto">
         <table className="w-full min-w-[420px] text-sm">
           <thead className="text-xs text-ink-3"><tr><th className="py-1 text-left font-medium" /><th className="w-24 font-medium">Zdarma</th><th className="w-24 font-medium text-gold">Premium</th></tr></thead>

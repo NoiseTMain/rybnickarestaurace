@@ -8,6 +8,7 @@ import { initialResult } from "@/lib/actions/result";
 import type { AssistantAnswer, AssistantContext, ExpenseDraft } from "@/lib/assistant";
 import { formatMoney, toInputValue } from "@/lib/money";
 import { useLookups } from "@/components/Lookups";
+import { VoiceButton } from "@/components/VoiceButton";
 import { Button } from "@/components/ui/Button";
 import { MoneyInput, Select } from "@/components/ui/Field";
 import { useToast } from "@/components/ui/Toast";
@@ -202,6 +203,7 @@ export function AssistantChat({ aiEnabled }: { aiEnabled: boolean }) {
       </div>
       <form onSubmit={(e) => { e.preventDefault(); ask(q); }} className="flex gap-2 border-t border-white/[0.06] pt-3">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Např. Můžeme si dovolit pračku za 9 990 Kč?" className="field flex-1" aria-label="Otázka pro asistenta" maxLength={ai ? 4000 : 500} />
+        <VoiceButton onText={(t) => setQ(t)} />
         <button type="submit" disabled={busy || !q.trim()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gold text-[#1b1407] disabled:opacity-40" aria-label="Odeslat"><ArrowUp className="h-5 w-5" /></button>
       </form>
       <p className="mt-2 text-[11px] text-ink-3">{ai ? "AI asistent (Claude) – čísla bere jen z vašich dat přes výpočty aplikace; nic neuloží bez potvrzení." : "Odpovědi počítá aplikace z vašich dat (AI není zapnutá – chybí ANTHROPIC_API_KEY)."}</p>

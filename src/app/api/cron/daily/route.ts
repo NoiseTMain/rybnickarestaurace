@@ -11,6 +11,7 @@ import { monthlyClosing } from "@/lib/finance/closing";
 import { addMonths, startOfMonth } from "@/lib/dates";
 import { REMINDER_KIND, dueReminders } from "@/lib/finance/networth";
 import { adminBackend } from "@/lib/admin";
+import { processReferrals } from "@/lib/referrals";
 
 /**
  * Denní upozornění (Vercel Cron, večer): den před odjezdem rozpis cesty,
@@ -77,5 +78,7 @@ export async function GET(req: Request) {
     const old = sentBefore.filter((n) => n.date < addDays(today, -60));
     for (const n of old) await store.remove("trip_notifications", { id: n.id } as never).catch(() => undefined);
   }
-  return NextResponse.json({ ok: true, sent });
+  // doporučení: vyhodnocení odměn (měsíc Premium oběma)
+  const referrals = await processReferrals(await adminBackend()).catch(() => null);
+  return NextResponse.json({ ok: true, sent, referrals });
 }
