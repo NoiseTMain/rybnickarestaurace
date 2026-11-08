@@ -18,6 +18,7 @@ const posted = (col: string) => (r: Record<string, unknown>) => r[col] != null &
 export const UNIQUE: Partial<Record<TableName, UniqueConstraint[]>> = {
   household_users: [{ columns: ["household_id", "user_id"], message: "Uživatel už je členem domácnosti." }],
   user_prefs: [{ columns: ["user_id"], message: "Předvolby už existují." }],
+  net_worth_snapshots: [{ columns: ["household_id", "month"], message: "Snímek za tento měsíc už existuje." }],
   household_invites: [{ columns: ["code"], message: "Kód pozvánky už existuje." }],
   household_settings: [{ columns: ["household_id"], message: "Nastavení už existuje." }],
   work_settings: [{ columns: ["household_id"], message: "Nastavení práce už existuje." }],
@@ -60,7 +61,7 @@ export const TABLE_SECTION: Partial<Record<TableName, string>> = {
   transactions: "finance", accounts: "finance", categories: "finance", recurring_payments: "finance", income_sources: "finance",
   occurrence_marks: "finance", budgets: "finance", invoices: "invoices", work_shifts: "work", payouts: "work", work_settings: "work",
   purchases: "purchases", shopping_lists: "purchases", shopping_items: "purchases", price_history: "purchases",
-  savings_goals: "savings", savings_contributions: "savings", trips: "travel", trip_legs: "travel", trip_expenses: "travel", trip_people: "travel", trip_cash_moves: "travel", trip_checklist: "travel", trip_plan_items: "travel", trip_settlements: "travel", household_settings: "settings", members: "settings", documents: "*",
+  savings_goals: "savings", savings_contributions: "savings", trips: "travel", trip_legs: "travel", trip_expenses: "travel", trip_people: "travel", trip_cash_moves: "travel", trip_checklist: "travel", trip_plan_items: "travel", trip_settlements: "travel", assets: "finance", debts: "finance", net_worth_snapshots: "finance", reminders: "finance", household_settings: "settings", members: "settings", documents: "*",
 };
 
 export const REFS: Partial<Record<TableName, Ref[]>> = {
@@ -81,7 +82,7 @@ export const REFS: Partial<Record<TableName, Ref[]>> = {
     { column: "income_source_id", table: "income_sources", onDelete: "cascade" },
   ],
   budgets: [{ column: "category_id", table: "categories", onDelete: "cascade" }],
-  savings_goals: [{ column: "account_id", table: "accounts", onDelete: "set_null" }],
+  savings_goals: [{ column: "account_id", table: "accounts", onDelete: "set_null" }, { column: "member_id", table: "members", onDelete: "set_null" }],
   savings_contributions: [{ column: "goal_id", table: "savings_goals", onDelete: "cascade" }],
   work_settings: [{ column: "member_id", table: "members", onDelete: "set_null" }],
   invoices: [{ column: "document_id", table: "documents", onDelete: "set_null" }],

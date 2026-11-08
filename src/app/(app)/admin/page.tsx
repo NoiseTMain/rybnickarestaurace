@@ -31,7 +31,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   }
   const b = await adminBackend();
   const month = todayISO().slice(0, 7);
-  const [users, subs, households, audit, usage] = await Promise.all([b.listUsers(), b.subscriptions(), b.households(), b.auditLog(50), b.aiUsage(month)]);
+  const [users, subs, households, audit, usage, errors] = await Promise.all([b.listUsers(), b.subscriptions(), b.households(), b.auditLog(50), b.aiUsage(month), b.errors(30)]);
   const subOf = new Map(subs.map((s) => [s.user_id, s]));
   const usageOf = new Map(usage.map((u) => [u.user_id, u.count]));
   const weekAgo = new Date(addDays(todayISO(), -7)).getTime();
@@ -116,6 +116,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             </tbody>
           </table>
         </div>
+      </Card>
+
+      <Card title={`Chyby aplikace (${errors.length})`} subtitle="Posledních 30 zachycených chyb z prohlížečů i serveru – bez finančních údajů">
+        {errors.length ? (
+          <ul className="space-y-1 text-xs" data-testid="app-errors">
+            {errors.map((e) => <li key={e.id} className="flex flex-wrap gap-x-2 border-t border-white/[0.06] py-1 first:border-0"><span className="text-ink-3">{dt(e.created_at)}</span><code className="text-ink-3">{e.path ?? "?"}</code><span className="break-all">{e.message}</span>{e.user_id && <span className="text-ink-3">{users.find((u) => u.id === e.user_id)?.email ?? ""}</span>}</li>)}
+          </ul>
+        ) : <p className="text-sm text-ink-3">Žádné chyby 🎉</p>}
       </Card>
 
       <Card title="Záznam akcí" subtitle="Přidělení, odebrání, blokace a platby">

@@ -868,6 +868,74 @@ await op.locator("aside nav").getByRole("link", { name: "Příjmy a výdaje" }).
   await sk.close();
 }
 
+step("zabezpečení: 2FA (TOTP), limit pokusů, záznam chyb");
+{
+  const { createHmac } = await import("node:crypto");
+  const totp = (b32) => {
+    const al = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"; let bits = "";
+    for (const c of b32.replace(/=+$/, "").toUpperCase()) bits += al.indexOf(c).toString(2).padStart(5, "0");
+    const key = Buffer.from(bits.match(/.{8}/g).map((x) => parseInt(x, 2)));
+    const ctr = Buffer.alloc(8); ctr.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000)));
+    const h = createHmac("sha1", key).update(ctr).digest(); const o = h[19] & 15;
+    return String((h.readUInt32BE(o) & 0x7fffffff) % 1e6).padStart(6, "0");
+  };
+  await op.goto(B + "/nastaveni#zabezpeceni");
+  await op.getByRole("button", { name: "Zapnout dvoufázové ověření" }).click();
+  const secret = (await op.getByTestId("totp-secret").innerText()).trim();
+  await op.getByLabel("Kód z aplikace").fill("000000");
+  await op.getByRole("button", { name: "Potvrdit" }).click();
+  await op.getByText("Nesprávný kód").waitFor();
+  await op.getByLabel("Kód z aplikace").fill(totp(secret));
+  await op.getByRole("button", { name: "Potvrdit" }).click();
+  await op.getByText("Dvoufázové ověření je zapnuté").waitFor();
+  // nové přihlášení vyžaduje kód
+  const z = await browser.newContext();
+  const zp = await z.newPage();
+  await zp.goto(B + "/prihlaseni");
+  await zp.fill("input[name=email]", "cizi@example.cz");
+  await zp.fill("input[name=password]", "tajneheslo2");
+  await zp.click("button[type=submit]");
+  await zp.waitForURL(/\/prihlaseni\/overeni/);
+  await zp.goto(B + "/transakce");
+  await zp.waitForURL(/\/prihlaseni\/overeni/);
+  assert.equal((await zp.request.get(`${B}/api/zaloha`)).ok(), false, "bez druhého faktoru nejsou data");
+  await zp.getByLabel("Kód").fill(totp(secret));
+  await zp.getByRole("button", { name: "Ověřit" }).click();
+  await zp.waitForURL((u) => u.pathname === "/");
+  // odhlásit všechna zařízení → i původní relace (op) končí
+  await zp.goto(B + "/nastaveni#zabezpeceni");
+  await zp.getByRole("button", { name: "Odhlásit ze všech zařízení" }).click();
+  await zp.waitForURL(/\/prihlaseni/);
+  await z.close();
+  await op.goto(B + "/transakce");
+  await op.waitForURL(/\/prihlaseni/);
+  await op.fill("input[name=email]", "cizi@example.cz");
+  await op.fill("input[name=password]", "tajneheslo2");
+  await op.click("button[type=submit]");
+  await op.waitForURL(/\/prihlaseni\/overeni/);
+  await op.getByLabel("Kód").fill(totp(secret));
+  await op.getByRole("button", { name: "Ověřit" }).click();
+  await op.waitForURL((u) => u.pathname === "/");
+  await op.goto(B + "/nastaveni#zabezpeceni");
+  await op.getByLabel("Heslo pro vypnutí").fill("tajneheslo2");
+  await op.getByRole("button", { name: "Vypnout 2FA" }).click();
+  await op.getByRole("button", { name: "Zapnout dvoufázové ověření" }).waitFor();
+  // limit chybných přihlášení
+  const g = await browser.newContext();
+  const gp = await g.newPage();
+  for (let i = 0; i < 6; i++) {
+    await gp.goto(B + "/prihlaseni");
+    await gp.fill("input[name=email]", "nikdo@example.cz");
+    await gp.fill("input[name=password]", "spatneheslo" + i);
+    await gp.click("button[type=submit]");
+    await gp.getByText(i < 5 ? "Nesprávný e-mail nebo heslo." : "Příliš mnoho neúspěšných pokusů").waitFor();
+  }
+  // chyba z prohlížeče se zapíše (admin ji vidí v přehledu)
+  const lr = await gp.request.post(`${B}/api/log-error`, { data: { message: "e2e testovací chyba", path: "/e2e" } });
+  assert.equal(lr.ok(), true);
+  await g.close();
+}
+
 step("smazání účtu (GDPR)");
 await op.goto(B + "/nastaveni#ucet");
 await op.getByRole("button", { name: "Smazat účet…" }).click();

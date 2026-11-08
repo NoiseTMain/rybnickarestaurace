@@ -5,6 +5,7 @@ import "@fontsource-variable/manrope";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
 import { I18nProvider } from "@/components/I18n";
+import { ErrorReporter } from "@/components/ErrorReporter";
 import { getLocale } from "@/lib/i18n/server";
 import { BACKGROUNDS, THEME_COOKIE, parseTheme, rootFontSize, sceneUrl, themeVars } from "@/lib/theme";
 
@@ -36,6 +37,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         <div className="ambient" aria-hidden />
         <div id="ambient-scene" className="ambient-scene" aria-hidden style={scene ? { backgroundImage: `url("${scene}")` } : { display: "none" }} />
+        <ErrorReporter />
         <I18nProvider locale={locale}><ToastProvider>{children}</ToastProvider></I18nProvider>
       </body>
     </html>

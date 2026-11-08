@@ -88,6 +88,9 @@ export interface Member {
   sort: number;
   phone: string | null;
   avatar_document_id: string | null;
+  is_child?: boolean;
+  pocket_money?: Cents | null;
+  pocket_frequency?: "weekly" | "monthly" | null;
   created_at: string;
 }
 
@@ -219,6 +222,7 @@ export interface SavingsGoal {
   priority: number;
   status: "active" | "achieved" | "archived";
   note: string | null;
+  member_id?: string | null;
   created_at: string;
 }
 
@@ -583,9 +587,20 @@ export interface UserPrefs {
   hidden_sections: string[];
   locale: Locale;
   promo_seen_at: string | null;
+  tour_seen_at?: string | null;
   created_at: string;
   updated_at: string;
 }
+
+export interface AppError { id: string; user_id: string | null; path: string | null; message: string; stack: string | null; digest: string | null; user_agent: string | null; created_at: string }
+export interface LoginAttempt { id: string; key: string; ok: boolean; created_at: string }
+export interface NotificationLog { key: string; date: ISODate; created_at: string }
+export interface Asset { id: string; household_id: string; name: string; kind: "investment" | "property" | "vehicle" | "pension" | "other"; value: Cents; note: string | null; updated_at: string; created_at: string }
+export interface Debt { id: string; household_id: string; name: string; balance: Cents; rate: number; min_payment: Cents; note: string | null; created_at: string }
+export interface NetWorthSnapshot { id: string; household_id: string; month: string; assets: Cents; liabilities: Cents; created_at: string }
+export interface Reminder { id: string; household_id: string; title: string; kind: "warranty" | "stk" | "insurance" | "fixation" | "contract" | "document" | "tax" | "other"; due_date: ISODate; notify_days: number; repeat_yearly: boolean; done: boolean; note: string | null; created_at: string }
+export interface ReferralCode { user_id: string; code: string; created_at: string }
+export interface Referral { id: string; referrer_id: string; referred_id: string; status: "pending" | "rewarded" | "rejected"; created_at: string; rewarded_at: string | null }
 
 export interface AiUsage {
   user_id: string;
@@ -641,6 +656,15 @@ export interface Tables {
   admin_audit: AdminAudit;
   ai_usage: AiUsage;
   user_prefs: UserPrefs;
+  app_errors: AppError;
+  login_attempts: LoginAttempt;
+  notification_log: NotificationLog;
+  assets: Asset;
+  debts: Debt;
+  net_worth_snapshots: NetWorthSnapshot;
+  reminders: Reminder;
+  referral_codes: ReferralCode;
+  referrals: Referral;
 }
 
 export type TableName = keyof Tables;
@@ -675,6 +699,10 @@ export const HOUSEHOLD_TABLES = [
   "trip_expenses",
   "trip_cash_moves",
   "trip_settlements",
+  "assets",
+  "debts",
+  "net_worth_snapshots",
+  "reminders",
 ] as const satisfies readonly TableName[];
 
 export type HouseholdTable = (typeof HOUSEHOLD_TABLES)[number];
@@ -682,6 +710,7 @@ export type HouseholdTable = (typeof HOUSEHOLD_TABLES)[number];
 /** Sloupce s penězi (bigint) – při čtení ze Supabase se převádí na number. */
 export const MONEY_COLUMNS: Partial<Record<TableName, string[]>> = {
   household_settings: ["safety_buffer"],
+  members: ["pocket_money"],
   accounts: ["opening_balance"],
   transactions: ["amount"],
   recurring_payments: ["amount", "debt_remaining"],
@@ -701,4 +730,7 @@ export const MONEY_COLUMNS: Partial<Record<TableName, string[]>> = {
   trip_expenses: ["amount", "amount_original", "rate"],
   trip_cash_moves: ["amount", "amount_original", "rate"],
   trip_settlements: ["amount"],
+  assets: ["value"],
+  debts: ["balance", "min_payment", "rate"],
+  net_worth_snapshots: ["assets", "liabilities"],
 };

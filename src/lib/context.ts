@@ -3,7 +3,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { appMode } from "@/lib/env";
-import { getUser, type AppUser } from "@/lib/auth";
+import { getUser, mfaPending, type AppUser } from "@/lib/auth";
 import type { Store } from "@/lib/db/store";
 import type { Household, PermissionSection, Permissions } from "@/lib/db/types";
 
@@ -37,6 +37,7 @@ export const getStore = cache(async (user: AppUser): Promise<Store> => {
 export const requireUser = cache(async () => {
   const user = await getUser();
   if (!user) redirect("/prihlaseni");
+  if (await mfaPending()) redirect("/prihlaseni/overeni");
   return { user, store: await getStore(user) };
 });
 
@@ -44,6 +45,7 @@ export const requireUser = cache(async () => {
 export const tryContext = cache(async (): Promise<AppContext | null | "no_household"> => {
   const user = await getUser();
   if (!user) return null;
+  if (await mfaPending()) return null;
   const store = await getStore(user);
   const [memberships, allHouseholds] = await Promise.all([store.select("household_users", { user_id: user.id }), store.select("households")]);
   const households = allHouseholds.filter((h) => memberships.some((m) => m.household_id === h.id));
@@ -60,7 +62,7 @@ export const tryContext = cache(async (): Promise<AppContext | null | "no_househ
 /** Kontext s aktuální domácností. Bez přihlášení → přihlášení, bez domácnosti → úvodní nastavení. */
 export const requireContext = cache(async (): Promise<AppContext> => {
   const ctx = await tryContext();
-  if (ctx === null) redirect("/prihlaseni");
+  if (ctx === null) redirect((await getUser()) ? "/prihlaseni/overeni" : "/prihlaseni");
   if (ctx === "no_household") redirect("/uvod");
   return ctx;
 });

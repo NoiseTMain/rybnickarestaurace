@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { appMode, publicEnv } from "@/lib/env";
 import type { AdminAudit, Subscription, Transaction, Trip, TripExpense, TripLeg, TripPerson, TripPlanItem, TripSettlement } from "@/lib/db/types";
 
@@ -58,8 +58,27 @@ export interface AdminBackend {
   claimTrial(emailHash: string, userId: string, card: string | null): Promise<void>;
   /** Byla už stejná karta použita na zkušební období u jiného účtu? */
   trialCardUsed(card: string, userId: string): Promise<boolean>;
+  /** Záznam chyb aplikace. */
+  logError(row: { user_id: string | null; path: string | null; message: string; stack: string | null; digest: string | null; user_agent: string | null }): Promise<void>;
+  errors(limit?: number): Promise<{ id: string; path: string | null; message: string; digest: string | null; user_id: string | null; created_at: string }[]>;
+  /** Neúspěšná přihlášení od daného času (ochrana proti hádání hesla). */
+  failedLogins(key: string, sinceIso: string): Promise<number>;
+  recordLogin(key: string, ok: boolean): Promise<void>;
+  /** Vrátí true, když se upozornění s tímto klíčem dnes ještě neposlalo (a zaznamená ho). */
+  notifyOnce(key: string, date: string): Promise<boolean>;
+  /** Doporučení: kód uživatele (vytvoří, když chybí), zápis doporučení, seznam. */
+  referralCode(userId: string): Promise<string>;
+  userByReferralCode(code: string): Promise<string | null>;
+  addReferral(referrerId: string, referredId: string): Promise<void>;
+  referrals(): Promise<{ id: string; referrer_id: string; referred_id: string; status: string; created_at: string }[]>;
+  setReferralStatus(id: string, status: "rewarded" | "rejected"): Promise<void>;
   /** Smaže účet: domácnosti, kde byl jediný, smaže; jinde předá vlastnictví dalšímu členovi. */
   deleteUser(userId: string): Promise<void>;
+}
+
+function refCode(): string {
+  const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  return Array.from({ length: 8 }, () => A[randomInt(A.length)]).join("");
 }
 
 export function adminConfigured(): boolean {
@@ -153,6 +172,49 @@ function supabaseBackend(): AdminBackend {
       const { data } = await db.from("ai_usage").select("user_id,count").eq("month", month);
       return (data ?? []) as { user_id: string; count: number }[];
     },
+    async logError(row) {
+      await db.from("app_errors").insert(row);
+    },
+    async errors(limit = 50) {
+      const { data } = await db.from("app_errors").select("id,path,message,digest,user_id,created_at").order("created_at", { ascending: false }).limit(limit);
+      return (data ?? []) as never;
+    },
+    async failedLogins(key, since) {
+      const { count } = await db.from("login_attempts").select("id", { count: "exact", head: true }).eq("key", key).eq("ok", false).gte("created_at", since);
+      return count ?? 0;
+    },
+    async recordLogin(key, ok) {
+      await db.from("login_attempts").insert({ key, ok });
+      if (ok) await db.from("login_attempts").delete().eq("key", key).eq("ok", false);
+    },
+    async notifyOnce(key, date) {
+      const { error } = await db.from("notification_log").insert({ key: key.slice(0, 200), date });
+      return !error;
+    },
+    async referralCode(userId) {
+      const { data } = await db.from("referral_codes").select("code").eq("user_id", userId).maybeSingle();
+      if (data?.code) return data.code as string;
+      for (let i = 0; i < 5; i++) {
+        const code = refCode();
+        const { error } = await db.from("referral_codes").insert({ user_id: userId, code });
+        if (!error) return code;
+      }
+      throw new Error("Kód se nepodařilo vytvořit");
+    },
+    async userByReferralCode(code) {
+      const { data } = await db.from("referral_codes").select("user_id").eq("code", code.toUpperCase()).maybeSingle();
+      return (data?.user_id as string | undefined) ?? null;
+    },
+    async addReferral(referrerId, referredId) {
+      await db.from("referrals").insert({ referrer_id: referrerId, referred_id: referredId });
+    },
+    async referrals() {
+      const { data } = await db.from("referrals").select("*").order("created_at", { ascending: false });
+      return (data ?? []) as never;
+    },
+    async setReferralStatus(id, status) {
+      await db.from("referrals").update({ status, rewarded_at: status === "rewarded" ? new Date().toISOString() : null }).eq("id", id);
+    },
     async trialClaimed(hash) {
       const { data } = await db.from("trial_claims").select("email_hash").eq("email_hash", hash).maybeSingle();
       return Boolean(data);
@@ -245,6 +307,20 @@ async function localBackend(): Promise<AdminBackend> {
     audit: (row) => writeLocal((d) => { t(d as never, "admin_audit").push({ id: randomUUID(), created_at: new Date().toISOString(), ...row }); }),
     auditLog: (limit = 100) => readLocal((d) => [...t(d as never, "admin_audit")].reverse().slice(0, limit) as unknown as AdminAudit[]),
     aiUsage: (month) => readLocal((d) => t(d as never, "ai_usage").filter((r) => r.month === month).map((r) => ({ user_id: r.user_id as string, count: r.count as number }))),
+    logError: (row) => writeLocal((d) => { const l = t(d as never, "app_errors"); l.push({ id: randomUUID(), created_at: new Date().toISOString(), ...row }); if (l.length > 500) l.splice(0, l.length - 500); }),
+    errors: (limit = 50) => readLocal((d) => [...t(d as never, "app_errors")].reverse().slice(0, limit) as never),
+    failedLogins: (key, since) => readLocal((d) => t(d as never, "login_attempts").filter((r) => r.key === key && !r.ok && String(r.created_at) >= since).length),
+    recordLogin: (key, ok) => writeLocal((d) => {
+      const l = t(d as never, "login_attempts");
+      if (ok) (d.tables as Any).login_attempts = l.filter((r) => r.key !== key);
+      else l.push({ id: randomUUID(), key, ok, created_at: new Date().toISOString() });
+    }),
+    notifyOnce: (key, date) => writeLocal((d) => { const l = t(d as never, "notification_log"); if (l.some((r) => r.key === key && r.date === date)) return false; l.push({ key, date, created_at: new Date().toISOString() }); return true; }),
+    referralCode: (userId) => writeLocal((d) => { const l = t(d as never, "referral_codes"); const f = l.find((r) => r.user_id === userId); if (f) return f.code as string; const code = refCode(); l.push({ user_id: userId, code, created_at: new Date().toISOString() }); return code; }),
+    userByReferralCode: (code) => readLocal((d) => (t(d as never, "referral_codes").find((r) => r.code === code.toUpperCase())?.user_id as string | undefined) ?? null),
+    addReferral: (a, b) => writeLocal((d) => { const l = t(d as never, "referrals"); if (!l.some((r) => r.referred_id === b) && a !== b) l.push({ id: randomUUID(), referrer_id: a, referred_id: b, status: "pending", created_at: new Date().toISOString(), rewarded_at: null }); }),
+    referrals: () => readLocal((d) => [...t(d as never, "referrals")].reverse() as never),
+    setReferralStatus: (id, status) => writeLocal((d) => { const r = t(d as never, "referrals").find((x) => x.id === id); if (r) { r.status = status; r.rewarded_at = status === "rewarded" ? new Date().toISOString() : null; } }),
     trialClaimed: (hash) => readLocal((d) => t(d as never, "trial_claims").some((r) => r.email_hash === hash)),
     claimTrial: (hash, userId, card) => writeLocal((d) => { const l = t(d as never, "trial_claims"); if (!l.some((r) => r.email_hash === hash)) l.push({ email_hash: hash, user_id: userId, card, created_at: new Date().toISOString() }); }),
     trialCardUsed: (card, userId) => readLocal((d) => t(d as never, "trial_claims").some((r) => r.card === card && r.user_id !== userId)),

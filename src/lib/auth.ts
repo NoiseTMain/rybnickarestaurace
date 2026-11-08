@@ -40,9 +40,9 @@ export async function verifyPassword(password: string, stored: string): Promise<
   return timingSafeEqual(expected, actual);
 }
 
-export async function createLocalSession(userId: string) {
+export async function createLocalSession(userId: string, mfa = false) {
   const exp = Date.now() + SESSION_DAYS * 86_400_000;
-  const payload = Buffer.from(JSON.stringify({ sub: userId, exp, n: randomUUID() })).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({ sub: userId, exp, iat: Date.now(), mfa, n: randomUUID() })).toString("base64url");
   const value = `${payload}.${sign(payload, await localSecret())}`;
   const jar = await cookies();
   jar.set(LOCAL_SESSION_COOKIE, value, {
@@ -54,7 +54,9 @@ export async function createLocalSession(userId: string) {
   });
 }
 
-async function localUser(): Promise<AppUser | null> {
+interface LocalSessionInfo { user: AppUser; mfa: boolean; totp: boolean }
+
+async function localSession(): Promise<LocalSessionInfo | null> {
   const jar = await cookies();
   const raw = jar.get(LOCAL_SESSION_COOKIE)?.value;
   if (!raw) return null;
@@ -64,11 +66,13 @@ async function localUser(): Promise<AppUser | null> {
   const a = Buffer.from(sig), b = Buffer.from(expected);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
   try {
-    const { sub, exp } = JSON.parse(Buffer.from(payload, "base64url").toString()) as { sub: string; exp: number };
+    const { sub, exp, iat, mfa } = JSON.parse(Buffer.from(payload, "base64url").toString()) as { sub: string; exp: number; iat?: number; mfa?: boolean };
     if (exp < Date.now()) return null;
     const { readLocal } = await import("@/lib/db/local-store");
-    const user = await readLocal((d) => d.users.find((u) => u.id === sub));
-    return user ? { id: user.id, email: user.email } : null;
+    const user = await readLocal((d) => d.users.find((u) => u.id === sub)) as unknown as { id: string; email: string; banned?: boolean; sessions_after?: number; totp_enabled?: boolean } | undefined;
+    if (!user || user.banned) return null;
+    if (user.sessions_after && (iat ?? 0) < user.sessions_after) return null; // „odhlásit všechna zařízení“
+    return { user: { id: user.id, email: user.email }, mfa: Boolean(mfa), totp: Boolean(user.totp_enabled) };
   } catch {
     return null;
   }
@@ -79,6 +83,21 @@ async function localUser(): Promise<AppUser | null> {
  * přes veřejné klíče projektu, které se ukládají do mezipaměti) – bez dalšího
  * dotazu na Auth server při každém kliknutí. Data stejně chrání RLS v databázi.
  */
+async function localUser(): Promise<AppUser | null> {
+  return (await localSession())?.user ?? null;
+}
+
+/** Přihlášen heslem, ale ještě neověřil druhý faktor (2FA)? */
+export const mfaPending = cache(async (): Promise<boolean> => {
+  if (appMode() === "local") {
+    const s = await localSession();
+    return Boolean(s && s.totp && !s.mfa);
+  }
+  const supabase = await createSessionClient();
+  const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  return data?.currentLevel === "aal1" && data?.nextLevel === "aal2";
+});
+
 export const getUser = cache(async (): Promise<AppUser | null> => {
   if (appMode() === "local") return localUser();
   const supabase = await createSessionClient();

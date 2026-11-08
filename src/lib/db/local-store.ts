@@ -104,7 +104,9 @@ function canSee(data: LocalData, userId: string, table: TableName, row: Record<s
   if (table === "households") return members.has(row.id as string) || row.created_by === userId;
   if (table === "household_invites") return ownerHouseholds(data, userId).has(row.household_id as string);
   if (table === "push_subscriptions" || table === "subscriptions" || table === "ai_usage" || table === "user_prefs") return row.user_id === userId;
-  if (table === "admin_audit") return false;
+  if (table === "admin_audit" || table === "app_errors" || table === "login_attempts" || table === "notification_log") return false;
+  if (table === "referral_codes") return row.user_id === userId;
+  if (table === "referrals") return row.referrer_id === userId || row.referred_id === userId;
   return members.has(row.household_id as string);
 }
 
@@ -149,7 +151,7 @@ function canWrite(data: LocalData, userId: string, table: TableName, row: Record
   }
   if (table === "household_invites") return ownerHouseholds(data, userId).has(row.household_id as string);
   if (table === "push_subscriptions") return row.user_id === userId && memberHouseholds(data, userId).has(row.household_id as string) && (op === "delete" || localHouseholdPremium(data, row.household_id as string));
-  if (table === "subscriptions" || table === "admin_audit" || table === "ai_usage") return false; // zapisuje jen server
+  if (["subscriptions", "admin_audit", "ai_usage", "app_errors", "login_attempts", "notification_log", "referral_codes", "referrals"].includes(table)) return false; // zapisuje jen server
   if (table === "user_prefs") return row.user_id === userId;
   const hid = row.household_id as string;
   if (!memberHouseholds(data, userId).has(hid)) return false;

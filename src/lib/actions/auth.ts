@@ -1,5 +1,5 @@
 "use server";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -23,20 +23,44 @@ function parseCreds(fd: FormData) {
   return { ok: false as const, result: fail("Zkontrolujte údaje.", fieldErrors) };
 }
 
+/** Ochrana proti hádání hesla: max. 5 chybných pokusů za 15 minut na e-mail a IP adresu. */
+const memAttempts = new Map<string, number[]>();
+async function loginGuard(email: string) {
+  const h = await headers();
+  const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || h.get("x-real-ip") || "?";
+  const key = createHash("sha256").update(`${email.toLowerCase()}|${ip}`).digest("hex");
+  const since = new Date(Date.now() - 15 * 60_000).toISOString();
+  const { adminBackend, adminConfigured } = await import("@/lib/admin");
+  const backend = adminConfigured() ? await adminBackend().catch(() => null) : null;
+  const failed = backend ? await backend.failedLogins(key, since).catch(() => 0) : (memAttempts.get(key) ?? []).filter((t) => t > Date.now() - 15 * 60_000).length;
+  return {
+    blocked: failed >= 5,
+    record: async (ok: boolean) => {
+      if (backend) await backend.recordLogin(key, ok).catch(() => undefined);
+      else if (ok) memAttempts.delete(key);
+      else memAttempts.set(key, [...(memAttempts.get(key) ?? []), Date.now()]);
+    },
+  };
+}
+
 export async function signIn(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const p = parseCreds(fd);
   if (!p.ok) return p.result;
   const { email, password } = p.data;
+  const guard = await loginGuard(email);
+  if (guard.blocked) return fail("Příliš mnoho neúspěšných pokusů. Zkuste to prosím za 15 minut.");
   if (appMode() === "local") {
     const { readLocal, writeLocal } = await import("@/lib/db/local-store");
     const user = await readLocal((d) => d.users.find((u) => u.email === email));
-    if (!user || !(await verifyPassword(password, user.password_hash))) return fail("Nesprávný e-mail nebo heslo.");
+    if (!user || !(await verifyPassword(password, user.password_hash))) { await guard.record(false); return fail("Nesprávný e-mail nebo heslo."); }
+    await guard.record(true);
     if ((user as unknown as { banned?: boolean }).banned) return fail("Účet je zablokovaný. Kontaktujte správce aplikace.");
     await writeLocal((d) => { const u = d.users.find((x) => x.id === user.id) as unknown as { last_sign_in_at?: string } | undefined; if (u) u.last_sign_in_at = new Date().toISOString(); });
     await createLocalSession(user.id);
   } else {
     const supabase = await createSessionClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    await guard.record(!error);
     if (error) return fail(error.message.includes("confirm") ? "E-mail ještě nebyl potvrzen – zkontrolujte schránku." : /banned/i.test(error.message) ? "Účet je zablokovaný. Kontaktujte správce aplikace." : "Nesprávný e-mail nebo heslo.");
   }
   redirect("/");

@@ -20,6 +20,7 @@ export function errorToResult(e: unknown): ActionResult {
   // přesměrování z requireContext apod. musí projít dál
   if (e && typeof e === "object" && "digest" in e && String((e as { digest: unknown }).digest).startsWith("NEXT_")) throw e;
   console.error(e);
+  void import("@/lib/errors-log").then((m) => m.logAppError({ message: e instanceof Error ? e.message : String(e), stack: e instanceof Error ? e.stack : null, path: "server-action" }));
   return fail(e instanceof Error && e.message ? `Uložení se nepovedlo: ${e.message}` : "Uložení se nepovedlo.");
 }
 

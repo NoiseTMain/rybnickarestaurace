@@ -6,6 +6,7 @@ import { getPremium } from "@/lib/premium";
 import { getPrefs } from "@/lib/prefs";
 import { ProfileForm } from "@/components/forms/ProfileForm";
 import { LanguageCard } from "@/components/forms/LanguageCard";
+import { SecurityCard } from "@/components/forms/SecurityForms";
 import { FREE_LIMITS } from "@/lib/plans";
 import { addDays, formatDate, todayISO } from "@/lib/dates";
 import { ACCOUNT_KIND_LABEL } from "@/lib/defaults";
@@ -31,7 +32,7 @@ import { AutosaveField, AutosaveToggle, CreateDemoButton, DeleteAccountForm, Del
 
 export const metadata = { title: "Nastavení" };
 
-const SECTIONS = [["predplatne", "Předplatné"], ["situace", "Situace a sekce"], ["jazyk", "Jazyk"], ["vzhled", "Vzhled"], ["domacnost", "Domácnost"], ["clenove", "Členové"], ["ucty", "Účty"], ["prijmy", "Příjmy"], ["kategorie", "Kategorie"], ["planovani", "Rezerva a upozornění"], ["ico", "IČO"], ["fakturace", "Fakturační údaje"], ["prace", "Práce"], ["banka", "Banka"], ["zaloha", "Export a záloha"], ["ucet", "Účet"]];
+const SECTIONS = [["predplatne", "Předplatné"], ["situace", "Situace a sekce"], ["jazyk", "Jazyk"], ["zabezpeceni", "Zabezpečení"], ["vzhled", "Vzhled"], ["domacnost", "Domácnost"], ["clenove", "Členové"], ["ucty", "Účty"], ["prijmy", "Příjmy"], ["kategorie", "Kategorie"], ["planovani", "Rezerva a upozornění"], ["ico", "IČO"], ["fakturace", "Fakturační údaje"], ["prace", "Práce"], ["banka", "Banka"], ["zaloha", "Export a záloha"], ["ucet", "Účet"]];
 
 export default async function SettingsPage() {
   const ctx = await requireContext();
@@ -56,6 +57,9 @@ export default async function SettingsPage() {
         </Card>
         <Card id="situace" title="Moje situace a sekce" subtitle="Skryjte sekce, které nepotřebujete – třeba Faktury, když nepodnikáte" className="xl:col-span-2">
           <ProfileForm profile={prefs.profile} hidden={prefs.hidden_sections} />
+        </Card>
+        <Card id="zabezpeceni" title="Zabezpečení účtu" subtitle="Dvoufázové ověření a odhlášení ze všech zařízení" className="xl:col-span-2">
+          <SecurityCard />
         </Card>
         <Card id="jazyk" title="Jazyk / Language" subtitle="Čeština · Slovenčina · English" className="xl:col-span-2">
           <LanguageCard />
