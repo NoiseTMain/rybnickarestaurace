@@ -103,7 +103,7 @@ function canSee(data: LocalData, userId: string, table: TableName, row: Record<s
   const members = memberHouseholds(data, userId);
   if (table === "households") return members.has(row.id as string) || row.created_by === userId;
   if (table === "household_invites") return ownerHouseholds(data, userId).has(row.household_id as string);
-  if (table === "push_subscriptions" || table === "subscriptions" || table === "ai_usage" || table === "user_prefs") return row.user_id === userId;
+  if (table === "push_subscriptions" || table === "subscriptions" || table === "ai_usage" || table === "user_prefs" || table === "recipe_reactions") return row.user_id === userId;
   if (table === "admin_audit" || table === "app_errors" || table === "login_attempts" || table === "notification_log") return false;
   if (table === "referral_codes") return row.user_id === userId;
   if (table === "referrals") return row.referrer_id === userId || row.referred_id === userId;
@@ -152,7 +152,7 @@ function canWrite(data: LocalData, userId: string, table: TableName, row: Record
   if (table === "household_invites") return ownerHouseholds(data, userId).has(row.household_id as string);
   if (table === "push_subscriptions") return row.user_id === userId && memberHouseholds(data, userId).has(row.household_id as string) && (op === "delete" || localHouseholdPremium(data, row.household_id as string));
   if (["subscriptions", "admin_audit", "ai_usage", "app_errors", "login_attempts", "notification_log", "referral_codes", "referrals"].includes(table)) return false; // zapisuje jen server
-  if (table === "user_prefs") return row.user_id === userId;
+  if (table === "user_prefs" || table === "recipe_reactions") return row.user_id === userId;
   const hid = row.household_id as string;
   if (!memberHouseholds(data, userId).has(hid)) return false;
   if (PREMIUM_TABLES.has(table) && op !== "delete" && !localHouseholdPremium(data, hid)) return false;
@@ -324,6 +324,13 @@ export function createLocalStore(userId: string): Store {
         const ids = new Set(targets.map((t) => t.id));
         data.tables[table] = list.filter((r) => !ids.has(r.id)) as never;
         return targets.length;
+      });
+    },
+    recipeLikeCounts() {
+      return readLocal((data) => {
+        const out: Record<string, number> = {};
+        for (const r of rows(data, "recipe_reactions")) if (r.liked) out[r.recipe_id] = (out[r.recipe_id] ?? 0) + 1;
+        return out;
       });
     },
     householdPremium(householdId: string) {

@@ -13,7 +13,7 @@ import { Card, PageHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 
-export function RecipeDetail({ r, lists, cuisine, meals, goals }: { r: Recipe; lists: { id: string; name: string }[]; cuisine: string; meals: string; goals: string[] }) {
+export function RecipeDetail({ r, lists, cuisine, meals, goals, top }: { r: Recipe; lists: { id: string; name: string }[]; cuisine: string; meals: string; goals: string[]; top?: React.ReactNode }) {
   const [n, setN] = useState(2);
   const [list, setList] = useState("");
   const [pending, start] = useTransition();
@@ -26,6 +26,7 @@ export function RecipeDetail({ r, lists, cuisine, meals, goals }: { r: Recipe; l
   return (
     <div className="space-y-4">
       <PageHeader title={recipeName(r)} subtitle={`${phrase(cuisine)} · ${meals.split(", ").map((m) => phrase(m)).join(", ")} · ${phrase(r.diet)}`} />
+      {top}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Card className="!p-4"><p className="text-[11px] uppercase tracking-wider text-ink-3">Energie</p><p className="flex items-center gap-1 text-xl font-semibold"><Flame className="h-4 w-4 text-gold" />{r.kcal} kcal</p><p className="text-xs text-ink-3">na porci</p></Card>
         <Card className="!p-4"><p className="text-[11px] uppercase tracking-wider text-ink-3">Bílkoviny</p><p className="text-xl font-semibold">{r.protein} g</p></Card>

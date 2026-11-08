@@ -1,12 +1,19 @@
 import { ING } from "./ingredients";
-import { A_GRAMS, B_GRAMS, BASES, CUISINES, MEALS, type Cuisine, type Meal } from "./bases";
+import { A_GRAMS, B_GRAMS, BASES, COURSES, COURSE_OF, CUISINES, MEALS, type Base, type Course, type Cuisine, type Meal } from "./bases";
+import { MORE_BASES } from "./bases-more";
 
-export { CUISINES, MEALS, ING };
-export type { Cuisine, Meal };
+export { COURSES, CUISINES, MEALS, ING };
+export type { Course, Cuisine, Meal };
 
 export interface RecipeIngredient { key: string; name: string; grams: number; pieces: number | null }
 export interface Recipe {
   id: string;
+  /** Jídlo, ke kterému varianta patří. */
+  dishId: string;
+  course: Course;
+  /** Zvolená hlavní surovina a příloha (klíče do ING). */
+  aKey: string;
+  bKey: string | null;
   name: string;
   cuisine: Cuisine;
   meal: Meal[];
@@ -27,9 +34,28 @@ export interface Recipe {
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+/** Jídlo = jeden recept s variantami (hlavní surovina × příloha), aby se v seznamu nic neopakovalo. */
+export interface Dish {
+  id: string;
+  title: string;
+  cuisine: Cuisine;
+  course: Course;
+  meal: Meal[];
+  time: number;
+  free: boolean;
+  variants: Recipe[];
+  /** Výchozí varianta (první surovina a příloha). */
+  def: Recipe;
+  aOptions: string[];
+  bOptions: string[] | null;
+}
+
+const ALL_BASES: Base[] = [...BASES, ...MORE_BASES];
+
 function build(): Recipe[] {
   const out: Recipe[] = [];
-  for (const b of BASES) {
+  for (const b of ALL_BASES) {
+    const course: Course = b.course ?? COURSE_OF[b.id] ?? "hlavni";
     for (const a of b.a) {
       for (const side of b.b ?? [null]) {
         const A = ING[a];
@@ -58,7 +84,7 @@ function build(): Recipe[] {
         const steps = tpls.map(fill);
         const nameParts = [b.title, A.with ?? `s ${A.name}`, ...(B ? [B.and ?? `a ${B.name}`] : [])];
         const r = {
-          id: `${b.id}-${a}${side ? `-${side}` : ""}`,
+          id: `${b.id}-${a}${side ? `-${side}` : ""}`, dishId: b.id, course, aKey: a, bKey: side,
           name: `${b.title} ${A.with ?? `s ${A.name}`}${B ? ` ${B.and ?? `a ${B.name}`}` : ""}`,
           cuisine: b.cuisine, meal: b.meal, time: b.time, ingredients, steps, nameParts, stepParts: { tpls, a: aWord, b: bWord },
           kcal: Math.round(kcal), protein: Math.round(p), carbs: Math.round(c), fat: Math.round(f), price: Math.round(price),
@@ -73,15 +99,29 @@ function build(): Recipe[] {
       }
     }
   }
-  // zdarma: každý 15. recept (rovnoměrně napříč kuchyněmi), ostatní v Premium
-  out.forEach((r, i) => { r.free = i % 15 === 0; });
+  // zdarma: každé 5. jídlo (rovnoměrně napříč kuchyněmi a kategoriemi) se všemi variantami
+  const freeDish = new Set(ALL_BASES.filter((_, i) => i % 5 === 0).map((b) => b.id));
+  out.forEach((r) => { r.free = freeDish.has(r.dishId); });
   return out;
 }
 
 export const RECIPES: Recipe[] = build();
 
+export const DISHES: Dish[] = ALL_BASES.map((b) => {
+  const variants = RECIPES.filter((r) => r.dishId === b.id);
+  return { id: b.id, title: b.title, cuisine: b.cuisine, course: variants[0].course, meal: b.meal, time: b.time, free: variants[0].free, variants, def: variants[0], aOptions: b.a, bOptions: b.b };
+});
+
+export const dishById = (id: string) => DISHES.find((d) => d.id === id) ?? null;
+
+/** Varianta jídla podle zvolené suroviny/přílohy (neplatná volba → výchozí). */
+export function variantOf(d: Dish, a?: string | null, b?: string | null): Recipe {
+  return d.variants.find((v) => v.aKey === (a || d.def.aKey) && v.bKey === (b ?? d.def.bKey)) ?? d.variants.find((v) => v.aKey === a) ?? d.def;
+}
+
 export { recipeName, recipeSteps } from "./localize";
-export const recipeById = (id: string) => RECIPES.find((r) => r.id === id) ?? null;
+/** Varianta podle id (nebo výchozí varianta jídla, když je id jen jídlo). */
+export const recipeById = (id: string) => RECIPES.find((r) => r.id === id) ?? dishById(id)?.def ?? null;
 
 export const GOALS: Record<Recipe["goals"][number], string> = {
   hubnuti: "Na hubnutí (do 500 kcal)", nabirani: "Na nabírání (650+ kcal)", protein: "Vysoký protein (30+ g)", lowcarb: "Málo sacharidů", rychle: "Do 20 minut",

@@ -40,7 +40,7 @@ EXTRA = {  # krátká slova bez diakritiky, která extrakce vynechává
   "{0} chystaná cesta": ("{0} chystaná cesta", "{0} upcoming trip"), "{0} chystané cesty": ("{0} chystané cesty", "{0} upcoming trips"), "{0} chystaných cest": ("{0} chystaných ciest", "{0} upcoming trips"),
   "{0} z {1}": ("{0} z {1}", "{0} of {1}"), "{0} – {1}": ("{0} – {1}", "{0} – {1}"), "· {0} dní": ("· {0} dní", "· {0} days"), "{0} {1}, průměrně {2} za nákup": ("{0} {1}, priemerne {2} za nákup", "{0} {1}, on average {2} per shop"),
   "Upravit pravidelný příjem": ("Upraviť pravidelný príjem", "Edit regular income"), "Upravit člena": ("Upraviť člena", "Edit member"), "Upravit účet": ("Upraviť účet", "Edit account"), "Nový pravidelný příjem": ("Nový pravidelný príjem", "New regular income"), "Nový člen": ("Nový člen", "New member"), "Nový účet": ("Nový účet", "New account"),
-  "získáno": ("získané", "earned"), "Spustit průvodce znovu": ("Spustiť sprievodcu znova", "Restart the tour"), "(spoření)": ("(sporenie)", "(savings)"), "/měs., zdravotní": ("/mes., zdravotné", "/mo., health"),
+  "získáno": ("získané", "earned"), "variant": ("variantov", "variants"), "Příloha k jídlu": ("Príloha", "Side"), "Spustit průvodce znovu": ("Spustiť sprievodcu znova", "Restart the tour"), "(spoření)": ("(sporenie)", "(savings)"), "/měs., zdravotní": ("/mes., zdravotné", "/mo., health"),
   "vyčleněno na běžném účtu": ("vyčlenené na bežnom účte", "set aside on the current account"), "dny": ("dni", "days"), "dní": ("dní", "days"), "/měs.": ("/mes.", "/mo."), "ks": ("ks", "pcs"), "dnes": ("dnes", "today"), "zítra": ("zajtra", "tomorrow"), "včera": ("včera", "yesterday"),
   "Domov": ("Domov", "Home"), "Odhad": ("Odhad", "Estimate"),
 }

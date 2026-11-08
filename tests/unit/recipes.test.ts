@@ -31,3 +31,29 @@ describe("recepty", () => {
     expect(amount({ key: "eggs", name: "vejce", grams: 180, pieces: 3 }, 2)).toBe("6 ks");
   });
 });
+
+import { DISHES, COURSES, dishById, variantOf } from "@/lib/recipes";
+import { matchVariant, weekPlan, dishOfDay } from "@/lib/recipes/browse";
+describe("jídla, kategorie a jídelníček", () => {
+  it("jídla se neopakují a každá kategorie je naplněná", () => {
+    expect(DISHES.length).toBeGreaterThanOrEqual(170);
+    expect(new Set(DISHES.map((d) => d.id)).size).toBe(DISHES.length);
+    expect(new Set(DISHES.map((d) => d.title)).size).toBe(DISHES.length);
+    for (const c of Object.keys(COURSES)) expect(DISHES.filter((d) => d.course === c).length, c).toBeGreaterThanOrEqual(8);
+    expect(DISHES.filter((d) => d.free).length).toBeGreaterThanOrEqual(30);
+  });
+  it("varianta podle volby a podle filtru diety", () => {
+    const d = dishById("gulas")!;
+    expect(variantOf(d, "tofu", "bread").id).toBe("gulas-tofu-bread");
+    expect(variantOf(d, "neexistuje", null).id).toBe(d.def.id);
+    expect(matchVariant(d, { diet: "veganské" }, (r) => r.name)?.aKey).toBe("tofu");
+    expect(matchVariant(d, { course: "dezert" }, (r) => r.name)).toBeNull();
+  });
+  it("jídelníček má 7 různých jídel a tip dne je stabilní", () => {
+    const w = weekPlan("2026-11-x", true);
+    expect(w).toHaveLength(7);
+    expect(new Set(w.map((r) => r.dishId)).size).toBe(7);
+    expect(weekPlan("2026-11-x", false).every((r) => r.free)).toBe(true);
+    expect(dishOfDay("2026-11-09", 0, true).id).toBe(dishOfDay("2026-11-09", 0, true).id);
+  });
+});

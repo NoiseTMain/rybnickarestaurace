@@ -34,6 +34,8 @@ export interface Store {
   ensureOwnMember(householdId: string, memberName?: string | null): Promise<string>;
   /** Má domácnost Premium (kterýkoli člen s aktivním předplatným, nebo ukázková domácnost)? */
   householdPremium(householdId: string): Promise<boolean>;
+  /** Počty lajků u receptů (všichni uživatelé, anonymně). */
+  recipeLikeCounts(): Promise<Record<string, number>>;
   /** Má přihlášený uživatel aktivní Premium? */
   userPremium(): Promise<boolean>;
   /** Započítá dotaz na AI v tomto měsíci a vrátí nový počet. */

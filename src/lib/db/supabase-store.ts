@@ -93,6 +93,11 @@ export function createSupabaseStore(client: SupabaseClient): Store {
       if (error) throw mapError(error);
       return data as string;
     },
+    async recipeLikeCounts() {
+      const { data, error } = await client.rpc("recipe_like_counts");
+      if (error || !data) return {};
+      return Object.fromEntries((data as { recipe_id: string; likes: number }[]).map((r) => [r.recipe_id, Number(r.likes)]));
+    },
     async householdPremium(householdId: string) {
       const { data, error } = await client.rpc("household_is_premium", { hid: householdId });
       if (error) return false;

@@ -18,6 +18,7 @@ const posted = (col: string) => (r: Record<string, unknown>) => r[col] != null &
 export const UNIQUE: Partial<Record<TableName, UniqueConstraint[]>> = {
   household_users: [{ columns: ["household_id", "user_id"], message: "Uživatel už je členem domácnosti." }],
   user_prefs: [{ columns: ["user_id"], message: "Předvolby už existují." }],
+  recipe_reactions: [{ columns: ["user_id", "recipe_id"], message: "Záznam receptu už existuje." }],
   net_worth_snapshots: [{ columns: ["household_id", "month"], message: "Snímek za tento měsíc už existuje." }],
   challenges: [{ columns: ["household_id", "kind", "month"], message: "Tuto výzvu už tento měsíc máte." }],
   household_invites: [{ columns: ["code"], message: "Kód pozvánky už existuje." }],
@@ -144,7 +145,7 @@ export const REFS: Partial<Record<TableName, Ref[]>> = {
   ],
 };
 
-export const TABLES_WITH_UPDATED_AT: TableName[] = ["transactions", "household_settings", "work_settings", "user_prefs", "assets"];
+export const TABLES_WITH_UPDATED_AT: TableName[] = ["transactions", "household_settings", "work_settings", "user_prefs", "assets", "recipe_reactions"];
 
 /** Tabulky, jejichž primární klíč není `id` (řazení při stránkování v Supabase). Hlídá test tests/unit/schema.test.ts. */
 export const PRIMARY_KEY: Partial<Record<string, string>> = { subscriptions: "user_id", user_prefs: "user_id", ai_usage: "user_id", trial_claims: "email_hash", referral_codes: "user_id", notification_log: "key", widget_tokens: "token_hash" };

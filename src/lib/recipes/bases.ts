@@ -5,9 +5,32 @@
 export type Cuisine = "ceska" | "italska" | "recka" | "mexicka" | "thajska" | "indicka" | "japonska" | "spanelska" | "blizkovychodni" | "americka";
 export type Meal = "snidane" | "obed" | "vecere" | "svacina";
 
+export type Course = "snidane" | "polevka" | "salat" | "bowl" | "testoviny" | "hlavni" | "svacina" | "dezert";
+
+/** Kategorie jídel (jak se zobrazují v sekci Recepty). */
+export const COURSES: Record<Course, { label: string; emoji: string }> = {
+  snidane: { label: "Snídaně", emoji: "🍳" }, polevka: { label: "Polévky", emoji: "🍲" }, salat: { label: "Saláty", emoji: "🥗" }, bowl: { label: "Bowly", emoji: "🥙" },
+  testoviny: { label: "Těstoviny a nudle", emoji: "🍝" }, hlavni: { label: "Hlavní jídla", emoji: "🍛" }, svacina: { label: "Svačiny", emoji: "🥪" }, dezert: { label: "Dezerty a sladké", emoji: "🍰" },
+};
+
+/** Kategorie původních receptů. */
+export const COURSE_OF: Record<string, Course> = {
+  gulas: "hlavni", leco: "hlavni", paprikas: "hlavni", "pohankove-rizoto": "hlavni", "tvarohova-snidane": "snidane", zelnacka: "polevka",
+  "testoviny-pomodoro": "testoviny", rizoto: "hlavni", minestrone: "polevka", caprese: "salat", frittata: "snidane", "tortilla-pizza": "svacina",
+  "recky-salat": "salat", souvlaki: "bowl", gemista: "hlavni", fasolada: "polevka", "pecena-zelenina-feta": "hlavni", "jogurt-med": "snidane",
+  "burrito-bowl": "bowl", fajitas: "hlavni", chili: "hlavni", quesadilla: "svacina", huevos: "snidane", "mexicka-polevka": "polevka",
+  "zelene-kari": "hlavni", "pad-thai": "testoviny", "stir-fry": "hlavni", "thajsky-salat": "salat", "tom-kha": "polevka", congee: "snidane",
+  tikka: "hlavni", dal: "hlavni", chana: "hlavni", tandoori: "bowl", "kvetakove-kari": "hlavni", "kardamomova-kase": "snidane",
+  teriyaki: "bowl", "sushi-bowl": "bowl", miso: "polevka", tamagoyaki: "snidane", yakitori: "hlavni", "edamame-salat": "salat",
+  paella: "hlavni", "tortilla-espanola": "snidane", gazpacho: "polevka", "fazole-po-spanelsku": "hlavni", "pecena-treska": "hlavni", "pan-con-tomate": "snidane",
+  shakshuka: "snidane", "falafel-bowl": "bowl", kofta: "hlavni", tabouleh: "salat", "cockova-polevka": "polevka", "lilek-tahini": "hlavni",
+  pancakes: "snidane", burger: "hlavni", cobb: "salat", bbq: "hlavni", "overnight-oats": "snidane", wrap: "svacina",
+};
+
 export interface Base {
   id: string;
   cuisine: Cuisine;
+  course?: Course;
   meal: Meal[];
   title: string;
   time: number;
@@ -28,12 +51,12 @@ export const MEALS: Record<Meal, string> = { snidane: "Snídaně", obed: "Oběd"
 /** Gramy hlavní bílkoviny na porci (cca 25–35 g bílkovin). */
 export const A_GRAMS: Record<string, number> = {
   chicken: 150, turkey: 150, beef: 130, pork: 140, salmon: 130, tuna: 120, cod: 170, shrimp: 160, eggs: 180, egg_whites: 200, tofu: 180,
-  chickpeas: 200, beans: 200, red_lentils: 70, cottage: 200, greek_yogurt: 250, skyr: 250, tvaroh: 200, protein: 30, halloumi: 80, mozzarella: 100, edamame: 150,
+  chickpeas: 200, beans: 200, black_beans: 180, red_lentils: 70, ham: 80, feta: 60, cheese: 40, mushrooms: 150, broccoli: 150, cottage: 200, greek_yogurt: 250, skyr: 250, tvaroh: 200, protein: 30, halloumi: 80, mozzarella: 100, edamame: 150,
 };
 /** Gramy přílohy / doplňku na porci. */
 export const B_GRAMS: Record<string, number> = {
   rice: 70, basmati: 70, quinoa: 70, bulgur: 70, couscous: 70, potatoes: 250, sweet_potato: 250, bread: 80, tortilla: 120, rice_noodles: 70, buckwheat: 70,
-  banana: 120, berries: 100, apple: 150, spinach: 80, zucchini: 120, mushrooms: 120, bell_pepper: 120, peas: 80, corn: 60, bok_choy: 120,
+  pasta_ww: 80, banana: 120, berries: 100, apple: 150, spinach: 80, zucchini: 120, mushrooms: 120, bell_pepper: 120, peas: 80, corn: 60, bok_choy: 120,
 };
 
 export const BASES: Base[] = [

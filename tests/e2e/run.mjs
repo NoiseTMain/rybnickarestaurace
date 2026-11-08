@@ -785,11 +785,28 @@ step("cestování: cesta, účastníci, hotovost, trasa, program, výdaje, vyrov
   await page.getByRole("heading", { name: /Uzávěrka:/ }).waitFor();
 }
 
-step("recepty: filtr kuchyně, detail s porcemi, suroviny do nákupního seznamu");
-await page.goto(B + "/recepty?kuchyne=recka");
-await page.getByText(/Nalezeno \d+ receptů/).waitFor();
-await page.getByText("Řecký salát s kuřecím masem a quinoou").click();
-await page.getByText("kuřecí prsa").waitFor();
+step("recepty: kategorie, varianty, lajk a uložení, detail s porcemi, jídelníček, suroviny do seznamu");
+await page.goto(B + "/recepty");
+await page.getByTestId("tip").waitFor();
+await page.getByTestId("course-polevka").waitFor();
+await page.getByTestId("course-dezert").waitFor();
+await page.goto(B + "/recepty?kuchyne=recka&kategorie=salat");
+await page.getByText(/Nalezeno \d+ jídel/).waitFor();
+assert.equal(await page.getByTestId("dish-card").filter({ hasText: "Řecký salát" }).count(), 1, "jídlo je jen jednou (varianty v detailu)");
+await page.getByTestId("dish-card").filter({ hasText: "Řecký salát" }).first().getByRole("button", { name: "Uložit recept" }).click();
+await page.getByTestId("dish-card").filter({ hasText: "Řecký salát" }).first().getByRole("button", { name: "Líbí se mi" }).click();
+await page.waitForTimeout(500);
+await page.goto(B + "/recepty?pohled=ulozene");
+await page.getByTestId("dish-card").filter({ hasText: "Řecký salát" }).waitFor();
+await page.goto(B + "/recepty?pohled=oblibene");
+await page.getByTestId("dish-card").filter({ hasText: "Řecký salát" }).click();
+await page.getByTestId("variants").getByRole("link", { name: "Kuřecí prsa" }).click();
+await page.waitForURL(/a=chicken/);
+await page.getByTestId("variants").getByRole("link", { name: /Quinoa/ }).click();
+await page.waitForURL(/b=quinoa/);
+await page.getByRole("heading", { name: "Řecký salát s kuřecím masem a quinoou" }).waitFor();
+await page.getByRole("button", { name: "Uvařil(a) jsem" }).click();
+await toast("Dobrou chuť");
 await page.getByText("300 g").first().waitFor(); // 2 porce
 await page.getByRole("button", { name: "Více porcí" }).click();
 await page.getByText("450 g").first().waitFor();
@@ -797,6 +814,14 @@ await page.getByRole("button", { name: "Do nákupního seznamu" }).click();
 await toast("Suroviny přidány do nákupního seznamu");
 await page.waitForURL(/\/planovani/);
 await page.getByText("Řecký salát s kuřecím masem a quinoou").first().waitFor();
+await page.goto(B + "/recepty?pohled=uvarene");
+await page.getByTestId("dish-card").filter({ hasText: "Řecký salát" }).getByText("✓ 1×").waitFor();
+await page.goto(B + "/recepty/jidelnicek");
+assert.equal(await page.getByTestId("week-plan").locator("li").count(), 7, "7 jídel v jídelníčku");
+await page.getByRole("button", { name: "Vše do nákupního seznamu" }).click();
+await toast("Jídelníček je v nákupním seznamu");
+await page.waitForURL(/\/planovani/);
+await page.getByText(/Jídelníček \(7 jídel\)/).first().waitFor();
 
 step("vzhled: interiér na pozadí (DEMO)");
 await page.goto(B + "/nastaveni#vzhled");
