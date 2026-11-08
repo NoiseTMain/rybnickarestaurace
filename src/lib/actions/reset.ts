@@ -13,7 +13,7 @@ const RESET_PARTS = {
   wealth: { tables: ["challenges", "reminders", "net_worth_snapshots", "debts", "assets"] },
   travel: { tables: ["trip_settlements", "trip_cash_moves", "trip_expenses", "trip_plan_items", "trip_checklist", "trip_legs", "trip_people", "trips"] },
   transactions: { tables: ["transactions", "occurrence_marks"] },
-  planning: { tables: ["shopping_items", "shopping_lists", "price_history", "purchases"] },
+  planning: { tables: ["custom_recipes", "shopping_items", "shopping_lists", "price_history", "purchases"] },
   savings: { tables: ["savings_contributions", "savings_goals"] },
   work: { tables: ["payouts", "work_shifts"] },
   invoices: { tables: ["invoices"] },

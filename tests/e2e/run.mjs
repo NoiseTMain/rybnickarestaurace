@@ -796,15 +796,26 @@ assert.equal(await page.getByTestId("dish-card").filter({ hasText: "Řecký sal�
 await page.getByTestId("dish-card").filter({ hasText: "Řecký salát" }).first().getByRole("button", { name: "Uložit recept" }).click();
 await page.getByTestId("dish-card").filter({ hasText: "Řecký salát" }).first().getByRole("button", { name: "Líbí se mi" }).click();
 await page.waitForTimeout(500);
-await page.goto(B + "/recepty?pohled=ulozene");
+await page.goto(B + "/recepty");
+await page.getByTestId("view-ulozene").click();
+await page.waitForURL(/pohled=ulozene/);
 await page.getByTestId("dish-card").filter({ hasText: "Řecký salát" }).waitFor();
-await page.goto(B + "/recepty?pohled=oblibene");
+await page.getByTestId("view-oblibene").click();
+await page.waitForURL(/pohled=oblibene/);
 await page.getByTestId("dish-card").filter({ hasText: "Řecký salát" }).click();
+await page.waitForURL(/\/recepty\/recky-salat/);
+await page.waitForFunction(() => { const i = document.querySelector("[data-testid=recipe-image]"); return i && i.complete && i.naturalWidth > 0; }, null, { timeout: 10000 }); // ilustrace se načte
 await page.getByTestId("variants").getByRole("link", { name: "Kuřecí prsa" }).click();
 await page.waitForURL(/a=chicken/);
 await page.getByTestId("variants").getByRole("link", { name: /Quinoa/ }).click();
 await page.waitForURL(/b=quinoa/);
 await page.getByRole("heading", { name: "Řecký salát s kuřecím masem a quinoou" }).waitFor();
+assert.match(await page.getByTestId("recipe-image").getAttribute("src"), /recky-salat-chicken-quinoa\.svg$/, "obrázek odpovídá zvolené variantě");
+{
+  const svg = await (await fetch(B + "/api/recipe-image/recky-salat-chicken-quinoa.svg")).text();
+  assert.match(svg, /^<svg/, "ilustrace je SVG");
+  assert.equal((await fetch(B + "/api/recipe-image/neexistuje.svg")).status, 404);
+}
 await page.getByRole("button", { name: "Uvařil(a) jsem" }).click();
 await toast("Dobrou chuť");
 await page.getByText("300 g").first().waitFor(); // 2 porce
@@ -822,6 +833,30 @@ await page.getByRole("button", { name: "Vše do nákupního seznamu" }).click();
 await toast("Jídelníček je v nákupním seznamu");
 await page.waitForURL(/\/planovani/);
 await page.getByText(/Jídelníček \(7 jídel\)/).first().waitFor();
+// vlastní recept s fotkou (Premium)
+const foodPhoto = await page.screenshot({ clip: { x: 0, y: 0, width: 240, height: 180 } });
+await page.goto(B + "/recepty");
+await page.getByTestId("view-vlastni").click();
+await page.getByTestId("custom-recipes").waitFor();
+await page.getByRole("button", { name: "Přidat vlastní recept" }).click();
+await page.getByTestId("recipe-photo-input").setInputFiles({ name: "jidlo.png", mimeType: "image/png", buffer: foodPhoto });
+await page.locator("[role=dialog] img[alt='Fotka jídla']").waitFor();
+await page.locator("[role=dialog] input[name=title]").fill("Babiččiny bramboráky");
+await page.locator("[role=dialog] textarea[name=ingredients]").fill("500 g brambor\n1 vejce\n2 lžíce hladké mouky\nmajoránka");
+await page.locator("[role=dialog] textarea[name=steps]").fill("Brambory nastrouhejte.\nSmíchejte se zbytkem.\nOsmažte dozlatova.");
+await page.locator("[role=dialog]").getByRole("button", { name: "Uložit recept" }).click();
+await toast("Recept uložen mezi vaše recepty");
+await page.waitForURL(/\/recepty\/vlastni\/[0-9a-f-]{36}/);
+await page.waitForFunction(() => { const i = document.querySelector("[data-testid=custom-photo]"); return i && i.complete && i.naturalWidth > 0; }, null, { timeout: 10000 }); // fotka vlastního receptu
+await page.getByText("Osmažte dozlatova.").waitFor();
+await page.getByText("500 g").waitFor();
+await page.getByRole("button", { name: "Více porcí" }).click();
+await page.getByText("750 g").waitFor();
+await page.getByRole("button", { name: "Do nákupního seznamu" }).click();
+await toast("Suroviny přidány do nákupního seznamu (4)");
+await page.waitForURL(/\/planovani/);
+await page.goto(B + "/recepty?pohled=vlastni");
+await page.getByTestId("custom-card").filter({ hasText: "Babiččiny bramboráky" }).waitFor();
 
 step("vzhled: interiér na pozadí (DEMO)");
 await page.goto(B + "/nastaveni#vzhled");
@@ -942,7 +977,7 @@ step("majetek: čisté jmění, plán splacení, hlídač termínů, daně OSVČ
   await page.getByRole("button", { name: "Termín", exact: true }).click();
   await page.locator("[role=dialog] input[name=title]").fill("STK auto");
   await page.locator("[role=dialog] select[name=kind]").selectOption("stk");
-  const soon = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10);
+  const soon = new Date(Date.now() + 5 * 86400000).toLocaleDateString("sv-SE", { timeZone: "Europe/Prague" }); // stejně jako aplikace (Praha)
   await page.locator("[role=dialog] input[name=due_date]").fill(soon);
   await modalSubmitOn(page, "Termín přidán");
   await page.getByTestId("reminders").getByText("za 5 dní").waitFor();

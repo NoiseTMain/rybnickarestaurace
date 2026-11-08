@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { recipeImage } from "@/lib/recipes/image";
 import { Clock, Flame, Minus, Plus, ShoppingCart } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -13,7 +14,7 @@ import { Card, PageHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 
-export function RecipeDetail({ r, lists, cuisine, meals, goals, top }: { r: Recipe; lists: { id: string; name: string }[]; cuisine: string; meals: string; goals: string[]; top?: React.ReactNode }) {
+export function RecipeDetail({ r, lists, cuisine, meals, goals, top, image }: { r: Recipe; lists: { id: string; name: string }[]; cuisine: string; meals: string; goals: string[]; top?: React.ReactNode; image?: string }) {
   const [n, setN] = useState(2);
   const [list, setList] = useState("");
   const [pending, start] = useTransition();
@@ -26,7 +27,14 @@ export function RecipeDetail({ r, lists, cuisine, meals, goals, top }: { r: Reci
   return (
     <div className="space-y-4">
       <PageHeader title={recipeName(r)} subtitle={`${phrase(cuisine)} · ${meals.split(", ").map((m) => phrase(m)).join(", ")} · ${phrase(r.diet)}`} />
-      {top}
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.15fr)_1fr]">
+        <figure className="overflow-hidden rounded-[var(--radius-card)] border border-white/10">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={image ?? recipeImage(r.id)} alt={recipeName(r)} className="aspect-[4/3] w-full object-cover" data-testid="recipe-image" />
+          {!image && <figcaption className="bg-black/30 px-3 py-1.5 text-[11px] text-ink-3">Ilustrace podle surovin a gramáží tohoto receptu</figcaption>}
+        </figure>
+        <div className="min-w-0">{top}</div>
+      </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Card className="!p-4"><p className="text-[11px] uppercase tracking-wider text-ink-3">Energie</p><p className="flex items-center gap-1 text-xl font-semibold"><Flame className="h-4 w-4 text-gold" />{r.kcal} kcal</p><p className="text-xs text-ink-3">na porci</p></Card>
         <Card className="!p-4"><p className="text-[11px] uppercase tracking-wider text-ink-3">Bílkoviny</p><p className="text-xl font-semibold">{r.protein} g</p></Card>

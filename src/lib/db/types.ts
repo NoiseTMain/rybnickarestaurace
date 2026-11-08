@@ -602,6 +602,7 @@ export interface NetWorthSnapshot { id: string; household_id: string; month: str
 export interface Reminder { id: string; household_id: string; title: string; kind: "warranty" | "stk" | "insurance" | "fixation" | "contract" | "document" | "tax" | "other"; due_date: ISODate; notify_days: number; repeat_yearly: boolean; done: boolean; note: string | null; created_at: string }
 export type ChallengeKind = "no_takeout" | "no_spend_days" | "save_amount" | "category_cut" | "daily_log";
 export interface Challenge { id: string; household_id: string; kind: ChallengeKind; month: string; target: Cents; category_id: string | null; created_at: string }
+export interface CustomRecipe { id: string; household_id: string; created_by: string | null; title: string; course: "snidane" | "polevka" | "salat" | "bowl" | "testoviny" | "hlavni" | "svacina" | "dezert"; time_min: number | null; servings: number; kcal: number | null; ingredients: { name: string; amount: string }[]; steps: string | null; note: string | null; photo_document_id: string | null; created_at: string; updated_at: string }
 export interface RecipeReaction { id: string; user_id: string; recipe_id: string; liked: boolean; saved: boolean; cooked_count: number; last_cooked_at: string | null; note: string | null; created_at: string; updated_at: string }
 export interface ReferralCode { user_id: string; code: string; created_at: string }
 export interface Referral { id: string; referrer_id: string; referred_id: string; status: "pending" | "rewarded" | "rejected"; created_at: string; rewarded_at: string | null }
@@ -661,6 +662,7 @@ export interface Tables {
   ai_usage: AiUsage;
   user_prefs: UserPrefs;
   recipe_reactions: RecipeReaction;
+  custom_recipes: CustomRecipe;
   app_errors: AppError;
   login_attempts: LoginAttempt;
   notification_log: NotificationLog;
@@ -710,6 +712,7 @@ export const HOUSEHOLD_TABLES = [
   "net_worth_snapshots",
   "reminders",
   "challenges",
+  "custom_recipes",
 ] as const satisfies readonly TableName[];
 
 export type HouseholdTable = (typeof HOUSEHOLD_TABLES)[number];

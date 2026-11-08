@@ -57,3 +57,29 @@ describe("jídla, kategorie a jídelníček", () => {
     expect(dishOfDay("2026-11-09", 0, true).id).toBe(dishOfDay("2026-11-09", 0, true).id);
   });
 });
+
+describe("ilustrace a vlastní recepty", async () => {
+  const { dishSvg, LOOK } = await import("@/lib/recipes/illustration");
+  const { ING, RECIPES } = await import("@/lib/recipes");
+  const { parseIngredientLines, scaleAmount } = await import("@/lib/recipes/custom");
+  it("každá surovina má vzhled a každá varianta má platnou ilustraci", () => {
+    for (const k of Object.keys(ING)) expect(LOOK[k], k).toBeTruthy();
+    for (const r of RECIPES) {
+      const svg = dishSvg(r);
+      expect(svg.startsWith("<svg"), r.id).toBe(true);
+      expect(svg.includes("NaN"), r.id).toBe(false);
+      expect(svg.length, r.id).toBeLessThan(120_000);
+    }
+    // různé varianty = různé obrázky
+    expect(dishSvg(RECIPES[0])).not.toBe(dishSvg(RECIPES[1]));
+  });
+  it("rozpozná množství u surovin a přepočítá porce", () => {
+    expect(parseIngredientLines("500 g brambor\n- 2 lžíce mouky\n1 vejce\nmajoránka\n\n")).toEqual([
+      { name: "brambor", amount: "500 g" }, { name: "mouky", amount: "2 lžíce" }, { name: "vejce", amount: "1" }, { name: "majoránka", amount: "" },
+    ]);
+    expect(scaleAmount("500 g", 1.5)).toBe("750 g");
+    expect(scaleAmount("½ lžičky", 2)).toBe("1 lžičky");
+    expect(scaleAmount("1,5 l", 2)).toBe("3 l");
+    expect(scaleAmount("podle chuti", 2)).toBe("podle chuti");
+  });
+});

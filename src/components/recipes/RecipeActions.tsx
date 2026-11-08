@@ -22,7 +22,7 @@ export function RecipeActions({ id, liked, saved, likes, cooked, compact = false
         <button type="button" onClick={(e) => toggle("liked", e)} className={cn(btn, "px-1.5 py-1 text-xs", st.liked ? "text-neg" : "text-ink-3 hover:text-ink")} aria-label={st.liked ? "Odebrat lajk" : "Líbí se mi"} aria-pressed={st.liked}>
           <Heart className={cn("h-4 w-4", st.liked && "fill-current")} />{st.likes > 0 && <span>{st.likes}</span>}
         </button>
-        <button type="button" onClick={(e) => toggle("saved", e)} className={cn(btn, "p-1", st.saved ? "text-gold" : "text-ink-3 hover:text-ink")} aria-label={st.saved ? "Odebrat z Moje recepty" : "Uložit recept"} aria-pressed={st.saved}>
+        <button type="button" onClick={(e) => toggle("saved", e)} className={cn(btn, "p-1", st.saved ? "text-gold" : "text-ink-3 hover:text-ink")} aria-label={st.saved ? "Odebrat z uložených" : "Uložit recept"} aria-pressed={st.saved}>
           <Bookmark className={cn("h-4 w-4", st.saved && "fill-current")} />
         </button>
       </span>
@@ -34,7 +34,7 @@ export function RecipeActions({ id, liked, saved, likes, cooked, compact = false
         <Heart className={cn("h-4 w-4", st.liked && "fill-current")} />{st.liked ? "Líbí se mi" : "Lajknout"}{st.likes > 0 && <span className="opacity-70">· {st.likes}</span>}
       </button>
       <button type="button" onClick={(e) => toggle("saved", e)} className={cn(btn, "border px-3 py-1.5 text-sm", st.saved ? "border-gold/40 bg-gold/10 text-gold-bright" : "border-white/10 text-ink-2 hover:text-ink")} aria-pressed={st.saved}>
-        <Bookmark className={cn("h-4 w-4", st.saved && "fill-current")} />{st.saved ? "Uloženo" : "Uložit do Moje recepty"}
+        <Bookmark className={cn("h-4 w-4", st.saved && "fill-current")} />{st.saved ? "Uloženo" : "Uložit recept"}
       </button>
       <button type="button" onClick={() => { setSt((s) => ({ ...s, cooked: s.cooked + 1 })); start(async () => { const r = await markCooked(id); toast(r.ok ? r.message ?? "" : r.error ?? "Chyba", r.ok ? undefined : "error"); }); }} className={cn(btn, "border border-white/10 px-3 py-1.5 text-sm text-ink-2 hover:text-ink")}>
         <ChefHat className="h-4 w-4" />Uvařil(a) jsem{st.cooked > 0 && <span className="opacity-70">· {st.cooked}×</span>}

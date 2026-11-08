@@ -63,10 +63,11 @@ export const TABLE_SECTION: Partial<Record<TableName, string>> = {
   transactions: "finance", accounts: "finance", categories: "finance", recurring_payments: "finance", income_sources: "finance",
   occurrence_marks: "finance", budgets: "finance", invoices: "invoices", work_shifts: "work", payouts: "work", work_settings: "work",
   purchases: "purchases", shopping_lists: "purchases", shopping_items: "purchases", price_history: "purchases",
-  savings_goals: "savings", savings_contributions: "savings", trips: "travel", trip_legs: "travel", trip_expenses: "travel", trip_people: "travel", trip_cash_moves: "travel", trip_checklist: "travel", trip_plan_items: "travel", trip_settlements: "travel", assets: "finance", debts: "finance", net_worth_snapshots: "finance", reminders: "finance", challenges: "finance", household_settings: "settings", members: "settings", documents: "*",
+  savings_goals: "savings", savings_contributions: "savings", trips: "travel", trip_legs: "travel", trip_expenses: "travel", trip_people: "travel", trip_cash_moves: "travel", trip_checklist: "travel", trip_plan_items: "travel", trip_settlements: "travel", assets: "finance", debts: "finance", net_worth_snapshots: "finance", reminders: "finance", challenges: "finance", custom_recipes: "purchases", household_settings: "settings", members: "settings", documents: "*",
 };
 
 export const REFS: Partial<Record<TableName, Ref[]>> = {
+  custom_recipes: [{ column: "photo_document_id", table: "documents", onDelete: "set_null" }],
   challenges: [{ column: "category_id", table: "categories", onDelete: "cascade" }],
   members: [{ column: "avatar_document_id", table: "documents", onDelete: "set_null" }],
   accounts: [{ column: "member_id", table: "members", onDelete: "set_null" }],
@@ -145,7 +146,7 @@ export const REFS: Partial<Record<TableName, Ref[]>> = {
   ],
 };
 
-export const TABLES_WITH_UPDATED_AT: TableName[] = ["transactions", "household_settings", "work_settings", "user_prefs", "assets", "recipe_reactions"];
+export const TABLES_WITH_UPDATED_AT: TableName[] = ["transactions", "household_settings", "work_settings", "user_prefs", "assets", "recipe_reactions", "custom_recipes"];
 
 /** Tabulky, jejichž primární klíč není `id` (řazení při stránkování v Supabase). Hlídá test tests/unit/schema.test.ts. */
 export const PRIMARY_KEY: Partial<Record<string, string>> = { subscriptions: "user_id", user_prefs: "user_id", ai_usage: "user_id", trial_claims: "email_hash", referral_codes: "user_id", notification_log: "key", widget_tokens: "token_hash" };

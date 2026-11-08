@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarDays, Crown, Search, Shuffle } from "lucide-react";
+import { ArrowLeft, Bookmark, CalendarDays, ChefHat, Crown, Heart, NotebookPen, Search, Shuffle } from "lucide-react";
 import { requireContext } from "@/lib/context";
 import { getPremium } from "@/lib/premium";
 import { loadSnapshot } from "@/lib/data";
@@ -11,16 +11,19 @@ import { todayISO } from "@/lib/dates";
 import { Card, EmptyState, PageHeader } from "@/components/ui/Card";
 import { FilterTabs } from "@/components/lists/Filters";
 import { DishCard, type Reaction } from "@/components/recipes/DishCard";
+import { CustomRecipeButton } from "@/components/recipes/CustomRecipeForms";
+import type { CustomRecipe } from "@/lib/db/types";
 
 export const metadata = { title: "Recepty" };
 const PAGE = 24;
-const VIEWS = [{ value: "", label: "Objevovat" }, { value: "ulozene", label: "Moje recepty" }, { value: "oblibene", label: "Oblíbené" }, { value: "uvarene", label: "Uvařené" }];
+const VIEW_TITLE: Record<string, string> = { oblibene: "❤️ Oblíbené recepty", ulozene: "🔖 Uložené recepty", uvarene: "👨‍🍳 Uvařené recepty", vlastni: "📝 Vlastní recepty" };
 
 export default async function RecipesPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const sp = await searchParams;
   const ctx = await requireContext();
-  const [premium, { snapshot }, reactions, likes] = await Promise.all([
+  const [premium, { snapshot }, reactions, likes, custom] = await Promise.all([
     getPremium(ctx), loadSnapshot(ctx), ctx.store.select("recipe_reactions", { user_id: ctx.user.id }), ctx.store.recipeLikeCounts().catch(() => ({} as Record<string, number>)),
+    ctx.store.select("custom_recipes", { household_id: ctx.household.id }),
   ]);
   const react = new Map<string, Reaction>(reactions.map((r) => [r.recipe_id, r]));
   const filter: DishFilter = { course: sp.kategorie, cuisine: sp.kuchyne, meal: sp.jidlo, goal: sp.cil, diet: sp.dieta, freeOnly: Boolean(sp.zdarma), q: sp.q?.trim() || undefined };
@@ -41,11 +44,28 @@ export default async function RecipesPage({ searchParams }: { searchParams: Prom
   const tipN = Math.max(0, Number(sp.tip) || 0);
   const tip = dishOfDay(`${todayISO()}-${ctx.user.id}`, tipN, premium.household);
   const popular = DISHES.filter((d) => (likes[d.id] ?? 0) > 0).sort((a, b) => (likes[b.id] ?? 0) - (likes[a.id] ?? 0)).slice(0, 10);
-  const savedCount = reactions.filter((r) => r.saved).length;
+  const counts = { oblibene: reactions.filter((r) => r.liked).length, ulozene: reactions.filter((r) => r.saved).length, uvarene: reactions.filter((r) => r.cooked_count > 0).length, vlastni: custom.length };
+  const iconLink = (v: keyof typeof counts, icon: React.ReactNode, label: string, tone: string) => (
+    <Link href={view === v ? "/recepty" : `/recepty?pohled=${v}`} aria-label={label} title={label} data-testid={`view-${v}`}
+      className={`flex h-10 items-center gap-1.5 rounded-full border px-3 text-sm transition ${view === v ? `${tone} border-current bg-white/[0.06]` : "border-white/10 text-ink-2 hover:text-ink"}`}>
+      {icon}<span className="num">{counts[v]}</span>
+    </Link>
+  );
+  const q = sp.q?.trim().toLowerCase();
+  const customList = custom.filter((c) => (!sp.kategorie || c.course === sp.kategorie) && (!q || c.title.toLowerCase().includes(q) || c.ingredients.some((i) => i.name.toLowerCase().includes(q))))
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
   return (
     <div className="space-y-4">
       <PageHeader title="Recepty" subtitle={`${DISHES.length} jídel a ${RECIPES.length} variant z ${Object.keys(CUISINES).length} kuchyní · kalorie, makra a cena porce · suroviny jedním klikem do nákupního seznamu`}
-        actions={<Link href="/recepty/jidelnicek" className="flex items-center gap-2 rounded-full bg-gold px-4 py-2 text-sm font-medium text-[#1b1407]"><CalendarDays className="h-4 w-4" />Jídelníček na týden</Link>} />
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {iconLink("oblibene", <Heart className={`h-4 w-4 ${counts.oblibene ? "fill-current text-neg" : ""}`} />, "Oblíbené", "text-neg")}
+            {iconLink("ulozene", <Bookmark className={`h-4 w-4 ${counts.ulozene ? "fill-current text-gold" : ""}`} />, "Uložené", "text-gold")}
+            {iconLink("uvarene", <ChefHat className="h-4 w-4" />, "Uvařené", "text-pos")}
+            {iconLink("vlastni", <><NotebookPen className="h-4 w-4" />{!premium.household && <Crown className="h-3 w-3 text-gold" />}</>, "Vlastní recepty", "text-gold")}
+            <Link href="/recepty/jidelnicek" className="flex h-10 items-center gap-2 rounded-full bg-gold px-4 text-sm font-medium text-[#1b1407]"><CalendarDays className="h-4 w-4" />Jídelníček na týden</Link>
+          </div>
+        } />
       {!premium.household && (
         <Card variant="light" className="!p-4 text-sm">
           <span className="flex flex-wrap items-center gap-2"><Crown className="h-4 w-4 text-gold" />Zdarma máte {DISHES.filter((d) => d.free).length} jídel. Všech {DISHES.length} odemkne <Link href="/premium" className="text-gold underline">Premium</Link>.</span>
@@ -56,7 +76,13 @@ export default async function RecipesPage({ searchParams }: { searchParams: Prom
         <input name="q" defaultValue={sp.q ?? ""} placeholder="Hledat recept nebo surovinu (např. losos, cizrna)…" className="field !h-10 flex-1" aria-label="Hledat recept" />
         {Object.entries(sp).filter(([k, v]) => v && k !== "q" && k !== "strana").map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
       </form>
-      <FilterTabs name="pohled" options={VIEWS.map((v) => ({ ...v, count: v.value === "ulozene" ? savedCount : undefined }))} />
+      {view && (
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/recepty" className="flex items-center gap-1 rounded-full border border-white/10 px-3 py-1.5 text-sm text-ink-2 hover:text-ink"><ArrowLeft className="h-4 w-4" />Všechny recepty</Link>
+          <h2 className="text-lg font-semibold">{VIEW_TITLE[view] ?? ""}</h2>
+          {view === "vlastni" && premium.household && <span className="ml-auto"><CustomRecipeButton /></span>}
+        </div>
+      )}
       <FilterTabs name="kategorie" options={[{ value: "", label: "Všechny kategorie" }, ...Object.entries(COURSES).map(([k, c]) => ({ value: k, label: `${c.emoji} ${phrase(c.label)}`, count: DISHES.filter((d) => d.course === k).length }))]} />
       <details className="rounded-2xl bg-white/[0.03] p-3" open={!browsing}>
         <summary className="cursor-pointer text-sm text-ink-2">Další filtry a řazení</summary>
@@ -71,7 +97,21 @@ export default async function RecipesPage({ searchParams }: { searchParams: Prom
       </details>
       {snapshot.food && <p className="text-xs text-ink-3">Váš denní limit na jídlo: {formatMoney(snapshot.food.dailyLimit, { decimals: "never" })} – u receptů vidíte cenu porce.</p>}
 
-      {browsing ? (
+      {view === "vlastni" ? (
+        <div className="space-y-4" data-testid="custom-recipes">
+          {!premium.household && (
+            <Card variant="light" className="!p-5 text-sm">
+              <p className="flex items-center gap-2 font-medium"><Crown className="h-4 w-4 text-gold" />Vlastní recepty jsou součástí Premium</p>
+              <p className="mt-1 text-ink-2">Uložte si své oblíbené recepty s fotkou jídla, surovinami a postupem – a suroviny pak jedním klikem pošlete do nákupního seznamu. <Link href="/premium" className="text-gold underline">Aktivovat Premium</Link></p>
+            </Card>
+          )}
+          {customList.length ? (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{customList.map((c) => <CustomCard key={c.id} c={c} />)}</div>
+          ) : (
+            <EmptyState title="Zatím tu nic není">{premium.household ? "Přidejte svůj první recept i s fotkou jídla." : "S Premium si sem uložíte vlastní recepty."}</EmptyState>
+          )}
+        </div>
+      ) : browsing ? (
         <div className="space-y-6">
           <Card variant="light" title="Co dnes uvařit?" subtitle="Tip na dnešek – každý den jiný" data-testid="tip"
             action={<Link href={`/recepty?tip=${tipN + 1}`} className="flex items-center gap-1 rounded-full border border-white/10 px-3 py-1.5 text-sm"><Shuffle className="h-4 w-4" />Jiný tip</Link>}>
@@ -111,5 +151,27 @@ export default async function RecipesPage({ searchParams }: { searchParams: Prom
         </>
       )}
     </div>
+  );
+}
+
+function CustomCard({ c }: { c: CustomRecipe }) {
+  return (
+    <Link href={`/recepty/vlastni/${c.id}`} className="glass flex h-full flex-col overflow-hidden rounded-[var(--radius-card)] transition hover:border-gold/40" data-testid="custom-card">
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-black/30">
+        {c.photo_document_id
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img src={`/api/files/${c.photo_document_id}`} alt={c.title} loading="lazy" className="h-full w-full object-cover" />
+          : <span className="flex h-full w-full items-center justify-center text-5xl" aria-hidden>{COURSES[c.course].emoji}</span>}
+        <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-xs backdrop-blur">{COURSES[c.course].emoji} {phrase(COURSES[c.course].label)}</span>
+      </div>
+      <div className="flex flex-1 flex-col px-4 pb-4">
+        <p className="mt-2 line-clamp-2 font-medium leading-snug">{c.title}</p>
+        <div className="mt-auto flex flex-wrap gap-x-3 gap-y-1 pt-3 text-xs text-ink-2">
+          <span>{c.ingredients.length} {phrase("surovin")}</span>
+          {c.time_min && <span>{c.time_min} min</span>}
+          {c.kcal != null && <span>{c.kcal} kcal</span>}
+        </div>
+      </div>
+    </Link>
   );
 }
