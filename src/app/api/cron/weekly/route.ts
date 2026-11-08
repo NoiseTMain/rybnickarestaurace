@@ -26,6 +26,7 @@ export async function GET(req: Request) {
   let sent = 0;
   const today = todayISO();
   for (const [hid, list] of byHousehold) {
+    if (!(await store.householdPremium(hid))) continue; // upozornění jsou Premium
     const data = await loadHouseholdData(store, hid);
     const w = weeklySummary(computeSnapshot(data, today), data);
     for (const s of list) {

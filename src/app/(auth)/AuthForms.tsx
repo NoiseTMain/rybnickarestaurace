@@ -25,6 +25,11 @@ export function RegisterForm() {
       <Input name="email" type="email" label="E-mail" autoComplete="email" required error={state.fieldErrors?.email} />
       <Input name="password" type="password" label="Heslo" hint="min. 8 znaků" autoComplete="new-password" required minLength={8} error={state.fieldErrors?.password} />
       <Input name="password2" type="password" label="Heslo znovu" autoComplete="new-password" required error={state.fieldErrors?.password2} />
+      <label className="flex items-start gap-2 text-xs text-ink-2">
+        <input type="checkbox" name="terms" className="mt-0.5 h-4 w-4 accent-[var(--color-gold)]" required />
+        <span>Souhlasím s <a href="/podminky" target="_blank" className="text-gold underline">podmínkami používání</a> a beru na vědomí <a href="/soukromi" target="_blank" className="text-gold underline">zásady ochrany osobních údajů</a>.</span>
+      </label>
+      {state.fieldErrors?.terms && <p className="text-xs text-neg">{state.fieldErrors.terms}</p>}
       <FormError error={state.ok ? undefined : state.error} />
       <Button type="submit" variant="primary" size="lg" className="w-full justify-center" loading={pending}>Vytvořit účet</Button>
     </form>

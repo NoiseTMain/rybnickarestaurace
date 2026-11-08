@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isSupabaseConfigured, localModeBlocked, publicEnv } from "@/lib/env";
 
-const PUBLIC = ["/prihlaseni", "/registrace", "/obnova-hesla", "/auth/confirm", "/konfigurace", "/api/cron"];
+const PUBLIC = ["/prihlaseni", "/registrace", "/obnova-hesla", "/auth/confirm", "/konfigurace", "/api/cron", "/api/billing/webhook", "/vitejte", "/podminky", "/soukromi", "/sdilene"];
 
 /**
  * První vrstva ochrany: obnovení relace Supabase a přesměrování nepřihlášených.
@@ -42,7 +42,7 @@ export async function proxy(request: NextRequest) {
   if (!isPublic && !loggedIn) {
     if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Nepřihlášeno" }, { status: 401 });
     const url = request.nextUrl.clone();
-    url.pathname = "/prihlaseni";
+    url.pathname = pathname === "/" ? "/vitejte" : "/prihlaseni";
     url.search = "";
     return NextResponse.redirect(url);
   }

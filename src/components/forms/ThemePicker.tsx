@@ -1,5 +1,7 @@
 "use client";
 import { Check, FlaskConical, ImagePlus, Loader2 } from "lucide-react";
+import { Crown } from "lucide-react";
+import { FREE_ACCENTS, FREE_BACKGROUNDS, FREE_SCENES } from "@/lib/plans";
 import { useState, type ReactNode } from "react";
 import { saveTheme } from "@/lib/actions/theme";
 import { ACCENTS, BACKGROUNDS, SCENES, rootFontSize, sceneUrl, themeVars, type Accent, type Background, type Scene, type Theme } from "@/lib/theme";
@@ -19,13 +21,16 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /** Výběr vzhledu – změna se projeví okamžitě a uloží se na tomto zařízení. */
-export function ThemePicker({ initial }: { initial: Theme }) {
+export function ThemePicker({ initial, premium = true }: { initial: Theme; premium?: boolean }) {
   const [t, setT] = useState<Theme>(initial);
   const [uploading, setUploading] = useState(false);
   const lk = useLookups();
   const toast = useToast();
 
+  const locked = (patch: Partial<Theme>) => !premium && ((patch.accent && !FREE_ACCENTS.includes(patch.accent)) || (patch.bg && !FREE_BACKGROUNDS.includes(patch.bg)) || (patch.scene && !FREE_SCENES.includes(patch.scene)));
+  const lock = (on: boolean) => on && <Crown className="absolute left-1.5 top-1.5 h-3.5 w-3.5 text-gold" aria-label="Premium" />;
   const apply = async (patch: Partial<Theme>) => {
+    if (locked(patch)) { toast("Tato možnost je součást Premium", "error"); return; }
     const next = { ...t, ...patch };
     setT(next);
     const root = document.documentElement;
@@ -53,11 +58,12 @@ export function ThemePicker({ initial }: { initial: Theme }) {
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
           {(Object.keys(ACCENTS) as Accent[]).map((a) => (
             <button key={a} type="button" onClick={() => apply({ accent: a })} aria-pressed={t.accent === a}
-              className={cn("flex flex-col items-center gap-2 rounded-2xl border p-3 text-xs transition", t.accent === a ? "border-ink/60 bg-white/[0.07]" : "border-white/10 hover:bg-white/[0.04]")}>
+              className={cn("relative flex flex-col items-center gap-2 rounded-2xl border p-3 text-xs transition", locked({ accent: a }) && "opacity-60", t.accent === a ? "border-ink/60 bg-white/[0.07]" : "border-white/10 hover:bg-white/[0.04]")}>
               <span className="flex h-10 w-10 items-center justify-center rounded-full shadow-lg" style={{ background: `linear-gradient(135deg, ${ACCENTS[a].bright}, ${ACCENTS[a].deep})` }}>
                 {t.accent === a && <Check className="h-5 w-5 text-[#1b1407]" />}
               </span>
               <span className="text-center text-ink-2">{ACCENTS[a].label}</span>
+              {lock(Boolean(locked({ accent: a })))}
             </button>
           ))}
         </div>
@@ -67,7 +73,8 @@ export function ThemePicker({ initial }: { initial: Theme }) {
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {(Object.keys(BACKGROUNDS) as Background[]).map((b) => (
             <button key={b} type="button" onClick={() => apply({ bg: b })} aria-pressed={t.bg === b}
-              className={cn("overflow-hidden rounded-2xl border text-left text-xs transition", t.bg === b ? "border-ink/60" : "border-white/10")}>
+              className={cn("relative overflow-hidden rounded-2xl border text-left text-xs transition", t.bg === b ? "border-ink/60" : "border-white/10", locked({ bg: b }) && "opacity-60")}>
+              {lock(Boolean(locked({ bg: b })))}
               <span className="block h-12" style={{ background: `radial-gradient(circle at 20% 0%, ${ACCENTS[t.accent].gold}40, transparent 70%), ${BACKGROUNDS[b].base}` }} />
               <span className="flex items-center justify-between gap-1 bg-white/[0.04] px-3 py-2 text-ink-2">{BACKGROUNDS[b].label}{t.bg === b && <Check className="h-3.5 w-3.5 text-gold" />}</span>
             </button>
@@ -79,7 +86,8 @@ export function ThemePicker({ initial }: { initial: Theme }) {
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {(Object.keys(SCENES) as Scene[]).map((s) => (
             <button key={s} type="button" onClick={() => apply({ scene: s })} aria-pressed={t.scene === s}
-              className={cn("relative overflow-hidden rounded-2xl border text-left text-xs transition", t.scene === s ? "border-ink/60" : "border-white/10")}>
+              className={cn("relative overflow-hidden rounded-2xl border text-left text-xs transition", t.scene === s ? "border-ink/60" : "border-white/10", locked({ scene: s }) && "opacity-60")}>
+              {lock(Boolean(locked({ scene: s })))}
               <span className="block h-20 bg-cover bg-center" style={SCENES[s].file ? { backgroundImage: `url("${SCENES[s].file}")`, filter: "blur(2px) brightness(.7)" } : { background: BACKGROUNDS[t.bg].base }} />
               {SCENES[s].file && (
                 <span className="absolute right-1.5 top-1.5 inline-flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-warn" title="Ukázkový ilustrační obrázek">
@@ -94,7 +102,7 @@ export function ThemePicker({ initial }: { initial: Theme }) {
               {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : !t.photo && <ImagePlus className="h-6 w-6 text-gold" />}
             </span>
             <span className="flex items-center justify-between gap-1 bg-white/[0.04] px-3 py-2 text-ink-2">Vlastní fotka{t.scene === "photo" && <Check className="h-3.5 w-3.5 text-gold" />}</span>
-            <input type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={async (e) => {
+            <input type="file" accept="image/*" className="sr-only" disabled={uploading || !premium} onChange={async (e) => {
               const f = e.target.files?.[0];
               if (!f) return;
               setUploading(true);

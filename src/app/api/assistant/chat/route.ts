@@ -2,6 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { apiContext } from "@/lib/context";
 import { loadSnapshot } from "@/lib/data";
+import { getPremium } from "@/lib/premium";
+import { AI_MONTHLY_LIMIT } from "@/lib/plans";
 import { aiEnabled } from "@/lib/ai";
 import { friendlyError, runChat, systemPrompt, type ChatMessage } from "@/lib/assistant-ai/chat";
 import type { ToolEnv } from "@/lib/assistant-ai/tools";
@@ -45,7 +47,10 @@ export async function POST(req: Request) {
   if (!parsed.success) return Response.json({ error: "Neplatný požadavek" }, { status: 400 });
   const history = cleanHistory(parsed.data.messages);
   if (!history.length || history[history.length - 1].role !== "user") return Response.json({ error: "Chybí otázka" }, { status: 400 });
+  if (!(await getPremium(ctx)).household) return Response.json({ error: "AI asistent je součástí Premium." }, { status: 402 });
   if (limited(ctx.user.id)) return Response.json({ error: "Příliš mnoho dotazů, zkuste to za pár minut." }, { status: 429 });
+  const used = await ctx.store.bumpAiUsage().catch(() => 0);
+  if (used > AI_MONTHLY_LIMIT) return Response.json({ error: `Tento měsíc jste vyčerpali ${AI_MONTHLY_LIMIT} dotazů na AI. Od prvního dne dalšího měsíce zase naplno.` }, { status: 429 });
 
   const { data, snapshot, today } = await loadSnapshot(ctx);
   const travel = data.travel;

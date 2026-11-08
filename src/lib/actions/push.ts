@@ -9,6 +9,12 @@ import type { ActionResult } from "./result";
 const subSchema = z.object({ endpoint: z.string().url().startsWith("https://").max(1000), keys: z.object({ p256dh: z.string().min(10).max(200), auth: z.string().min(8).max(100) }) });
 
 export async function savePushSubscription(sub: unknown): Promise<ActionResult> {
+  {
+    const { requireContext } = await import("@/lib/context");
+    const { premiumError } = await import("@/lib/premium");
+    const err = await premiumError(await requireContext(), "Upozornění na telefon");
+    if (err) return { ok: false, error: err, at: Date.now() };
+  }
   return withContext(async (ctx) => {
     if (!pushConfigured()) return fail("Oznámení nejsou na serveru nastavená.");
     const p = subSchema.safeParse(sub);

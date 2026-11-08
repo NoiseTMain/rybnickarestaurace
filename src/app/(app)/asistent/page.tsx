@@ -3,6 +3,8 @@ import { loadSnapshot } from "@/lib/data";
 import { buildInsights } from "@/lib/assistant";
 import { anomalies, lookback, savingsTips, weeklySummary, workInsights } from "@/lib/finance/insights";
 import { aiEnabled } from "@/lib/ai";
+import { getPremium } from "@/lib/premium";
+import { PremiumHint } from "@/components/premium/PremiumWall";
 import { formatMoney } from "@/lib/money";
 import { Card, PageHeader } from "@/components/ui/Card";
 import { InsightItem } from "@/components/dashboard/bits";
@@ -12,7 +14,7 @@ export const metadata = { title: "Finanční asistent" };
 
 export default async function AssistantPage() {
   const ctx = await requireContext();
-  const { data, snapshot: s } = await loadSnapshot(ctx);
+  const [{ data, snapshot: s }, premium] = await Promise.all([loadSnapshot(ctx), getPremium(ctx)]);
   const insights = buildInsights(s, data);
   const weekly = weeklySummary(s, data);
   const odd = anomalies(s, data);
@@ -25,7 +27,8 @@ export default async function AssistantPage() {
       <PageHeader title="Finanční asistent" subtitle="Analýza vašich skutečných dat – žádné odhady z ničeho. Když údaje chybí, asistent se doptá." />
       <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
         <Card variant="dark" title="Zeptejte se" subtitle="Odpovědi se počítají z databáze v okamžiku dotazu">
-          <AssistantChat aiEnabled={aiEnabled()} />
+          <AssistantChat aiEnabled={aiEnabled() && premium.household} />
+          {!premium.household && <div className="mt-2"><PremiumHint>AI asistent, který odpoví na cokoli, je součást</PremiumHint></div>}
         </Card>
         <div className="space-y-4">
           <Card title={weekly.title} subtitle="Posledních 7 dní a co vás čeká">

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { CalendarDays, Globe2, MapPin, Users } from "lucide-react";
 import { requireContext } from "@/lib/context";
+import { getPremium } from "@/lib/premium";
+import { PremiumWall } from "@/components/premium/PremiumWall";
 import { loadSnapshot } from "@/lib/data";
 import { effectiveExpenses, STATUS_LABEL, summarizeTrip, type TripSummary } from "@/lib/finance/travel";
 import { formatDate } from "@/lib/dates";
@@ -55,6 +57,7 @@ function TripCard({ trip, s, legs }: { trip: Trip; s: TripSummary; legs: TripLeg
 export default async function TravelPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const sp = await searchParams;
   const ctx = await requireContext();
+  if (!(await getPremium(ctx)).household) return <PremiumWall title="Cestování je součástí Premium" highlight="travel">Plánujte cesty, trasy a dopravu, hlídejte rozpočet na místě, hotovost v cizí měně a kdo komu dluží. Uložené cesty se neztratí – po aktivaci je zase uvidíte.</PremiumWall>;
   const { data, today } = await loadSnapshot(ctx);
   const tr = data.travel;
   const all = tr.trips.map((t) => {

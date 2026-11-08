@@ -106,7 +106,7 @@ export function AssistantChat({ aiEnabled }: { aiEnabled: boolean }) {
     setMsgs((m) => [...m, { role: "ai", text: "", status: "Přemýšlím…", drafts: [], error: null, done: false }]);
     try {
       const res = await fetch("/api/assistant/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: history }) });
-      if (res.status === 501) {
+      if (res.status === 501 || res.status === 402) {
         setAi(false);
         setMsgs((all) => all.filter((_, i) => i !== idx));
         askRules(text);

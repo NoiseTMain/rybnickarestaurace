@@ -6,6 +6,7 @@ import type { SavingsGoal, Transaction, Trip, TripCashMove, TripExpense, TripExp
 import { addDays, diffDays, todayISO } from "@/lib/dates";
 import { checklistTemplate, effectiveExpenses, guessKind, suggestTripTransactions, summarizeTrip, wallets } from "@/lib/finance/travel";
 import { done, fail, own, parse, withContext } from "./helpers";
+import { premiumError } from "@/lib/premium";
 import type { ActionResult } from "./result";
 
 const MODES = ["train", "bus", "car", "plane", "ferry", "transit", "bike", "other"] as const;
@@ -30,6 +31,7 @@ const tripSchema = z.object({
 
 export async function saveTrip(_: ActionResult, fd: FormData): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    { const err = await premiumError(ctx, "Cestování"); if (err) return fail(err); }
     const p = parse(tripSchema, fd);
     if (!p.ok) return p.result;
     const { id, ...row } = p.data;
@@ -110,6 +112,7 @@ async function roadRoute(mode: string, from: { lat: number; lon: number } | null
 
 export async function saveLeg(_: ActionResult, fd: FormData): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    { const err = await premiumError(ctx, "Cestování"); if (err) return fail(err); }
     const p = parse(legSchema, fd);
     if (!p.ok) return p.result;
     const { id, ...row } = p.data;
@@ -146,6 +149,7 @@ export async function deleteLeg(id: string): Promise<ActionResult> {
 
 export async function moveLeg(id: string, dir: -1 | 1): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    { const err = await premiumError(ctx, "Cestování"); if (err) return fail(err); }
     const leg = (await own(ctx, "trip_legs", id)) as TripLeg;
     const legs = (await ctx.store.select("trip_legs", { household_id: ctx.household.id, trip_id: leg.trip_id })).sort((a, b) => a.sort - b.sort);
     const i = legs.findIndex((l) => l.id === id);
@@ -185,6 +189,7 @@ function czkAmount(e: z.infer<typeof expenseSchema>): number {
 
 export async function saveTripExpense(_: ActionResult, fd: FormData): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    { const err = await premiumError(ctx, "Cestování"); if (err) return fail(err); }
     const p = parse(expenseSchema, fd);
     if (!p.ok) return p.result;
     const e = p.data;
@@ -258,6 +263,7 @@ export async function deleteTripExpense(id: string, cancelTx = true): Promise<Ac
 /** Přiřazení už zapsaného výdaje (např. platba kartou v zahraničí z importu banky) k cestě. */
 export async function linkTransactionToTrip(tripId: string, transactionId: string, kind: TripExpenseKind): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    { const err = await premiumError(ctx, "Cestování"); if (err) return fail(err); }
     if (!KINDS.includes(kind as never)) return fail("Neplatný druh");
     await own(ctx, "trips", tripId);
     const t = (await own(ctx, "transactions", transactionId)) as Transaction;
@@ -284,6 +290,7 @@ export async function getExchangeRate(code: string, day: string): Promise<{ rate
 
 export async function addTripPerson(tripId: string, name: string, memberId: string | null = null): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    { const err = await premiumError(ctx, "Cestování"); if (err) return fail(err); }
     await own(ctx, "trips", tripId);
     const n = String(name).trim().slice(0, 60);
     if (!n) return fail("Zadejte jméno.");
@@ -299,6 +306,7 @@ export async function addTripPerson(tripId: string, name: string, memberId: stri
 /** Přidá všechny členy domácnosti jako účastníky. */
 export async function addMembersToTrip(tripId: string): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    { const err = await premiumError(ctx, "Cestování"); if (err) return fail(err); }
     await own(ctx, "trips", tripId);
     const h = ctx.household.id;
     const [members, existing] = await Promise.all([ctx.store.select("members", { household_id: h }), ctx.store.select("trip_people", { household_id: h, trip_id: tripId })]);
@@ -344,6 +352,7 @@ const cashSchema = z.object({
 
 export async function saveCashMove(_: ActionResult, fd: FormData): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    { const err = await premiumError(ctx, "Cestování"); if (err) return fail(err); }
     const p = parse(cashSchema, fd);
     if (!p.ok) return p.result;
     const c = p.data;
@@ -388,6 +397,7 @@ export async function deleteCashMove(id: string): Promise<ActionResult> {
 
 export async function addChecklistItem(tripId: string, text_: string, category: string | null = null): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    { const err = await premiumError(ctx, "Cestování"); if (err) return fail(err); }
     await own(ctx, "trips", tripId);
     const t = String(text_).trim().slice(0, 120);
     if (!t) return fail("Zadejte, co vyřídit nebo sbalit.");
@@ -399,6 +409,7 @@ export async function addChecklistItem(tripId: string, text_: string, category: 
 
 export async function fillChecklist(tripId: string): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    { const err = await premiumError(ctx, "Cestování"); if (err) return fail(err); }
     const trip = (await own(ctx, "trips", tripId)) as Trip;
     const h = ctx.household.id;
     const [legs, existing] = await Promise.all([ctx.store.select("trip_legs", { household_id: h, trip_id: tripId }), ctx.store.select("trip_checklist", { household_id: h, trip_id: tripId })]);
@@ -412,6 +423,7 @@ export async function fillChecklist(tripId: string): Promise<ActionResult> {
 
 export async function toggleChecklistItem(id: string, doneFlag: boolean): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    { const err = await premiumError(ctx, "Cestování"); if (err) return fail(err); }
     await own(ctx, "trip_checklist", id);
     await ctx.store.update("trip_checklist", { id, household_id: ctx.household.id }, { done: doneFlag });
     return done("");
@@ -436,6 +448,7 @@ const planSchema = z.object({
 
 export async function savePlanItem(_: ActionResult, fd: FormData): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    { const err = await premiumError(ctx, "Cestování"); if (err) return fail(err); }
     const p = parse(planSchema, fd);
     if (!p.ok) return p.result;
     const { id, ...row } = p.data;
@@ -463,6 +476,7 @@ export async function deletePlanItem(id: string): Promise<ActionResult> {
 
 export async function attachDocumentToTrip(tripId: string, documentId: string): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    { const err = await premiumError(ctx, "Cestování"); if (err) return fail(err); }
     await Promise.all([own(ctx, "trips", tripId), own(ctx, "documents", documentId)]);
     await ctx.store.update("documents", { id: documentId, household_id: ctx.household.id }, { trip_id: tripId } as never);
     return done("Dokument přiložen k cestě");
@@ -482,6 +496,7 @@ export async function detachDocumentFromTrip(documentId: string): Promise<Action
 
 export async function duplicateTrip(_: ActionResult, fd: FormData): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    { const err = await premiumError(ctx, "Cestování"); if (err) return fail(err); }
     const p = parse(z.object({ id: uuid(), start_date: optionalDate(), name: text(120) }), fd);
     if (!p.ok) return p.result;
     const h = ctx.household.id;
@@ -528,6 +543,7 @@ export async function duplicateTrip(_: ActionResult, fd: FormData): Promise<Acti
 
 export async function createGoalForTrip(tripId: string): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    { const err = await premiumError(ctx, "Cestování"); if (err) return fail(err); }
     if (!canEdit(ctx, "savings")) return fail("Nemáte oprávnění upravovat Spoření.");
     const h = ctx.household.id;
     const trip = (await own(ctx, "trips", tripId)) as Trip;
@@ -561,6 +577,7 @@ export async function unlinkGoal(tripId: string): Promise<ActionResult> {
 
 export async function linkSuggestedTransactions(tripId: string): Promise<ActionResult> {
   return withContext(async (ctx) => {
+    { const err = await premiumError(ctx, "Cestování"); if (err) return fail(err); }
     const trip = (await own(ctx, "trips", tripId)) as Trip;
     const h = ctx.household.id;
     const [txs, exps, cats, cash] = await Promise.all([

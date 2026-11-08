@@ -3,6 +3,7 @@ import { requireContext } from "@/lib/context";
 import { loadSnapshot } from "@/lib/data";
 import { answer, type AssistantAnswer, type AssistantContext } from "@/lib/assistant";
 import { aiEnabled, interpretQuestion } from "@/lib/ai";
+import { getPremium } from "@/lib/premium";
 
 /**
  * Odpověď asistenta. Nejdřív deterministické rozpoznání; když otázce nerozumí
@@ -14,7 +15,7 @@ export async function askAssistant(question: string, prev?: AssistantContext | n
   const { data, snapshot } = await loadSnapshot(ctx);
   const q = String(question).slice(0, 500);
   const first = answer(q, snapshot, data, prev ?? null);
-  if (first.context?.intent !== "unknown" || !aiEnabled()) return first;
+  if (first.context?.intent !== "unknown" || !aiEnabled() || !(await getPremium(ctx)).household) return first;
   const intent = await interpretQuestion(q, data.categories.filter((c) => c.kind === "expense").map((c) => c.name));
   if (!intent || intent.intent === "unknown") return first;
   const forced: Partial<AssistantContext> = {

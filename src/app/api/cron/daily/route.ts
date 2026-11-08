@@ -25,6 +25,7 @@ export async function GET(req: Request) {
   const today = todayISO();
   let sent = 0;
   for (const [hid, list] of byHousehold) {
+    if (!(await store.householdPremium(hid))) continue; // upozornění jsou Premium
     const data = await loadHouseholdData(store, hid);
     const sentBefore = await store.select("trip_notifications", { household_id: hid });
     for (const a of travelAlerts(data, today)) {

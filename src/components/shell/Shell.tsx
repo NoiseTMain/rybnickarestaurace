@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, LogOut, Menu, X, FlaskConical } from "lucide-react";
+import { ChevronDown, Crown, LogOut, Menu, ShieldCheck, X, FlaskConical } from "lucide-react";
+import { useLookups } from "@/components/Lookups";
 import { useState, useTransition, type ReactNode } from "react";
 import { signOut } from "@/lib/actions/auth";
 import { switchHousehold } from "@/lib/actions/household";
@@ -61,9 +62,11 @@ function HouseholdSwitcher({ household, households }: Pick<ShellProps, "househol
 }
 
 function NavList({ path, onNavigate }: { path: string; onNavigate?: () => void }) {
+  const { isAdmin, premium } = useLookups();
+  const items = [...NAV.slice(0, -1), { href: "/premium", label: premium ? "Premium" : "Získat Premium", icon: Crown }, ...(isAdmin ? [{ href: "/admin", label: "Administrace", icon: ShieldCheck }] : []), NAV[NAV.length - 1]];
   return (
     <nav className="space-y-0.5" aria-label="Hlavní navigace">
-      {NAV.map((n) => {
+      {items.map((n) => {
         const active = isActive(path, n.href);
         return (
           <Link key={n.href} href={n.href} onClick={onNavigate} aria-current={active ? "page" : undefined}

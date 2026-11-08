@@ -12,7 +12,7 @@ function b64ToUint8(b64: string) {
 }
 
 /** Zapnutí týdenního souhrnu jako oznámení na telefonu (iPhone: jen z aplikace přidané na plochu). */
-export function PushToggle({ publicKey }: { publicKey: string | null }) {
+export function PushToggle({ publicKey, premium = true }: { publicKey: string | null; premium?: boolean }) {
   const [state, setState] = useState<"unsupported" | "off" | "on" | "loading">("loading");
   const [endpoint, setEndpoint] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -26,6 +26,7 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
       setState(sub ? "on" : "off");
     })().catch(() => setState("unsupported"));
   }, []);
+  if (!premium) return <p className="text-xs text-ink-3">Upozornění na telefon (týdenní souhrn, připomínky plateb a cest) jsou součást <a href="/premium" className="text-gold underline">Premium</a>.</p>;
   if (!publicKey) return <p className="text-xs text-ink-3">Oznámení na telefon zatím nejsou na serveru zapnutá (vyžadují nastavení klíčů – viz README).</p>;
   if (state === "unsupported") return <p className="text-xs text-ink-3">Tento prohlížeč oznámení nepodporuje. Na iPhonu nejdřív přidejte HomeOS na plochu (Sdílet → Přidat na plochu) a oznámení zapněte z ní.</p>;
   return state === "on" ? (

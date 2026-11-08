@@ -68,6 +68,18 @@ nastavení a v jednotlivých sekcích. Ukázková data existují jen v samostatn
 
 ---
 
+## Free a Premium, platby, administrace
+
+- **Zdarma:** vše kromě funkcí níže, 1 vlastní domácnost a 2 členové. **Premium** (49 Kč/měs., 449 Kč/rok): AI asistent
+  a čtení faktur, Cestování, upozornění na telefon a měsíční uzávěrka, neomezeně členů a domácností, celý vzhled.
+  Premium jednoho člena platí pro celou domácnost; ukázková domácnost má vše.
+- Limity se vynucují i v databázi (RLS a triggery), ne jen v aplikaci – nejde je obejít přímým voláním API.
+- **Platby:** Lemon Squeezy (prodejce, řeší DPH a doklady). Webhook `/api/billing/webhook` (události `subscription_*`).
+- **Administrace** `/admin` jen pro e-maily v `ADMIN_EMAILS`: uživatelé, domácnosti a rozsah používání,
+  stav předplatného, přidělení/odebrání Premium podle e-mailu, blokace, záznam akcí. Finanční data uživatelů
+  administrace záměrně nezobrazuje.
+- **Veřejné stránky:** `/vitejte` (úvod), `/podminky`, `/soukromi`; souhlas při registraci; smazání účtu v Nastavení.
+
 ## Přesnost výpočtů
 
 Toto je nejdůležitější technická vlastnost aplikace.

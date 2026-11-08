@@ -1,6 +1,8 @@
 "use client";
 import { Check, Copy, FlaskConical, Loader2, Trash2 } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useActionState, useState, useTransition } from "react";
+import { deleteAccount } from "@/lib/actions/account";
+import { initialResult } from "@/lib/actions/result";
 import { useRouter } from "next/navigation";
 import { acceptInvite, createDemoHousehold, createInvite, leaveHousehold, removeAccess, deleteHousehold, renameHousehold, saveSetting } from "@/lib/actions/household";
 import { restoreFromBackup } from "@/lib/actions/backup";
@@ -150,5 +152,25 @@ export function LeaveHouseholdButton() {
       if (!window.confirm("Opustit domácnost? Přestanete vidět její data. Vrátit se půjde jen s novou pozvánkou.")) return;
       start(async () => { const r = await leaveHousehold(); if (r && !r.ok) toast(r.error ?? "Chyba", "error"); });
     }}>Opustit domácnost</Button>
+  );
+}
+
+export function DeleteAccountForm() {
+  const [open, setOpen] = useState(false);
+  const [state, formAction, pending] = useActionState(deleteAccount, initialResult);
+  const [pw, setPw] = useState("");
+  const [confirmText, setConfirmText] = useState("");
+  if (!open) return <button type="button" onClick={() => setOpen(true)} className="mt-4 text-sm text-neg underline">Smazat účet…</button>;
+  return (
+    <form action={formAction} className="mt-4 space-y-3 rounded-2xl border border-neg/30 bg-neg/[0.06] p-4">
+      <p className="text-sm"><b className="text-neg">Trvalé smazání účtu.</b> Domácnosti, kde jste jediný člen, se smažou i se všemi daty a soubory. Ve sdílených domácnostech zůstanou data ostatním. Placené předplatné se zruší. Nejdřív si případně stáhněte zálohu.</p>
+      <Input name="password" type="password" label="Vaše heslo" value={pw} onChange={(e) => setPw(e.target.value)} error={state.ok ? undefined : state.fieldErrors?.password} required />
+      <Input name="confirm" label="Pro potvrzení napište SMAZAT" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} error={state.ok ? undefined : state.fieldErrors?.confirm} required />
+      <FormError error={state.ok ? undefined : state.error} />
+      <div className="flex gap-2">
+        <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Zrušit</Button>
+        <Button type="submit" variant="danger" loading={pending}>Trvale smazat účet</Button>
+      </div>
+    </form>
   );
 }

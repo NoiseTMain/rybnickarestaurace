@@ -4,6 +4,7 @@ import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DbError, type FileStore, type Filter, type NewRow, type Row, type Store } from "./store";
 import { REFS, TABLE_SECTION, TABLES_WITH_UPDATED_AT, UNIQUE } from "./schema-meta";
+import { subscriptionActive } from "@/lib/subscription";
 import type { TableName, Tables } from "./types";
 
 /**
@@ -102,8 +103,35 @@ function canSee(data: LocalData, userId: string, table: TableName, row: Record<s
   const members = memberHouseholds(data, userId);
   if (table === "households") return members.has(row.id as string) || row.created_by === userId;
   if (table === "household_invites") return ownerHouseholds(data, userId).has(row.household_id as string);
-  if (table === "push_subscriptions") return row.user_id === userId;
+  if (table === "push_subscriptions" || table === "subscriptions" || table === "ai_usage") return row.user_id === userId;
+  if (table === "admin_audit") return false;
   return members.has(row.household_id as string);
+}
+
+/** Napodobení SQL funkcí user_is_premium / household_is_premium. */
+export function localUserPremium(data: LocalData, userId: string): boolean {
+  return subscriptionActive(rows(data, "subscriptions").find((s) => s.user_id === userId));
+}
+export function localHouseholdPremium(data: LocalData, hid: string): boolean {
+  if (rows(data, "households").some((h) => h.id === hid && h.is_demo)) return true;
+  return rows(data, "household_users").some((hu) => hu.household_id === hid && localUserPremium(data, hu.user_id));
+}
+const PREMIUM_TABLES = new Set<string>(["trips", "trip_legs", "trip_expenses", "trip_people", "trip_cash_moves", "trip_checklist", "trip_plan_items"]);
+
+/** Napodobení triggerů s limity verze zdarma. */
+function checkFreeLimits(data: LocalData, table: TableName, row: Record<string, unknown>) {
+  if (table === "members") {
+    const hid = row.household_id as string;
+    if (!localHouseholdPremium(data, hid) && rows(data, "members").filter((m) => m.household_id === hid).length >= 2) {
+      throw new DbError("forbidden", "Verze zdarma umožňuje nejvýše 2 členy domácnosti. Pro další členy aktivujte Premium.");
+    }
+  }
+  if (table === "household_users" && row.role === "owner") {
+    const uid = row.user_id as string;
+    const isDemo = rows(data, "households").some((h) => h.id === row.household_id && h.is_demo);
+    const owned = rows(data, "household_users").filter((hu) => hu.user_id === uid && hu.role === "owner" && !rows(data, "households").some((h) => h.id === hu.household_id && h.is_demo)).length;
+    if (!isDemo && !localUserPremium(data, uid) && owned >= 1) throw new DbError("forbidden", "Verze zdarma umožňuje 1 vlastní domácnost. Pro další aktivujte Premium.");
+  }
 }
 
 function canWrite(data: LocalData, userId: string, table: TableName, row: Record<string, unknown>, op: "insert" | "update" | "delete"): boolean {
@@ -120,9 +148,11 @@ function canWrite(data: LocalData, userId: string, table: TableName, row: Record
     return ownerHouseholds(data, userId).has(row.household_id as string); // změna oprávnění jen vlastník
   }
   if (table === "household_invites") return ownerHouseholds(data, userId).has(row.household_id as string);
-  if (table === "push_subscriptions") return row.user_id === userId && memberHouseholds(data, userId).has(row.household_id as string);
+  if (table === "push_subscriptions") return row.user_id === userId && memberHouseholds(data, userId).has(row.household_id as string) && (op === "delete" || localHouseholdPremium(data, row.household_id as string));
+  if (table === "subscriptions" || table === "admin_audit" || table === "ai_usage") return false; // zapisuje jen server
   const hid = row.household_id as string;
   if (!memberHouseholds(data, userId).has(hid)) return false;
+  if (PREMIUM_TABLES.has(table) && op !== "delete" && !localHouseholdPremium(data, hid)) return false;
   const section = TABLE_SECTION[table];
   return section ? hasPerm(data, userId, hid, section) : true;
 }
@@ -143,6 +173,7 @@ function ensureMember(data: LocalData, userId: string, hid: string, memberName?:
   const members = rows(data, "members").filter((m) => m.household_id === hid);
   const own = members.find((m) => m.user_id === userId);
   if (own) return own.id;
+  checkFreeLimits(data, "members", { household_id: hid });
   const colors = ["#d4b483", "#9ccc65", "#7fb3d5", "#f48fb1", "#ffab91", "#ce93d8"];
   const email = data.users.find((u) => u.id === userId)?.email ?? "";
   const id = randomUUID();
@@ -251,6 +282,7 @@ export function createLocalStore(userId: string): Store {
           if (TABLES_WITH_UPDATED_AT.includes(table)) row.updated_at = now();
           if (table === "households" && !row.created_by) row.created_by = userId;
           if (!canWrite(data, userId, table, row, "insert")) throw new DbError("forbidden", "Nemáte oprávnění k této úpravě. Oprávnění nastavuje vlastník domácnosti.");
+          checkFreeLimits(data, table, row);
           if (rows(data, table).some((r) => (r as unknown as Record<string, unknown>).id === row.id)) throw new DbError("unique", "Záznam už existuje.");
           checkUnique(data, table, row);
           checkRefs(data, table, row);
@@ -291,10 +323,27 @@ export function createLocalStore(userId: string): Store {
         return targets.length;
       });
     },
+    householdPremium(householdId: string) {
+      return readLocal((data) => localHouseholdPremium(data, householdId));
+    },
+    userPremium() {
+      return readLocal((data) => localUserPremium(data, userId));
+    },
+    bumpAiUsage() {
+      return writeLocal((data) => {
+        const month = new Date().toISOString().slice(0, 7);
+        const list = rows(data, "ai_usage");
+        const row = list.find((r) => r.user_id === userId && r.month === month);
+        if (row) row.count += 1;
+        else list.push({ user_id: userId, month, count: 1 });
+        return row?.count ?? 1;
+      });
+    },
     acceptInvite(code: string, memberName?: string | null) {
       return writeLocal((data) => {
         const inv = rows(data, "household_invites").find((i) => i.code.toUpperCase() === code.toUpperCase() && !i.used_by && i.expires_at > now());
         if (!inv) throw new DbError("not_found", "Pozvánka neexistuje nebo vypršela.");
+        if (!rows(data, "members").some((m) => m.household_id === inv.household_id && m.user_id === userId)) checkFreeLimits(data, "members", { household_id: inv.household_id });
         if (!memberHouseholds(data, userId).has(inv.household_id)) {
           rows(data, "household_users").push({ id: randomUUID(), household_id: inv.household_id, user_id: userId, role: "member", permissions: {}, created_at: now() });
         }

@@ -28,14 +28,16 @@ export async function signIn(_: ActionResult, fd: FormData): Promise<ActionResul
   if (!p.ok) return p.result;
   const { email, password } = p.data;
   if (appMode() === "local") {
-    const { readLocal } = await import("@/lib/db/local-store");
+    const { readLocal, writeLocal } = await import("@/lib/db/local-store");
     const user = await readLocal((d) => d.users.find((u) => u.email === email));
     if (!user || !(await verifyPassword(password, user.password_hash))) return fail("Nesprávný e-mail nebo heslo.");
+    if ((user as unknown as { banned?: boolean }).banned) return fail("Účet je zablokovaný. Kontaktujte správce aplikace.");
+    await writeLocal((d) => { const u = d.users.find((x) => x.id === user.id) as unknown as { last_sign_in_at?: string } | undefined; if (u) u.last_sign_in_at = new Date().toISOString(); });
     await createLocalSession(user.id);
   } else {
     const supabase = await createSessionClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return fail(error.message.includes("confirm") ? "E-mail ještě nebyl potvrzen – zkontrolujte schránku." : "Nesprávný e-mail nebo heslo.");
+    if (error) return fail(error.message.includes("confirm") ? "E-mail ještě nebyl potvrzen – zkontrolujte schránku." : /banned/i.test(error.message) ? "Účet je zablokovaný. Kontaktujte správce aplikace." : "Nesprávný e-mail nebo heslo.");
   }
   redirect("/");
 }
@@ -45,6 +47,7 @@ export async function signUp(_: ActionResult, fd: FormData): Promise<ActionResul
   if (!p.ok) return p.result;
   const { email, password } = p.data;
   if (fd.get("password") !== fd.get("password2")) return fail("Hesla se neshodují.", { password2: "Hesla se neshodují" });
+  if (fd.get("terms") !== "on") return fail("Pro registraci je potřeba souhlasit s podmínkami a zásadami ochrany osobních údajů.", { terms: "Potvrďte souhlas" });
   if (appMode() === "local") {
     const { writeLocal } = await import("@/lib/db/local-store");
     const hash = await hashPassword(password);

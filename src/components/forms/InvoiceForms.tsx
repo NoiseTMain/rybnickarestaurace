@@ -73,7 +73,7 @@ export function InvoiceForm({ initial, onDone }: { initial?: Invoice; onDone?: (
           kind="invoice"
           label="PDF nebo fotografie faktury"
           initialId={initial?.document_id}
-          onFile={(f, id) => void runOcr(f, id)}
+          onFile={(f, id) => { if (lk.premium) void runOcr(f, id); }}
         />
         {ocrState.busy && (
           <div className="mt-2 flex items-center gap-2 text-xs text-ink-2">
@@ -81,7 +81,9 @@ export function InvoiceForm({ initial, onDone }: { initial?: Invoice; onDone?: (
           </div>
         )}
         {ocrState.error && <p className="mt-2 text-xs text-warn">{ocrState.error}</p>}
-        {!ocr && !ocrState.busy && <p className="mt-2 flex items-center gap-1.5 text-xs text-ink-3"><ScanText className="h-3.5 w-3.5" /> Po nahrání se údaje pokusíme rozpoznat (OCR). Vždy je zkontrolujte.</p>}
+        {!ocr && !ocrState.busy && (lk.premium
+          ? <p className="mt-2 flex items-center gap-1.5 text-xs text-ink-3"><ScanText className="h-3.5 w-3.5" /> Po nahrání se údaje pokusíme rozpoznat (OCR). Vždy je zkontrolujte.</p>
+          : <p className="mt-2 flex items-center gap-1.5 text-xs text-ink-3"><ScanText className="h-3.5 w-3.5" /> Automatické čtení údajů z faktury je součást <a href="/premium" className="text-gold underline">Premium</a>. Údaje vyplňte ručně.</p>)}
         {ocr && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-ink-2">
             <Badge tone="gold">rozpoznáno</Badge><Badge tone="warning">nejisté</Badge><Badge tone="danger">nenalezeno</Badge>

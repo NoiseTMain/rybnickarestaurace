@@ -1,7 +1,8 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DbError, type Filter, type NewRow, type Row, type Store } from "./store";
-import { MONEY_COLUMNS, type TableName } from "./types";
+import { MONEY_COLUMNS, type Subscription, type TableName } from "./types";
+import { subscriptionActive } from "@/lib/subscription";
 
 const PAGE = 1000;
 
@@ -15,6 +16,8 @@ function normalize<T extends TableName>(table: T, row: Record<string, unknown>):
 
 function mapError(e: { code?: string; message?: string } | null): DbError {
   const code = e?.code ?? "";
+  const premium = e?.message?.match(/PREMIUM:\s*(.+)$/);
+  if (premium) return new DbError("forbidden", premium[1]);
   if (code === "23505") return new DbError("unique", "Záznam už existuje (duplicitní údaj).");
   if (code === "23503") return new DbError("reference", "Záznam nelze uložit nebo smazat kvůli vazbě na jiná data (např. účet s transakcemi).");
   if (code === "23514" || code === "23502" || code === "22P02") return new DbError("check", "Údaje nesplňují pravidla databáze.");
@@ -73,13 +76,27 @@ export function createSupabaseStore(client: SupabaseClient): Store {
     },
     async acceptInvite(code: string, memberName?: string | null) {
       const { data, error } = await client.rpc("accept_household_invite", { invite_code: code, member_name: memberName ?? null });
-      if (error) throw new DbError("not_found", "Pozvánka neexistuje nebo vypršela.");
+      if (error) throw error.message?.includes("PREMIUM:") ? mapError(error) : new DbError("not_found", "Pozvánka neexistuje nebo vypršela.");
       return data as string;
     },
     async ensureOwnMember(householdId: string, memberName?: string | null) {
       const { data, error } = await client.rpc("ensure_own_member", { hid: householdId, member_name: memberName ?? null });
       if (error) throw mapError(error);
       return data as string;
+    },
+    async householdPremium(householdId: string) {
+      const { data, error } = await client.rpc("household_is_premium", { hid: householdId });
+      if (error) return false;
+      return Boolean(data);
+    },
+    async userPremium() {
+      const { data } = await client.from("subscriptions").select("*").maybeSingle();
+      return subscriptionActive(data as Subscription | null);
+    },
+    async bumpAiUsage() {
+      const { data, error } = await client.rpc("increment_ai_usage");
+      if (error) throw mapError(error);
+      return Number(data);
     },
     files: {
       async upload(path, bytes, mime) {

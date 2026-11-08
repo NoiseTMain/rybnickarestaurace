@@ -529,6 +529,38 @@ export interface TripExpense {
   created_at: string;
 }
 
+export interface Subscription {
+  user_id: string;
+  status: "active" | "on_trial" | "past_due" | "paused" | "cancelled" | "expired" | "unpaid" | "granted" | "revoked";
+  source: "lemonsqueezy" | "admin";
+  variant: "monthly" | "yearly" | "lifetime" | "manual" | null;
+  provider_subscription_id: string | null;
+  provider_customer_id: string | null;
+  renews_at: string | null;
+  ends_at: string | null;
+  portal_url: string | null;
+  granted_by: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminAudit {
+  id: string;
+  admin_id: string | null;
+  action: string;
+  target_user_id: string | null;
+  target_email: string | null;
+  detail: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface AiUsage {
+  user_id: string;
+  month: string;
+  count: number;
+}
+
 export interface PushSubscriptionRow {
   id: string;
   user_id: string;
@@ -572,6 +604,9 @@ export interface Tables {
   trip_plan_items: TripPlanItem;
   trip_notifications: TripNotification;
   push_subscriptions: PushSubscriptionRow;
+  subscriptions: Subscription;
+  admin_audit: AdminAudit;
+  ai_usage: AiUsage;
 }
 
 export type TableName = keyof Tables;

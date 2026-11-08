@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, BedDouble, CalendarDays, ExternalLink, FileText, MapPin, Paperclip, PiggyBank, StickyNote, Ticket, Users } from "lucide-react";
 import { canEdit, requireContext } from "@/lib/context";
+import { getPremium } from "@/lib/premium";
+import { PremiumWall } from "@/components/premium/PremiumWall";
 import { loadSnapshot } from "@/lib/data";
 import { carrierSite, connectionLinks, effectiveExpenses, KIND_LABEL, MODE_LABEL, settle, STATUS_LABEL, suggestTripTransactions, summarizeTrip, wallets } from "@/lib/finance/travel";
 import { addDays, diffDays, formatDate } from "@/lib/dates";
@@ -30,6 +32,7 @@ const kc = (c: number) => formatMoney(c, { decimals: "never" });
 export default async function TripPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | undefined>> }) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const ctx = await requireContext();
+  if (!(await getPremium(ctx)).household) return <PremiumWall title="Cestování je součástí Premium" highlight="travel">Plánujte cesty, trasy a dopravu, hlídejte rozpočet na místě, hotovost v cizí měně a kdo komu dluží. Uložené cesty se neztratí – po aktivaci je zase uvidíte.</PremiumWall>;
   const { data, snapshot, today } = await loadSnapshot(ctx);
   const tr = data.travel;
   const trip = tr.trips.find((t) => t.id === id);

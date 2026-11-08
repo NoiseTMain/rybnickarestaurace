@@ -2,6 +2,8 @@ import { Download, Landmark, Trash2 } from "lucide-react";
 import { canEdit, requireContext } from "@/lib/context";
 import { ReadOnlyNotice } from "@/components/ui/ReadOnlyNotice";
 import { loadSnapshot } from "@/lib/data";
+import { getPremium } from "@/lib/premium";
+import { FREE_LIMITS } from "@/lib/plans";
 import { addDays, formatDate, todayISO } from "@/lib/dates";
 import { ACCOUNT_KIND_LABEL } from "@/lib/defaults";
 import { FREQUENCY_LABEL } from "@/lib/finance/recurrence";
@@ -22,15 +24,15 @@ import { LinkButton } from "@/components/ui/Button";
 import { SetupButton } from "@/components/forms/SetupForms";
 import { WorkSettingsForm } from "@/components/forms/WorkForms";
 import { BankImportButton } from "@/components/forms/CsvImport";
-import { AutosaveField, AutosaveToggle, CreateDemoButton, DeleteHouseholdForm, InviteBox, JoinHouseholdForm, LeaveHouseholdButton, RemoveAccessButton, PasswordForm, RenameHousehold, RestoreForm } from "@/components/forms/SettingsForms";
+import { AutosaveField, AutosaveToggle, CreateDemoButton, DeleteAccountForm, DeleteHouseholdForm, InviteBox, JoinHouseholdForm, LeaveHouseholdButton, RemoveAccessButton, PasswordForm, RenameHousehold, RestoreForm } from "@/components/forms/SettingsForms";
 
 export const metadata = { title: "Nastavení" };
 
-const SECTIONS = [["vzhled", "Vzhled"], ["domacnost", "Domácnost"], ["clenove", "Členové"], ["ucty", "Účty"], ["prijmy", "Příjmy"], ["kategorie", "Kategorie"], ["planovani", "Rezerva a upozornění"], ["ico", "IČO"], ["fakturace", "Fakturační údaje"], ["prace", "Práce"], ["banka", "Banka"], ["zaloha", "Export a záloha"], ["ucet", "Účet"]];
+const SECTIONS = [["predplatne", "Předplatné"], ["vzhled", "Vzhled"], ["domacnost", "Domácnost"], ["clenove", "Členové"], ["ucty", "Účty"], ["prijmy", "Příjmy"], ["kategorie", "Kategorie"], ["planovani", "Rezerva a upozornění"], ["ico", "IČO"], ["fakturace", "Fakturační údaje"], ["prace", "Práce"], ["banka", "Banka"], ["zaloha", "Export a záloha"], ["ucet", "Účet"]];
 
 export default async function SettingsPage() {
   const ctx = await requireContext();
-  const { data, snapshot: s } = await loadSnapshot(ctx);
+  const [{ data, snapshot: s }, premium] = await Promise.all([loadSnapshot(ctx), getPremium(ctx)]);
   const st = data.settings!;
   const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
   const icoActive = Boolean(st.billing_ico && st.ico_activated_at);
@@ -46,8 +48,11 @@ export default async function SettingsPage() {
       </nav>
 
       <div className="grid gap-4 xl:grid-cols-2">
+        <Card id="predplatne" title="Předplatné" className="xl:col-span-2" action={<LinkButton href="/premium" size="sm" variant={premium.household ? "ghost" : "primary"}>{premium.household ? "Detail" : "Získat Premium"}</LinkButton>}>
+          <p className="text-sm text-ink-2">{premium.isAdmin ? "Jste správce aplikace – Premium máte napořád." : premium.user ? "Máte Premium – děkujeme!" : premium.household ? "Premium máte díky jinému členovi této domácnosti." : `Používáte verzi zdarma (${FREE_LIMITS.members} členové, ${FREE_LIMITS.households} domácnost). AI asistent, cestování, upozornění a další jsou v Premium.`}</p>
+        </Card>
         <Card id="vzhled" title="Vzhled aplikace" subtitle="Platí pro toto zařízení" className="xl:col-span-2">
-          <ThemePicker initial={theme} />
+          <ThemePicker initial={theme} premium={premium.household} />
         </Card>
         <Card id="domacnost" title="Domácnost" subtitle={ctx.household.is_demo ? "Ukázková domácnost" : `Vaše role: ${ctx.role === "owner" ? "vlastník" : "člen"}`}>
           <RenameHousehold name={ctx.household.name} />
@@ -154,7 +159,7 @@ export default async function SettingsPage() {
           <p className="mt-2 text-xs text-ink-3">Upozornění se zobrazují na přehledu a ve Finančním asistentovi.</p>
           <div className="mt-4 border-t border-white/[0.06] pt-4">
             <p className="mb-2 text-sm font-medium">Týdenní souhrn na telefon</p>
-            <PushToggle publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || null} />
+            <PushToggle publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || null} premium={premium.household} />
           </div>
         </Card>
 
@@ -202,6 +207,7 @@ export default async function SettingsPage() {
 
         <Card id="ucet" title="Uživatelský účet" subtitle={ctx.user.email}>
           <PasswordForm />
+          <DeleteAccountForm />
           <p className="mt-3 text-xs text-ink-3">Režim: {ctx.store.mode === "supabase" ? "Supabase (produkční databáze s Row Level Security)" : "lokální vývojový režim (soubor .data/homeos.json)"}.</p>
         </Card>
       </div>

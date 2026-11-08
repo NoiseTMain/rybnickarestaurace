@@ -17,6 +17,9 @@ export interface Lookups {
   role: "owner" | "member";
   permissions: Permissions;
   icoActive: boolean;
+  /** Má aktuální domácnost Premium? */
+  premium?: boolean;
+  isAdmin?: boolean;
   /** Probíhající a brzy začínající cesty (pro rychlý zápis výdaje). */
   activeTrips?: { trip: Trip; people: TripPerson[]; wallets: Wallet[] }[];
 }

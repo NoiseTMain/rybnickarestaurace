@@ -7,8 +7,8 @@ const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(), interest-cohort=()" },
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
-  { key: "X-Robots-Tag", value: "noindex, nofollow" },
 ];
+const noindex = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
@@ -22,7 +22,11 @@ const nextConfig: NextConfig = {
     serverActions: { bodySizeLimit: "50mb" },
   },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // aplikace se neindexuje; veřejné stránky (úvod, podmínky, zásady) ano
+      { source: "/:path((?!vitejte|podminky|soukromi).*)", headers: noindex },
+    ];
   },
 };
 

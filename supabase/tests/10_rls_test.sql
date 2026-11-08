@@ -259,6 +259,7 @@ end $$;
 reset role;
 
 \echo '11) Cestování: oprávnění sekce a vazby'
+insert into public.subscriptions (user_id, status, source) values (:alice, 'granted', 'admin');
 select pg_temp.as_user(:alice);
 insert into public.trips (id, household_id, name, destination, budget) values ('77777777-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'Vídeň', 'Vídeň', 900000);
 insert into public.trip_legs (household_id, trip_id, mode, carrier, from_place, to_place, price) values ('11111111-0000-0000-0000-000000000001', '77777777-0000-0000-0000-000000000001', 'train', 'RegioJet', 'Praha', 'Vídeň', 79800);
@@ -349,4 +350,70 @@ reset role;
 delete from public.trip_people where id = '77777777-0000-0000-0000-0000000000a1';
 do $$ begin
   assert (select paid_by from public.trip_expenses where description = 'Řízek') is null, 'plátce nezůstal po smazání účastníka prázdný';
+end $$;
+
+\echo '13) Free/Premium: limity v databázi, předplatné jen ze serveru'
+-- Dan nemá Premium: druhou vlastní domácnost nezaloží
+insert into auth.users (id, email) values ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'dan@example.cz');
+\set dan '''dddddddd-dddd-dddd-dddd-dddddddddddd'''
+select pg_temp.as_user(:dan);
+insert into public.households (id, name, created_by) values ('99999999-0000-0000-0000-000000000001', 'Dan 1', :dan);
+insert into public.household_users (household_id, user_id, role) values ('99999999-0000-0000-0000-000000000001', :dan, 'owner');
+insert into public.households (id, name, created_by) values ('99999999-0000-0000-0000-000000000002', 'Dan 2', :dan);
+do $$
+declare ok boolean;
+begin
+  begin
+    insert into public.household_users (household_id, user_id, role) values ('99999999-0000-0000-0000-000000000002', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'owner');
+    ok := false;
+  exception when raise_exception then ok := sqlerrm like 'PREMIUM:%';
+  end;
+  assert ok, 'uživatel zdarma založil druhou domácnost';
+  -- nejvýše 2 členové
+  insert into public.members (household_id, name) values ('99999999-0000-0000-0000-000000000001', 'A'), ('99999999-0000-0000-0000-000000000001', 'B');
+  begin
+    insert into public.members (household_id, name) values ('99999999-0000-0000-0000-000000000001', 'C');
+    ok := false;
+  exception when raise_exception then ok := sqlerrm like 'PREMIUM:%';
+  end;
+  assert ok, 'uživatel zdarma přidal třetího člena';
+  -- cestování bez Premium nejde
+  begin
+    insert into public.trips (household_id, name, destination) values ('99999999-0000-0000-0000-000000000001', 'x', 'y');
+    ok := false;
+  exception when insufficient_privilege then ok := true;
+  end;
+  assert ok, 'uživatel zdarma založil cestu';
+  -- předplatné si sám nedá
+  begin
+    insert into public.subscriptions (user_id, status, source) values ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'granted', 'admin');
+    ok := false;
+  exception when insufficient_privilege then ok := true;
+  end;
+  assert ok, 'uživatel si sám přidělil Premium';
+  begin
+    insert into public.ai_usage (user_id, month, count) values ('dddddddd-dddd-dddd-dddd-dddddddddddd', '2026-11', -100);
+    ok := false;
+  exception when insufficient_privilege then ok := true;
+  end;
+  assert ok, 'uživatel si upravil počítadlo AI';
+  assert public.increment_ai_usage() = 1 and public.increment_ai_usage() = 2, 'počítadlo AI';
+  assert not public.user_is_premium('dddddddd-dddd-dddd-dddd-dddddddddddd'), 'dan nemá premium';
+end $$;
+reset role;
+-- s Premium (přidělené administrátorem) už limity neplatí
+insert into public.subscriptions (user_id, status, source, ends_at) values (:dan, 'granted', 'admin', now() + interval '30 days');
+select pg_temp.as_user(:dan);
+insert into public.members (household_id, name) values ('99999999-0000-0000-0000-000000000001', 'C');
+insert into public.household_users (household_id, user_id, role) values ('99999999-0000-0000-0000-000000000002', :dan, 'owner');
+insert into public.trips (household_id, name, destination) values ('99999999-0000-0000-0000-000000000001', 'Řím', 'Řím');
+do $$ begin
+  assert (select count(*) from public.subscriptions) = 1, 'uživatel vidí cizí předplatné';
+  assert public.household_is_premium('99999999-0000-0000-0000-000000000001');
+end $$;
+reset role;
+-- vypršelé přidělení = zpět na Free
+update public.subscriptions set ends_at = now() - interval '1 day' where user_id = :dan;
+do $$ begin
+  assert not public.user_is_premium('dddddddd-dddd-dddd-dddd-dddddddddddd'), 'vypršelé Premium stále platí';
 end $$;

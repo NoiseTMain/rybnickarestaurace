@@ -32,5 +32,11 @@ export interface Store {
   acceptInvite(code: string, memberName?: string | null): Promise<string>;
   /** Zajistí, že přihlášený uživatel má v domácnosti svého člena (vrací jeho id). */
   ensureOwnMember(householdId: string, memberName?: string | null): Promise<string>;
+  /** Má domácnost Premium (kterýkoli člen s aktivním předplatným, nebo ukázková domácnost)? */
+  householdPremium(householdId: string): Promise<boolean>;
+  /** Má přihlášený uživatel aktivní Premium? */
+  userPremium(): Promise<boolean>;
+  /** Započítá dotaz na AI v tomto měsíci a vrátí nový počet. */
+  bumpAiUsage(): Promise<number>;
   files: FileStore;
 }

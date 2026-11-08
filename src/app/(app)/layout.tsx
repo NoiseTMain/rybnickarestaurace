@@ -3,6 +3,7 @@ import { requireContext } from "@/lib/context";
 import { loadData } from "@/lib/data";
 import { addDays, todayISO } from "@/lib/dates";
 import { wallets } from "@/lib/finance/travel";
+import { getPremium } from "@/lib/premium";
 import { localModeBlocked } from "@/lib/env";
 import { LookupsProvider } from "@/components/Lookups";
 import { Shell } from "@/components/shell/Shell";
@@ -19,6 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     await ctx.store.ensureOwnMember(ctx.household.id).catch(() => undefined);
     members = await ctx.store.select("members", { household_id: ctx.household.id });
   }
+  const premium = await getPremium(ctx);
   return (
     <LookupsProvider
       value={{
@@ -35,7 +37,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         icoActive: Boolean(data.settings?.billing_ico && data.settings.ico_activated_at),
         goals: data.goals,
         workSettings: data.workSettings,
-        activeTrips: activeTrips(data, todayISO()),
+        activeTrips: premium.household ? activeTrips(data, todayISO()) : [],
+        premium: premium.household,
+        isAdmin: premium.isAdmin,
       }}
     >
       <Shell email={ctx.user.email} household={ctx.household} households={ctx.households} mode={ctx.store.mode}>

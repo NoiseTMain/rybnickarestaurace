@@ -21,6 +21,7 @@ import { SimpleDashboard } from "@/components/dashboard/SimpleDashboard";
 import { DashboardMode } from "@/components/dashboard/DashboardMode";
 import { DASH_COOKIE } from "@/lib/dashboard-mode";
 import { cookies } from "next/headers";
+import { getPremium } from "@/lib/premium";
 
 export const metadata = { title: "Přehled" };
 
@@ -32,7 +33,8 @@ export default async function DashboardPage() {
     const legs = travel.legs.filter((l) => l.trip_id === trip.id);
     return { trip, legs, s: summarizeTrip(trip, legs, effectiveExpenses(travel.expenses.filter((e) => e.trip_id === trip.id), data.transactions), today, travel.cash.filter((c) => c.trip_id === trip.id)) };
   });
-  const ongoing = trips.find((t) => t.s.status === "ongoing");
+  const premium = await getPremium(ctx);
+  const ongoing = premium.household ? trips.find((t) => t.s.status === "ongoing") : undefined;
   const catName = (id: string | null) => data.categories.find((c) => c.id === id)?.name ?? "Bez kategorie";
   const firstOpening = data.accounts.reduce((m, a) => (a.opening_date < m ? a.opening_date : m), today);
   const seriesFrom = firstOpening > addDays(today, -89) ? firstOpening : addDays(today, -89);
@@ -73,7 +75,7 @@ export default async function DashboardPage() {
         {ongoing && <OngoingTripBanner item={ongoing} today={today} />}
         {missingBlock}
         <SimpleDashboard s={s} today={today} insights={insights} categories={s.month.byCategory.map((c) => ({ name: catName(c.categoryId), amount: c.amount }))}
-          extra={trips.some((t) => t.s.status === "upcoming" || t.s.status === "ongoing") ? <TravelCard items={trips} today={today} /> : null} />
+          extra={premium.household && trips.some((t) => t.s.status === "upcoming" || t.s.status === "ongoing") ? <TravelCard items={trips} today={today} /> : null} />
       </div>
     );
   }
@@ -269,7 +271,7 @@ export default async function DashboardPage() {
         </Card>
 
         {/* Cestování */}
-        <TravelCard items={trips} today={today} className="md:col-span-2" />
+        {premium.household && <TravelCard items={trips} today={today} className="md:col-span-2" />}
 
         {/* Kategorie */}
         <Card title="Výdaje podle kategorií" subtitle={monthName(today)} className="md:col-span-2">

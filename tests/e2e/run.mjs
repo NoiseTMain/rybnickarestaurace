@@ -37,6 +37,7 @@ await page.goto(B + "/registrace");
 await page.fill("input[name=email]", "jana@example.cz");
 await page.fill("input[name=password]", "tajneheslo1");
 await page.fill("input[name=password2]", "tajneheslo1");
+await page.check("input[name=terms]");
 await page.click("button[type=submit]");
 await page.waitForURL(/\/uvod/);
 
@@ -76,6 +77,56 @@ await page.getByText(/Je to částka, kterou můžete utratit za cokoli navíc/)
 await page.getByText("Na účtech teď máte").waitFor();
 await page.getByRole("radio", { name: "Podrobný" }).click();
 await page.getByText("Skutečně volné").waitFor();
+
+step("verze zdarma: cestování a AI jsou Premium, úvodní stránka pro nepřihlášené");
+await page.goto(B + "/cestovani");
+await page.getByText("Cestování je součástí Premium").waitFor();
+await page.goto(B + "/premium");
+await page.getByText("Online platby zatím nejsou spuštěné").waitFor();
+{
+  const anon = await browser.newContext();
+  const ap = await anon.newPage();
+  await ap.goto(B + "/");
+  await ap.waitForURL(/\/vitejte$/);
+  await ap.getByRole("link", { name: "Začít zdarma" }).first().waitFor();
+  await ap.goto(B + "/podminky");
+  await ap.getByText("Podmínky používání HomeOS").waitFor();
+  await anon.close();
+}
+
+step("administrace: jen správce, přidělení Premium podle e-mailu");
+await page.goto(B + "/admin");
+await page.getByText("Stránka neexistuje").waitFor();
+assert.equal(await page.getByText("Přidat Premium podle e-mailu").count(), 0, "běžný uživatel administraci nevidí");
+{
+  const adm = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const ap = await adm.newPage();
+  await ap.goto(B + "/registrace");
+  await ap.fill("input[name=email]", "adamhorvath07@icloud.com");
+  await ap.fill("input[name=password]", "spravce-heslo-1");
+  await ap.fill("input[name=password2]", "spravce-heslo-1");
+  await ap.check("input[name=terms]");
+  await ap.click("button[type=submit]");
+  await ap.waitForURL(/\/uvod/);
+  await ap.getByText("Vyzkoušet s ukázkovými daty").click();
+  await ap.waitForURL((u) => u.pathname === "/", { timeout: 30000 });
+  await ap.getByRole("link", { name: "Administrace" }).first().click();
+  await ap.getByText("jana@example.cz").waitFor();
+  await ap.getByLabel("E-mail uživatele").first().fill("jana@example.cz");
+  await ap.getByLabel("Na jak dlouho").first().selectOption("1y");
+  await ap.getByLabel("Poznámka (jen pro vás)").first().fill("tester");
+  await ap.getByRole("button", { name: "Přidat Premium" }).first().click();
+  await ap.locator("[role=status]", { hasText: "Premium přidáno: jana@example.cz" }).first().waitFor();
+  await ap.reload();
+  await ap.locator("tr", { hasText: "jana@example.cz" }).getByText("přiděleno").waitFor();
+  await ap.getByText("grant_premium").waitFor();
+  await ap.goto(B + "/premium");
+  await ap.getByText("Jste správce – Premium máte napořád").waitFor();
+  await adm.close();
+}
+await page.goto(B + "/premium");
+await page.getByText("Máte Premium").waitFor();
+await page.goto(B + "/");
 
 step("přehled ukazuje zadané údaje (očekávaný příjem se nepočítá)");
 assert.equal(await stat("Disponibilní"), 50000);
@@ -292,6 +343,7 @@ await op.goto(B + "/registrace");
 await op.fill("input[name=email]", "cizi@example.cz");
 await op.fill("input[name=password]", "tajneheslo2");
 await op.fill("input[name=password2]", "tajneheslo2");
+await op.check("input[name=terms]");
 await op.click("button[type=submit]");
 await op.waitForURL(/\/uvod/);
 const r = await op.request.get(`${B}/api/zaloha`);
@@ -694,6 +746,19 @@ assert.equal(after.tables.transactions.length, 0);
 assert.equal(after.tables.accounts.length, 0);
 assert.equal(after.tables.categories.length, 19, "výchozí kategorie");
 assert.equal(after.tables.household_settings[0].billing_ico, "27082440", "IČO zůstalo");
+
+step("smazání účtu (GDPR)");
+await op.goto(B + "/nastaveni#ucet");
+await op.getByRole("button", { name: "Smazat účet…" }).click();
+await op.getByLabel("Vaše heslo").fill("tajneheslo2");
+await op.getByLabel("Pro potvrzení napište SMAZAT").fill("SMAZAT");
+await op.getByRole("button", { name: "Trvale smazat účet" }).click();
+await op.waitForURL(/\/vitejte/);
+await op.goto(B + "/prihlaseni");
+await op.fill("input[name=email]", "cizi@example.cz");
+await op.fill("input[name=password]", "tajneheslo2");
+await op.click("button[type=submit]");
+await op.getByText("Nesprávný e-mail nebo heslo.").waitFor();
 
 assert.deepEqual(errors, [], "chyby v konzoli prohlížeče");
 console.log("✓ Všechny end-to-end kontroly prošly");

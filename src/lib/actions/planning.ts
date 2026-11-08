@@ -151,7 +151,7 @@ export async function suggestPrice(name: string, quantity?: string | null): Prom
   const average = rows.length ? Math.round(rows.reduce((a, r) => a + r.price, 0) / rows.length) : null;
   const cheapest = history.length ? history.reduce((m, h) => (h.price < m.price ? h : m)) : null;
   let ai: PriceSuggestion["ai"] = null;
-  if (!rows.length) {
+  if (!rows.length && (await (await import("@/lib/premium")).getPremium(ctx)).household) {
     const { estimateGroceryPrice } = await import("@/lib/ai");
     ai = await estimateGroceryPrice(String(name).slice(0, 120), quantity ?? null).catch(() => null);
   }
