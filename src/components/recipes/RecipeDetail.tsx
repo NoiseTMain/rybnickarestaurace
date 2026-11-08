@@ -6,6 +6,8 @@ import { useState, useTransition } from "react";
 import { addRecipeToList } from "@/lib/actions/recipes";
 import { amount } from "@/lib/recipes/amount";
 import type { Recipe } from "@/lib/recipes";
+import { recipeName, recipeSteps } from "@/lib/recipes/localize";
+import { phrase } from "@/lib/i18n/phrase";
 import { formatMoney } from "@/lib/money";
 import { Card, PageHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -23,7 +25,7 @@ export function RecipeDetail({ r, lists, cuisine, meals, goals }: { r: Recipe; l
   });
   return (
     <div className="space-y-4">
-      <PageHeader title={r.name} subtitle={`${cuisine} · ${meals} · ${r.diet}`} />
+      <PageHeader title={recipeName(r)} subtitle={`${phrase(cuisine)} · ${meals.split(", ").map((m) => phrase(m)).join(", ")} · ${phrase(r.diet)}`} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Card className="!p-4"><p className="text-[11px] uppercase tracking-wider text-ink-3">Energie</p><p className="flex items-center gap-1 text-xl font-semibold"><Flame className="h-4 w-4 text-gold" />{r.kcal} kcal</p><p className="text-xs text-ink-3">na porci</p></Card>
         <Card className="!p-4"><p className="text-[11px] uppercase tracking-wider text-ink-3">Bílkoviny</p><p className="text-xl font-semibold">{r.protein} g</p></Card>
@@ -51,7 +53,7 @@ export function RecipeDetail({ r, lists, cuisine, meals, goals }: { r: Recipe; l
           </div>
         </Card>
         <Card title="Postup">
-          <ol className="space-y-3 text-sm">{r.steps.map((s, i) => <li key={i} className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gold/20 text-xs font-semibold text-gold">{i + 1}</span><span className="pt-0.5">{s}</span></li>)}</ol>
+          <ol className="space-y-3 text-sm">{recipeSteps(r).map((s, i) => <li key={i} className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gold/20 text-xs font-semibold text-gold">{i + 1}</span><span className="pt-0.5">{s}</span></li>)}</ol>
           <p className="mt-4 text-xs text-ink-3">Nutriční hodnoty jsou vypočtené z běžných tabulkových hodnot surovin (syrové váhy). <Link href="/recepty" className="text-gold underline">Další recepty</Link></p>
         </Card>
       </div>

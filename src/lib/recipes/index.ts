@@ -13,6 +13,9 @@ export interface Recipe {
   time: number;
   ingredients: RecipeIngredient[];
   steps: string[];
+  /** Části názvu (titulek, „s …“, „a …“) a šablony kroků – pro překlad. */
+  nameParts: string[];
+  stepParts: { tpls: string[]; a: string; b: string };
   /** Na 1 porci. */
   kcal: number; protein: number; carbs: number; fat: number;
   /** Orientační cena 1 porce v haléřích. */
@@ -49,12 +52,15 @@ function build(): Recipe[] {
         const meat = tags.includes("meat"), fish = tags.includes("fish");
         const animal = tags.includes("dairy") || ingredients.some((x) => x.key === "honey" || x.key === "eggs" || x.key === "egg_whites");
         const diet = meat ? "maso" : fish ? "ryby" : animal ? "vegetariánské" : "veganské";
-        const fill = (s: string) => cap(s.replaceAll("{a}", A.acc ?? A.name).replaceAll("{b}", B?.acc ?? B?.name ?? "přílohu"));
-        const steps = [A.prep, B?.prep, ...b.steps.map(fill)].filter((x): x is string => Boolean(x));
+        const aWord = A.acc ?? A.name, bWord = B?.acc ?? B?.name ?? "přílohu";
+        const fill = (s: string) => cap(s.replaceAll("{a}", aWord).replaceAll("{b}", bWord));
+        const tpls = [A.prep, B?.prep, ...b.steps].filter((x): x is string => Boolean(x));
+        const steps = tpls.map(fill);
+        const nameParts = [b.title, A.with ?? `s ${A.name}`, ...(B ? [B.and ?? `a ${B.name}`] : [])];
         const r = {
           id: `${b.id}-${a}${side ? `-${side}` : ""}`,
           name: `${b.title} ${A.with ?? `s ${A.name}`}${B ? ` ${B.and ?? `a ${B.name}`}` : ""}`,
-          cuisine: b.cuisine, meal: b.meal, time: b.time, ingredients, steps,
+          cuisine: b.cuisine, meal: b.meal, time: b.time, ingredients, steps, nameParts, stepParts: { tpls, a: aWord, b: bWord },
           kcal: Math.round(kcal), protein: Math.round(p), carbs: Math.round(c), fat: Math.round(f), price: Math.round(price),
           diet: diet as Recipe["diet"], goals: [] as Recipe["goals"], free: false,
         };
@@ -73,6 +79,8 @@ function build(): Recipe[] {
 }
 
 export const RECIPES: Recipe[] = build();
+
+export { recipeName, recipeSteps } from "./localize";
 export const recipeById = (id: string) => RECIPES.find((r) => r.id === id) ?? null;
 
 export const GOALS: Record<Recipe["goals"][number], string> = {

@@ -3,7 +3,8 @@ import { Clock, Crown, Flame, Search } from "lucide-react";
 import { requireContext } from "@/lib/context";
 import { getPremium } from "@/lib/premium";
 import { loadSnapshot } from "@/lib/data";
-import { CUISINES, GOALS, MEALS, RECIPES, type Recipe } from "@/lib/recipes";
+import { CUISINES, GOALS, MEALS, RECIPES, recipeName, type Recipe } from "@/lib/recipes";
+import { phrase } from "@/lib/i18n/phrase";
 import { formatMoney } from "@/lib/money";
 import { Card, PageHeader } from "@/components/ui/Card";
 import { FilterTabs } from "@/components/lists/Filters";
@@ -19,8 +20,8 @@ function RecipeCard({ r, locked }: { r: Recipe; locked: boolean }) {
           <span className="text-xl">{CUISINES[r.cuisine].flag}</span>
           {locked ? <Crown className="h-4 w-4 text-gold" aria-label="Premium" /> : <span className="rounded-full bg-pos/15 px-2 py-0.5 text-[10px] text-pos">zdarma</span>}
         </div>
-        <p className="mt-1 line-clamp-2 font-medium leading-snug">{r.name}</p>
-        <p className="mt-1 text-xs text-ink-3">{r.meal.map((m) => MEALS[m]).join(", ")} · {CUISINES[r.cuisine].label}</p>
+        <p className="mt-1 line-clamp-2 font-medium leading-snug">{recipeName(r)}</p>
+        <p className="mt-1 text-xs text-ink-3">{r.meal.map((m) => phrase(MEALS[m])).join(", ")} · {phrase(CUISINES[r.cuisine].label)}</p>
         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-2">
           <span className="flex items-center gap-1"><Flame className="h-3.5 w-3.5 text-gold" />{r.kcal} kcal</span>
           <span>B {r.protein} g · S {r.carbs} g · T {r.fat} g</span>
@@ -41,7 +42,7 @@ export default async function RecipesPage({ searchParams }: { searchParams: Prom
     (!sp.kuchyne || r.cuisine === sp.kuchyne) && (!sp.jidlo || r.meal.includes(sp.jidlo as never)) && (!sp.cil || r.goals.includes(sp.cil as never))
     && (!sp.dieta || r.diet === sp.dieta || (sp.dieta === "vegetariánské" && r.diet === "veganské"))
     && (!sp.zdarma || r.free)
-    && (!q || r.name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").includes(q) || r.ingredients.some((i) => i.name.normalize("NFD").replace(/[̀-ͯ]/g, "").includes(q))));
+    && (!q || recipeName(r).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").includes(q) || r.name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").includes(q) || r.ingredients.some((i) => i.name.normalize("NFD").replace(/[̀-ͯ]/g, "").includes(q))));
   const page = Math.max(1, Number(sp.strana) || 1);
   const shown = list.slice((page - 1) * PAGE, page * PAGE);
   const pages = Math.ceil(list.length / PAGE);
@@ -60,7 +61,7 @@ export default async function RecipesPage({ searchParams }: { searchParams: Prom
         <input name="q" defaultValue={sp.q ?? ""} placeholder="Hledat recept nebo surovinu (např. losos, cizrna)…" className="field !h-10 flex-1" aria-label="Hledat recept" />
         {Object.entries(sp).filter(([k, v]) => v && k !== "q" && k !== "strana").map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
       </form>
-      <FilterTabs name="kuchyne" options={[{ value: "", label: "Všechny kuchyně" }, ...Object.entries(CUISINES).map(([k, c]) => ({ value: k, label: `${c.flag} ${c.label}` }))]} />
+      <FilterTabs name="kuchyne" options={[{ value: "", label: "Všechny kuchyně" }, ...Object.entries(CUISINES).map(([k, c]) => ({ value: k, label: `${c.flag} ${phrase(c.label)}` }))]} />
       <div className="flex flex-wrap gap-2">
         <FilterTabs name="jidlo" options={[{ value: "", label: "Každé jídlo" }, ...Object.entries(MEALS).map(([k, l]) => ({ value: k, label: l }))]} />
         <FilterTabs name="cil" options={[{ value: "", label: "Jakýkoli cíl" }, ...Object.entries(GOALS).map(([k, l]) => ({ value: k, label: l }))]} />

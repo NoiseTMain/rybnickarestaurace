@@ -4,6 +4,7 @@ import { requireContext } from "@/lib/context";
 import { loadSnapshot } from "@/lib/data";
 import { REMINDER_KIND, dueReminders } from "@/lib/finance/networth";
 import { badges } from "@/lib/finance/badges";
+import { phrase } from "@/lib/i18n/phrase";
 import { evaluateChallenge } from "@/lib/finance/challenges";
 import { resolveBudget } from "@/lib/finance/budgets";
 import { addDays, diffDays, formatDate, monthName } from "@/lib/dates";
@@ -321,7 +322,7 @@ export default async function DashboardPage() {
         {/* Motivace */}
         <Card title={t("d.0")} subtitle={ach.streak.current > 0 ? `🔥 ${ach.streak.current} ${ach.streak.current === 1 ? "den" : ach.streak.current < 5 ? "dny" : "dní"} v řadě${ach.streak.todayDone ? "" : " – dnes ještě nic nezapsáno"}` : "Zapisujte každý den a sbírejte odznaky"} data-testid="badges">
           <div className="flex flex-wrap gap-1.5">
-            {ach.list.map((b) => <span key={b.key} title={`${b.title} – ${b.detail}${!b.earned && b.progress ? ` (${b.progress.value.toLocaleString("cs-CZ")}/${b.progress.target.toLocaleString("cs-CZ")})` : ""}`} className={`flex h-9 w-9 items-center justify-center rounded-xl text-lg ${b.earned ? "bg-gold/15 ring-1 ring-gold/40" : "bg-white/[0.04] opacity-35 grayscale"}`} aria-label={`${b.title}${b.earned ? " – získáno" : ""}`}>{b.emoji}</span>)}
+            {ach.list.map((b) => <span key={b.key} title={`${phrase(b.title)} – ${phrase(b.detail)}${!b.earned && b.progress ? ` (${b.progress.value.toLocaleString("cs-CZ")}/${b.progress.target.toLocaleString("cs-CZ")})` : ""}`} className={`flex h-9 w-9 items-center justify-center rounded-xl text-lg ${b.earned ? "bg-gold/15 ring-1 ring-gold/40" : "bg-white/[0.04] opacity-35 grayscale"}`} aria-label={`${phrase(b.title)}${b.earned ? ` – ${phrase("získáno")}` : ""}`}>{b.emoji}</span>)}
           </div>
           <p className="mt-2 text-xs text-ink-3">{ach.list.filter((b) => b.earned).length} z {ach.list.length} odznaků{(() => { const next = ach.list.find((b) => !b.earned && b.progress); return next ? ` · další: ${next.title} (${next.progress!.value.toLocaleString("cs-CZ")}/${next.progress!.target.toLocaleString("cs-CZ")})` : ""; })()}</p>
           <div className="mt-3 space-y-1.5 border-t border-white/[0.06] pt-2">

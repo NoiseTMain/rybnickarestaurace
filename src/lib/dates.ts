@@ -134,9 +134,11 @@ export function monthName(d: ISODate, withYear = true): string {
   return withYear ? `${name} ${p.y}` : name;
 }
 
+const MONTHS_SHORT = ["led", "úno", "bře", "dub", "kvě", "čvn", "čvc", "srp", "zář", "říj", "lis", "pro"];
+
 export function shortMonth(d: ISODate): string {
   const p = parts(d);
-  return `${MONTHS[p.m - 1].slice(0, 3)} ${String(p.y).slice(2)}`;
+  return `${MONTHS_SHORT[p.m - 1]} ${String(p.y).slice(2)}`;
 }
 
 export function weekday(d: ISODate): number {

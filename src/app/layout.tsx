@@ -25,6 +25,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
   const scene = sceneUrl(theme);
   const locale = await getLocale();
+  const dictJson = locale === "cs" ? null : JSON.stringify((await import(`@/lib/i18n/phrases/${locale}.json`)).default).replace(/</g, "\\u003c");
   return (
     <html
       lang={locale}
@@ -35,6 +36,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       style={{ ...(themeVars(theme) as React.CSSProperties), fontSize: rootFontSize(theme) }}
     >
       <body>
+        {dictJson && <script id="homeos-dict" type="application/json" data-locale={locale} dangerouslySetInnerHTML={{ __html: dictJson }} />}
         <div className="ambient" aria-hidden />
         <div id="ambient-scene" className="ambient-scene" aria-hidden style={scene ? { backgroundImage: `url("${scene}")` } : { display: "none" }} />
         <ErrorReporter />

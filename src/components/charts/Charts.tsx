@@ -5,6 +5,7 @@ import {
 import { useEffect, useState } from "react";
 import { formatMoney } from "@/lib/money";
 import { formatDate, shortMonth } from "@/lib/dates";
+import { phrase } from "@/lib/i18n/phrase";
 
 /** Aktuální barva zvýraznění (mění se podle zvoleného vzhledu). */
 function useAccent(): { gold: string; bright: string } {
@@ -95,10 +96,10 @@ export function IncomeExpenseChart({ data }: { data: { month: string; start: str
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }} barGap={2} barCategoryGap="28%">
             <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
-            <XAxis dataKey="start" {...AXIS} tickFormatter={shortMonth} />
+            <XAxis dataKey="start" {...AXIS} tickFormatter={(d: string) => phrase(shortMonth(d))} />
             <YAxis {...AXIS} width={52} tickFormatter={compact} />
             <Tooltip cursor={{ fill: "rgba(255,255,255,0.04)" }} content={({ active, payload }) => active && payload?.length ? (
-              <TooltipBox title={shortMonth(payload[0].payload.start)} rows={[
+              <TooltipBox title={phrase(shortMonth(payload[0].payload.start))} rows={[
                 { label: "Příjmy", value: payload[0].payload.income, color: INCOME },
                 { label: "Výdaje", value: payload[0].payload.expense, color: EXPENSE },
                 { label: "Rozdíl", value: payload[0].payload.income - payload[0].payload.expense },

@@ -1,3 +1,4 @@
+import { getLocale } from "@/lib/i18n/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { apiContext } from "@/lib/context";
@@ -56,7 +57,7 @@ export async function POST(req: Request) {
   const travel = data.travel;
   const env: ToolEnv = { data, snapshot, today, travel, drafts: [] };
   const me = data.members.find((m) => m.user_id === ctx.user.id)?.name ?? ctx.user.email.split("@")[0];
-  const system = systemPrompt(env, ctx.household.name, me);
+  const system = systemPrompt(env, ctx.household.name, me, await getLocale());
   client ??= new Anthropic({ timeout: 55_000, maxRetries: 1 });
 
   const enc = new TextEncoder();

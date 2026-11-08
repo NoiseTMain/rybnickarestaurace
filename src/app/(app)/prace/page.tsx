@@ -1,3 +1,4 @@
+import { phrase } from "@/lib/i18n/phrase";
 import { Download, RotateCcw, Trash2, XCircle } from "lucide-react";
 import { requireContext } from "@/lib/context";
 import { ReadOnlyNotice } from "@/components/ui/ReadOnlyNotice";
@@ -51,7 +52,7 @@ export default async function WorkPage({ searchParams }: { searchParams: Promise
     ? groupBy(inPeriod(data.shifts, addDays(today, -29), today), "day").map((a) => ({ label: `${Number(a.key.slice(8))}.${Number(a.key.slice(5, 7))}.`, net: a.net, hours: a.minutes / 60 }))
     : view === "tyden"
       ? groupBy(inPeriod(data.shifts, addDays(startOfWeek(today), -7 * 11), today), "week").map((a) => ({ label: `${Number(a.key.slice(8))}.${Number(a.key.slice(5, 7))}.`, net: a.net, hours: a.minutes / 60 }))
-      : groupBy(data.shifts, "month").slice(-12).map((a) => ({ label: shortMonth(`${a.key}-01`), net: a.net, hours: a.minutes / 60 }));
+      : groupBy(data.shifts, "month").slice(-12).map((a) => ({ label: phrase(shortMonth(`${a.key}-01`)), net: a.net, hours: a.minutes / 60 }));
   const monthShifts = inPeriod(data.shifts, mFrom, mTo);
   const monthAgg = aggregate("sel", monthShifts);
   const payouts = data.payouts.map((p) => payoutView(p, today));
