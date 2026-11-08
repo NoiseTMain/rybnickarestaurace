@@ -4,6 +4,8 @@ import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, Crown, LogOut, Menu, ShieldCheck, X, FlaskConical } from "lucide-react";
 import { useLookups } from "@/components/Lookups";
+import { useT } from "@/components/I18n";
+import type { Key } from "@/lib/i18n/dict";
 import { sectionOfHref } from "@/lib/profiles";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -67,8 +69,9 @@ function HouseholdSwitcher({ household, households }: Pick<ShellProps, "househol
 
 function NavList({ path, onNavigate }: { path: string; onNavigate?: () => void }) {
   const { isAdmin, premium, hiddenSections = [] } = useLookups();
+  const { t } = useT();
   const visible = NAV.filter((n) => { const k = sectionOfHref(n.href); return !k || !hiddenSections.includes(k); });
-  const items = [...visible.slice(0, -1), { href: "/premium", label: premium ? "Premium" : "Získat Premium", icon: Crown }, ...(isAdmin ? [{ href: "/admin", label: "Administrace", icon: ShieldCheck }] : []), visible[visible.length - 1]];
+  const items = [...visible.slice(0, -1).map((n) => ({ ...n, label: t(`nav.${n.href}` as Key) })), { href: "/premium", label: premium ? t("nav.premium") : t("nav.getPremium"), icon: Crown }, ...(isAdmin ? [{ href: "/admin", label: t("nav.admin"), icon: ShieldCheck }] : []), { ...visible[visible.length - 1], label: t(`nav.${visible[visible.length - 1].href}` as Key) }];
   return (
     <nav className="space-y-0.5" aria-label="Hlavní navigace">
       {items.map((n) => {
@@ -88,25 +91,27 @@ function NavList({ path, onNavigate }: { path: string; onNavigate?: () => void }
 /** Šipka zpět na každé podstránce (na Přehledu se nezobrazuje). */
 function BackButton({ path }: { path: string }) {
   const router = useRouter();
+  const { t } = useT();
   if (path === "/") return <span />;
   const parent = path.split("/").slice(0, -1).join("/") || "/";
   return (
     <button type="button" onClick={() => (window.history.length > 1 ? router.back() : router.push(parent))}
-      className="flex items-center gap-1 rounded-full px-2 py-1 text-sm text-ink-2 hover:bg-white/[0.06] hover:text-ink" aria-label="Zpět">
-      <ArrowLeft className="h-4 w-4" />Zpět
+      className="flex items-center gap-1 rounded-full px-2 py-1 text-sm text-ink-2 hover:bg-white/[0.06] hover:text-ink" aria-label={t("shell.back")}>
+      <ArrowLeft className="h-4 w-4" />{t("shell.back")}
     </button>
   );
 }
 
 export function Shell({ children, email, household, households, mode }: ShellProps) {
   const path = usePathname();
+  const { t } = useT();
   const [drawer, setDrawer] = useState(false);
   const footer = (
     <div className="space-y-2 border-t border-white/[0.06] pt-3">
       {mode === "local" && <p className="rounded-xl bg-info/10 px-3 py-2 text-[11px] leading-snug text-info">Lokální režim – data jsou v souboru na tomto počítači. Pro produkci nastavte Supabase.</p>}
       <div className="flex items-center gap-2 px-1">
         <span className="min-w-0 flex-1 truncate text-xs text-ink-3">{email}</span>
-        <form action={signOut} onSubmit={() => navigator.serviceWorker?.controller?.postMessage("clear")}><button className="rounded-full p-2 text-ink-3 hover:bg-white/10 hover:text-ink" aria-label="Odhlásit se" title="Odhlásit se"><LogOut className="h-4 w-4" /></button></form>
+        <form action={signOut} onSubmit={() => navigator.serviceWorker?.controller?.postMessage("clear")}><button className="rounded-full p-2 text-ink-3 hover:bg-white/10 hover:text-ink" aria-label={t("shell.logout")} title={t("shell.logout")}><LogOut className="h-4 w-4" /></button></form>
       </div>
     </div>
   );
@@ -147,7 +152,7 @@ export function Shell({ children, email, household, households, mode }: ShellPro
         {household.is_demo && (
           <div className="mx-3 mt-3 flex items-center gap-2 rounded-2xl border border-warn/30 bg-warn/10 px-4 py-2 text-sm text-warn lg:mr-3">
             <FlaskConical className="h-4 w-4 shrink-0" />
-            <span>Prohlížíte <b>ukázkovou (DEMO) domácnost</b> s vymyšlenými daty. Vaše skutečné finance jsou oddělené.</span>
+            <span>{t("shell.demo")}</span>
           </div>
         )}
         <div className="mx-auto flex max-w-[1400px] items-center justify-between px-4 pt-3 sm:px-6 lg:pt-5">
@@ -166,11 +171,11 @@ export function Shell({ children, email, household, households, mode }: ShellPro
             return (
               <Link key={href} href={href} className={cn("flex flex-col items-center gap-1 py-2.5 text-[10px]", active ? "text-gold" : "text-ink-3")}>
                 <n.icon className="h-5 w-5" />
-                {{ "/": "Přehled", "/transakce": "Pohyby", "/rozpocty": "Rozpočty", "/asistent": "Asistent" }[href] ?? n.label}
+                {t(`tab.${href}` as Key)}
               </Link>
             );
           })}
-          <button type="button" onClick={() => setDrawer(true)} className="flex flex-col items-center gap-1 py-2.5 text-[10px] text-ink-3"><Menu className="h-5 w-5" />Více</button>
+          <button type="button" onClick={() => setDrawer(true)} className="flex flex-col items-center gap-1 py-2.5 text-[10px] text-ink-3"><Menu className="h-5 w-5" />{t("tab.more")}</button>
         </div>
       </nav>
       <QuickAdd floating />

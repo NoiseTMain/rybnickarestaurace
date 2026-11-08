@@ -7,6 +7,7 @@ import { saveTransaction } from "@/lib/actions/transactions";
 import { initialResult } from "@/lib/actions/result";
 import { OFFLINE_EVENT, readQueue, removeFromQueue } from "@/lib/offline-queue";
 import { useToast } from "@/components/ui/Toast";
+import { useT } from "@/components/I18n";
 
 const subscribe = (cb: () => void) => {
   window.addEventListener("online", cb);
@@ -20,6 +21,7 @@ export function OfflineSync() {
   const online = useSyncExternalStore(subscribe, () => navigator.onLine, () => true);
   const pending = useSyncExternalStore(subscribe, () => readQueue().length, () => 0);
   const toast = useToast();
+  const { t } = useT();
   const router = useRouter();
   const busy = useRef(false);
 
@@ -52,7 +54,7 @@ export function OfflineSync() {
   return (
     <div className="fixed inset-x-0 top-[env(safe-area-inset-top)] z-50 mx-auto mt-2 flex w-fit max-w-[92vw] items-center gap-2 rounded-full border border-warn/30 bg-[#1b1407]/95 px-4 py-1.5 text-xs text-warn shadow-lg" role="status">
       {online ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <CloudOff className="h-3.5 w-3.5" />}
-      {online ? `Odesílám ${pending} záznamů…` : `Jste offline${pending ? ` · ${pending} čeká na odeslání` : " – výdaje můžete zapisovat, odešlou se po připojení"}`}
+      {online ? t("offline.sending", { n: pending }) : `${t("offline.off")}${pending ? ` · ${t("offline.pending", { n: pending })}` : t("offline.canWrite")}`}
     </div>
   );
 }

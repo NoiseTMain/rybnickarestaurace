@@ -4,6 +4,8 @@ import "@fontsource-variable/inter";
 import "@fontsource-variable/manrope";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
+import { I18nProvider } from "@/components/I18n";
+import { getLocale } from "@/lib/i18n/server";
 import { BACKGROUNDS, THEME_COOKIE, parseTheme, rootFontSize, sceneUrl, themeVars } from "@/lib/theme";
 
 export const metadata: Metadata = {
@@ -21,9 +23,10 @@ export async function generateViewport(): Promise<Viewport> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
   const scene = sceneUrl(theme);
+  const locale = await getLocale();
   return (
     <html
-      lang="cs"
+      lang={locale}
       data-accent={theme.accent}
       data-bg={theme.bg}
       data-privacy={theme.privacy ? "1" : "0"}
@@ -33,7 +36,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         <div className="ambient" aria-hidden />
         <div id="ambient-scene" className="ambient-scene" aria-hidden style={scene ? { backgroundImage: `url("${scene}")` } : { display: "none" }} />
-        <ToastProvider>{children}</ToastProvider>
+        <I18nProvider locale={locale}><ToastProvider>{children}</ToastProvider></I18nProvider>
       </body>
     </html>
   );

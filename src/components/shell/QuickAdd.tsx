@@ -10,6 +10,7 @@ import { ShiftForm } from "@/components/forms/WorkForms";
 import { ContributionForm } from "@/components/forms/SavingsForms";
 import { cn } from "@/components/ui/cn";
 import { useLookups } from "@/components/Lookups";
+import { useT } from "@/components/I18n";
 import Link from "next/link";
 import { ExpenseForm } from "@/components/travel/TripForms";
 
@@ -60,6 +61,7 @@ export function QuickAdd({ floating }: { floating?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setForm(null), []);
   const { icoActive, activeTrips = [] } = useLookups();
+  const { t } = useT();
   useEffect(() => {
     if (!menu) return;
     const h = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setMenu(false); };
@@ -72,14 +74,14 @@ export function QuickAdd({ floating }: { floating?: boolean }) {
         type="button"
         onClick={() => setMenu((m) => !m)}
         aria-expanded={menu}
-        aria-label="Rychle přidat"
+        aria-label={t("shell.quickAdd")}
         className={cn(
           "flex items-center justify-center rounded-full bg-gradient-to-b from-gold-bright to-gold text-[#1b1407] shadow-[0_10px_30px_-8px_rgb(var(--accent-rgb)/0.7)] transition active:scale-95",
           floating ? "h-14 w-14" : "h-10 gap-2 px-4 text-sm font-semibold",
         )}
       >
         <Plus className={cn("transition-transform", menu && "rotate-45", floating ? "h-6 w-6" : "h-4 w-4")} />
-        {!floating && "Přidat"}
+        {!floating && t("shell.add")}
       </button>
       <AnimatePresence>
         {menu && (
@@ -93,7 +95,7 @@ export function QuickAdd({ floating }: { floating?: boolean }) {
             {ITEMS.filter((i) => i.key !== "trip" || activeTrips.length > 0).map((i) => (
               <button key={i.key} role="menuitem" type="button" onClick={() => { setMenu(false); setForm(i.key); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-white/[0.07]">
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] text-gold"><i.icon className="h-4 w-4" /></span>
-                {i.label}
+                {t(`quick.${i.key}` as "quick.trip")}
               </button>
             ))}
           </motion.div>

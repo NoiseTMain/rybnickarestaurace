@@ -23,6 +23,8 @@ import { DASH_COOKIE } from "@/lib/dashboard-mode";
 import { cookies } from "next/headers";
 import { getPremium } from "@/lib/premium";
 import { getPrefs } from "@/lib/prefs";
+import { getT } from "@/lib/i18n/server";
+import { daysWord } from "@/lib/i18n/dict";
 import { ProfileTips } from "@/components/dashboard/ProfileTips";
 import { monthlyClosing } from "@/lib/finance/closing";
 import { addMonths as addM, startOfMonth as som } from "@/lib/dates";
@@ -47,7 +49,8 @@ export default async function DashboardPage() {
   const insights = buildInsights(s, data).filter((i) => !i.id.startsWith("missing"));
   const greetingName = data.members.find((m) => m.user_id === ctx.user.id)?.name.replace(/\s*\(demo\)/, "");
   const hour = Number(new Intl.DateTimeFormat("cs-CZ", { hour: "numeric", timeZone: "Europe/Prague" }).format(new Date()));
-  const greeting = hour < 10 ? "Dobré ráno" : hour < 18 ? "Dobrý den" : "Dobrý večer";
+  const { t, locale } = await getT();
+  const greeting = hour < 10 ? t("dash.morning") : hour < 18 ? t("dash.day") : t("dash.evening");
   const householdCats = s.household.byCategory.slice(0, 6);
   const icoActive = Boolean(data.settings?.billing_ico && data.settings.ico_activated_at);
   const spentPct = s.month.income > 0 ? Math.round(percent(s.month.expense, s.month.income)) : null;
@@ -55,7 +58,7 @@ export default async function DashboardPage() {
   const greetingBlock = (
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div>
-        <p className="text-sm text-ink-3">{monthName(today)} · zbývá {s.daysLeftInMonth} {s.daysLeftInMonth === 1 ? "den" : s.daysLeftInMonth < 5 ? "dny" : "dní"}</p>
+        <p className="text-sm text-ink-3">{monthName(today)} · {t("dash.daysLeft", { n: daysWord(locale, s.daysLeftInMonth) })}</p>
         <h1 className="font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight sm:text-4xl">{greeting}{greetingName ? `, ${greetingName}` : ""}</h1>
       </div>
       <DashboardMode mode={mode} />
@@ -92,7 +95,7 @@ export default async function DashboardPage() {
         {missingBlock}
         {closingBlock}
         <ProfileTips profile={prefs.profile} premium={premium.household} />
-        <SimpleDashboard s={s} today={today} insights={insights} categories={s.month.byCategory.map((c) => ({ name: catName(c.categoryId), amount: c.amount }))}
+        <SimpleDashboard locale={locale} s={s} today={today} insights={insights} categories={s.month.byCategory.map((c) => ({ name: catName(c.categoryId), amount: c.amount }))}
           extra={premium.household && trips.some((t) => t.s.status === "upcoming" || t.s.status === "ongoing") ? <TravelCard items={trips} today={today} /> : null} />
       </div>
     );
@@ -104,7 +107,7 @@ export default async function DashboardPage() {
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div className="space-y-2">
           <div>
-            <p className="text-sm text-ink-3">{monthName(today)} · zbývá {s.daysLeftInMonth} {s.daysLeftInMonth === 1 ? "den" : s.daysLeftInMonth < 5 ? "dny" : "dní"}</p>
+            <p className="text-sm text-ink-3">{monthName(today)} · {t("dash.daysLeft", { n: daysWord(locale, s.daysLeftInMonth) })}</p>
             <h1 className="font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight sm:text-4xl">{greeting}{greetingName ? `, ${greetingName}` : ""}</h1>
           </div>
           <DashboardMode mode={mode} />

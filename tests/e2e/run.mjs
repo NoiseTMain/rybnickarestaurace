@@ -848,6 +848,26 @@ await op.locator("[role=status]", { hasText: "Uloženo" }).first().waitFor();
 await op.reload();
 await op.locator("aside nav").getByRole("link", { name: "Faktury" }).waitFor();
 
+step("jazyk: slovenčina a angličtina, zpět čeština");
+await op.goto(B + "/nastaveni#jazyk");
+await op.getByRole("radio", { name: "Slovenčina" }).first().click();
+await op.locator("aside nav").getByRole("link", { name: "Príjmy a výdavky" }).waitFor();
+await op.getByRole("radio", { name: "English" }).first().click();
+await op.locator("aside nav").getByRole("link", { name: "Income & expenses" }).waitFor();
+await op.goto(B + "/");
+await op.getByRole("radio", { name: "Simple" }).click();
+await op.getByText("you can still safely spend").waitFor();
+await op.goto(B + "/nastaveni#jazyk");
+await op.getByRole("radio", { name: "Čeština" }).first().click();
+await op.locator("aside nav").getByRole("link", { name: "Příjmy a výdaje" }).waitFor();
+{
+  const sk = await browser.newContext({ locale: "sk-SK" });
+  const sp = await sk.newPage();
+  await sp.goto(B + "/vitejte");
+  await sp.getByText("Viete, koľko si môžete dovoliť.").waitFor();
+  await sk.close();
+}
+
 step("smazání účtu (GDPR)");
 await op.goto(B + "/nastaveni#ucet");
 await op.getByRole("button", { name: "Smazat účet…" }).click();
