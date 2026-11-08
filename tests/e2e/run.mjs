@@ -69,6 +69,14 @@ await page.getByText("Shrnutí").waitFor();
 await page.getByRole("button", { name: "Dokončit nastavení" }).click();
 await page.waitForURL((u) => u.pathname === "/", { timeout: 30000 });
 
+step("jednoduchý přehled: jedna jasná odpověď, přepnutí na podrobný");
+await page.getByText("můžete ještě v klidu utratit").waitFor();
+await page.getByText("Co to znamená?").first().click();
+await page.getByText(/Je to částka, kterou můžete utratit za cokoli navíc/).waitFor();
+await page.getByText("Na účtech teď máte").waitFor();
+await page.getByRole("radio", { name: "Podrobný" }).click();
+await page.getByText("Skutečně volné").waitFor();
+
 step("přehled ukazuje zadané údaje (očekávaný příjem se nepočítá)");
 assert.equal(await stat("Disponibilní"), 50000);
 assert.equal(await stat("Příjem tento měsíc"), 0);
@@ -278,6 +286,7 @@ await page.screenshot({ path: `${SHOTS}/02-demo.png`, fullPage: true });
 
 step("cizí uživatel nevidí data");
 const other = await browser.newContext();
+await other.addCookies([{ name: "homeos_dash", value: "detailed", url: B }]); // podrobný Přehled
 const op = await other.newPage();
 await op.goto(B + "/registrace");
 await op.fill("input[name=email]", "cizi@example.cz");

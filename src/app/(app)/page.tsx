@@ -17,6 +17,10 @@ import { CardLink, InsightItem, KV, Stat } from "@/components/dashboard/bits";
 import { PayOccurrenceButton } from "@/components/forms/PaymentForms";
 import { effectiveExpenses, summarizeTrip } from "@/lib/finance/travel";
 import { OngoingTripBanner, TravelCard } from "@/components/dashboard/TravelCard";
+import { SimpleDashboard } from "@/components/dashboard/SimpleDashboard";
+import { DashboardMode } from "@/components/dashboard/DashboardMode";
+import { DASH_COOKIE } from "@/lib/dashboard-mode";
+import { cookies } from "next/headers";
 
 export const metadata = { title: "Přehled" };
 
@@ -41,14 +45,49 @@ export default async function DashboardPage() {
   const householdCats = s.household.byCategory.slice(0, 6);
   const icoActive = Boolean(data.settings?.billing_ico && data.settings.ico_activated_at);
   const spentPct = s.month.income > 0 ? Math.round(percent(s.month.expense, s.month.income)) : null;
+  const mode = (await cookies()).get(DASH_COOKIE)?.value === "detailed" ? "detailed" : "simple";
+  const greetingBlock = (
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <p className="text-sm text-ink-3">{monthName(today)} · zbývá {s.daysLeftInMonth} {s.daysLeftInMonth === 1 ? "den" : s.daysLeftInMonth < 5 ? "dny" : "dní"}</p>
+        <h1 className="font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight sm:text-4xl">{greeting}{greetingName ? `, ${greetingName}` : ""}</h1>
+      </div>
+      <DashboardMode mode={mode} />
+    </div>
+  );
+  const missingBlock = s.missing.length > 0 && (
+    <Card variant="light">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <AlertTriangle className="h-5 w-5 shrink-0 text-gold-bright" />
+        <div className="flex-1 text-sm">
+          <b>Aby čísla seděla, doplňte prosím:</b>{" "}
+          {s.missing.map((m, i) => <span key={m.code}>{i > 0 && " · "}<Link href={m.href} className="underline underline-offset-2">{m.message}</Link></span>)}
+        </div>
+      </div>
+    </Card>
+  );
+  if (mode === "simple") {
+    return (
+      <div className="space-y-4">
+        {greetingBlock}
+        {ongoing && <OngoingTripBanner item={ongoing} today={today} />}
+        {missingBlock}
+        <SimpleDashboard s={s} today={today} insights={insights} categories={s.month.byCategory.map((c) => ({ name: catName(c.categoryId), amount: c.amount }))}
+          extra={trips.some((t) => t.s.status === "upcoming" || t.s.status === "ongoing") ? <TravelCard items={trips} today={today} /> : null} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
       {/* hlavička jako na referenčním dashboardu */}
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <p className="text-sm text-ink-3">{monthName(today)} · zbývá {s.daysLeftInMonth} {s.daysLeftInMonth === 1 ? "den" : s.daysLeftInMonth < 5 ? "dny" : "dní"}</p>
-          <h1 className="font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight sm:text-4xl">{greeting}{greetingName ? `, ${greetingName}` : ""}</h1>
+        <div className="space-y-2">
+          <div>
+            <p className="text-sm text-ink-3">{monthName(today)} · zbývá {s.daysLeftInMonth} {s.daysLeftInMonth === 1 ? "den" : s.daysLeftInMonth < 5 ? "dny" : "dní"}</p>
+            <h1 className="font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight sm:text-4xl">{greeting}{greetingName ? `, ${greetingName}` : ""}</h1>
+          </div>
+          <DashboardMode mode={mode} />
         </div>
         <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
           <Stat big label="Disponibilní zůstatek" value={s.planner.available} info="Peníze na běžných účtech a v hotovosti mínus částky odložené na cíle. Očekávané příjmy nejsou započteny." />
