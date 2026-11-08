@@ -103,7 +103,7 @@ function canSee(data: LocalData, userId: string, table: TableName, row: Record<s
   const members = memberHouseholds(data, userId);
   if (table === "households") return members.has(row.id as string) || row.created_by === userId;
   if (table === "household_invites") return ownerHouseholds(data, userId).has(row.household_id as string);
-  if (table === "push_subscriptions" || table === "subscriptions" || table === "ai_usage") return row.user_id === userId;
+  if (table === "push_subscriptions" || table === "subscriptions" || table === "ai_usage" || table === "user_prefs") return row.user_id === userId;
   if (table === "admin_audit") return false;
   return members.has(row.household_id as string);
 }
@@ -150,6 +150,7 @@ function canWrite(data: LocalData, userId: string, table: TableName, row: Record
   if (table === "household_invites") return ownerHouseholds(data, userId).has(row.household_id as string);
   if (table === "push_subscriptions") return row.user_id === userId && memberHouseholds(data, userId).has(row.household_id as string) && (op === "delete" || localHouseholdPremium(data, row.household_id as string));
   if (table === "subscriptions" || table === "admin_audit" || table === "ai_usage") return false; // zapisuje jen server
+  if (table === "user_prefs") return row.user_id === userId;
   const hid = row.household_id as string;
   if (!memberHouseholds(data, userId).has(hid)) return false;
   if (PREMIUM_TABLES.has(table) && op !== "delete" && !localHouseholdPremium(data, hid)) return false;

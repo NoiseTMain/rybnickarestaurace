@@ -571,6 +571,19 @@ export interface AdminAudit {
   created_at: string;
 }
 
+export type LifeProfile = "family" | "couple" | "single" | "single_parent" | "student" | "senior" | "entrepreneur" | "freelancer" | "courier";
+export type Locale = "cs" | "sk" | "en";
+
+export interface UserPrefs {
+  user_id: string;
+  profile: LifeProfile | null;
+  hidden_sections: string[];
+  locale: Locale;
+  promo_seen_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AiUsage {
   user_id: string;
   month: string;
@@ -624,6 +637,7 @@ export interface Tables {
   subscriptions: Subscription;
   admin_audit: AdminAudit;
   ai_usage: AiUsage;
+  user_prefs: UserPrefs;
 }
 
 export type TableName = keyof Tables;

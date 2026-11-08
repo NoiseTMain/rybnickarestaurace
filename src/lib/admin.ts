@@ -53,6 +53,11 @@ export interface AdminBackend {
   auditLog(limit?: number): Promise<AdminAudit[]>;
   aiUsage(month: string): Promise<{ user_id: string; count: number }[]>;
   setBanned(userId: string, banned: boolean): Promise<void>;
+  /** Zkušební období: bylo už pro tento e-mail (hash) využito? */
+  trialClaimed(emailHash: string): Promise<boolean>;
+  claimTrial(emailHash: string, userId: string, card: string | null): Promise<void>;
+  /** Byla už stejná karta použita na zkušební období u jiného účtu? */
+  trialCardUsed(card: string, userId: string): Promise<boolean>;
   /** Smaže účet: domácnosti, kde byl jediný, smaže; jinde předá vlastnictví dalšímu členovi. */
   deleteUser(userId: string): Promise<void>;
 }
@@ -148,6 +153,17 @@ function supabaseBackend(): AdminBackend {
       const { data } = await db.from("ai_usage").select("user_id,count").eq("month", month);
       return (data ?? []) as { user_id: string; count: number }[];
     },
+    async trialClaimed(hash) {
+      const { data } = await db.from("trial_claims").select("email_hash").eq("email_hash", hash).maybeSingle();
+      return Boolean(data);
+    },
+    async claimTrial(hash, userId, card) {
+      await db.from("trial_claims").upsert({ email_hash: hash, user_id: userId, card }, { onConflict: "email_hash", ignoreDuplicates: true });
+    },
+    async trialCardUsed(card, userId) {
+      const { data } = await db.from("trial_claims").select("user_id").eq("card", card).neq("user_id", userId).limit(1);
+      return Boolean(data?.length);
+    },
     async setBanned(userId, banned) {
       const { error } = await db.auth.admin.updateUserById(userId, { ban_duration: banned ? "876000h" : "none" });
       if (error) throw new Error(error.message);
@@ -229,6 +245,9 @@ async function localBackend(): Promise<AdminBackend> {
     audit: (row) => writeLocal((d) => { t(d as never, "admin_audit").push({ id: randomUUID(), created_at: new Date().toISOString(), ...row }); }),
     auditLog: (limit = 100) => readLocal((d) => [...t(d as never, "admin_audit")].reverse().slice(0, limit) as unknown as AdminAudit[]),
     aiUsage: (month) => readLocal((d) => t(d as never, "ai_usage").filter((r) => r.month === month).map((r) => ({ user_id: r.user_id as string, count: r.count as number }))),
+    trialClaimed: (hash) => readLocal((d) => t(d as never, "trial_claims").some((r) => r.email_hash === hash)),
+    claimTrial: (hash, userId, card) => writeLocal((d) => { const l = t(d as never, "trial_claims"); if (!l.some((r) => r.email_hash === hash)) l.push({ email_hash: hash, user_id: userId, card, created_at: new Date().toISOString() }); }),
+    trialCardUsed: (card, userId) => readLocal((d) => t(d as never, "trial_claims").some((r) => r.card === card && r.user_id !== userId)),
     setBanned: (userId, banned) => writeLocal((d) => { const u = d.users.find((x) => x.id === userId) as unknown as Any | undefined; if (u) u.banned = banned; }),
     deleteUser: (userId) => writeLocal((d) => {
       d.users = d.users.filter((u) => u.id !== userId);

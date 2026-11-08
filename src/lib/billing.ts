@@ -1,5 +1,5 @@
 import "server-only";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import type { Subscription } from "@/lib/db/types";
 
 /**
@@ -13,8 +13,22 @@ export function billingConfigured(): boolean {
   return Boolean(e.LEMONSQUEEZY_API_KEY && e.LEMONSQUEEZY_STORE_ID && e.LEMONSQUEEZY_VARIANT_MONTHLY && e.LEMONSQUEEZY_VARIANT_YEARLY && e.LEMONSQUEEZY_WEBHOOK_SECRET);
 }
 
-export async function createCheckoutUrl(p: { userId: string; email: string; plan: "monthly" | "yearly"; redirectUrl: string }): Promise<string> {
-  const variant = p.plan === "yearly" ? process.env.LEMONSQUEEZY_VARIANT_YEARLY! : process.env.LEMONSQUEEZY_VARIANT_MONTHLY!;
+/** Varianty se zkušební dobou 3 dny (v Lemon Squeezy: Free trial = 3 dny, vyžaduje kartu). Nepovinné. */
+export function trialConfigured(plan: "monthly" | "yearly"): boolean {
+  return Boolean(plan === "yearly" ? process.env.LEMONSQUEEZY_VARIANT_YEARLY_TRIAL : process.env.LEMONSQUEEZY_VARIANT_MONTHLY_TRIAL);
+}
+
+export const TRIAL_DAYS = 3;
+
+/** Hash e-mailu pro evidenci využitého zkušebního období (e-mail se neukládá v čitelné podobě). */
+export function emailHash(email: string): string {
+  return createHash("sha256").update(`homeos-trial:${email.trim().toLowerCase()}`).digest("hex");
+}
+
+export async function createCheckoutUrl(p: { userId: string; email: string; plan: "monthly" | "yearly"; redirectUrl: string; trial?: boolean }): Promise<string> {
+  const variant = p.trial && trialConfigured(p.plan)
+    ? (p.plan === "yearly" ? process.env.LEMONSQUEEZY_VARIANT_YEARLY_TRIAL! : process.env.LEMONSQUEEZY_VARIANT_MONTHLY_TRIAL!)
+    : p.plan === "yearly" ? process.env.LEMONSQUEEZY_VARIANT_YEARLY! : process.env.LEMONSQUEEZY_VARIANT_MONTHLY!;
   const r = await fetch("https://api.lemonsqueezy.com/v1/checkouts", {
     method: "POST",
     headers: { Accept: "application/vnd.api+json", "Content-Type": "application/vnd.api+json", Authorization: `Bearer ${process.env.LEMONSQUEEZY_API_KEY}` },
@@ -62,7 +76,8 @@ export function subscriptionFromWebhook(w: LsWebhook): (Partial<Subscription> & 
   const allowed = ["active", "on_trial", "past_due", "paused", "cancelled", "expired", "unpaid"];
   if (!allowed.includes(status)) return null;
   const variantId = String(a.variant_id ?? "");
-  const variant = variantId && variantId === String(process.env.LEMONSQUEEZY_VARIANT_YEARLY) ? "yearly" : "monthly";
+  const yearly = [process.env.LEMONSQUEEZY_VARIANT_YEARLY, process.env.LEMONSQUEEZY_VARIANT_YEARLY_TRIAL].filter(Boolean).map(String);
+  const variant = variantId && yearly.includes(variantId) ? "yearly" : "monthly";
   const urls = (a.urls ?? {}) as { customer_portal?: string };
   return {
     provider_subscription_id: String(w.data.id),

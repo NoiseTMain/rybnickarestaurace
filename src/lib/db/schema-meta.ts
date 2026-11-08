@@ -17,6 +17,7 @@ const posted = (col: string) => (r: Record<string, unknown>) => r[col] != null &
 
 export const UNIQUE: Partial<Record<TableName, UniqueConstraint[]>> = {
   household_users: [{ columns: ["household_id", "user_id"], message: "Uživatel už je členem domácnosti." }],
+  user_prefs: [{ columns: ["user_id"], message: "Předvolby už existují." }],
   household_invites: [{ columns: ["code"], message: "Kód pozvánky už existuje." }],
   household_settings: [{ columns: ["household_id"], message: "Nastavení už existuje." }],
   work_settings: [{ columns: ["household_id"], message: "Nastavení práce už existuje." }],
@@ -140,4 +141,4 @@ export const REFS: Partial<Record<TableName, Ref[]>> = {
   ],
 };
 
-export const TABLES_WITH_UPDATED_AT: TableName[] = ["transactions", "household_settings", "work_settings"];
+export const TABLES_WITH_UPDATED_AT: TableName[] = ["transactions", "household_settings", "work_settings", "user_prefs"];

@@ -4,6 +4,9 @@ import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, Crown, LogOut, Menu, ShieldCheck, X, FlaskConical } from "lucide-react";
 import { useLookups } from "@/components/Lookups";
+import { sectionOfHref } from "@/lib/profiles";
+import { useRouter } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import { useState, useTransition, type ReactNode } from "react";
 import { signOut } from "@/lib/actions/auth";
 import { switchHousehold } from "@/lib/actions/household";
@@ -63,8 +66,9 @@ function HouseholdSwitcher({ household, households }: Pick<ShellProps, "househol
 }
 
 function NavList({ path, onNavigate }: { path: string; onNavigate?: () => void }) {
-  const { isAdmin, premium } = useLookups();
-  const items = [...NAV.slice(0, -1), { href: "/premium", label: premium ? "Premium" : "Získat Premium", icon: Crown }, ...(isAdmin ? [{ href: "/admin", label: "Administrace", icon: ShieldCheck }] : []), NAV[NAV.length - 1]];
+  const { isAdmin, premium, hiddenSections = [] } = useLookups();
+  const visible = NAV.filter((n) => { const k = sectionOfHref(n.href); return !k || !hiddenSections.includes(k); });
+  const items = [...visible.slice(0, -1), { href: "/premium", label: premium ? "Premium" : "Získat Premium", icon: Crown }, ...(isAdmin ? [{ href: "/admin", label: "Administrace", icon: ShieldCheck }] : []), visible[visible.length - 1]];
   return (
     <nav className="space-y-0.5" aria-label="Hlavní navigace">
       {items.map((n) => {
@@ -78,6 +82,19 @@ function NavList({ path, onNavigate }: { path: string; onNavigate?: () => void }
         );
       })}
     </nav>
+  );
+}
+
+/** Šipka zpět na každé podstránce (na Přehledu se nezobrazuje). */
+function BackButton({ path }: { path: string }) {
+  const router = useRouter();
+  if (path === "/") return <span />;
+  const parent = path.split("/").slice(0, -1).join("/") || "/";
+  return (
+    <button type="button" onClick={() => (window.history.length > 1 ? router.back() : router.push(parent))}
+      className="flex items-center gap-1 rounded-full px-2 py-1 text-sm text-ink-2 hover:bg-white/[0.06] hover:text-ink" aria-label="Zpět">
+      <ArrowLeft className="h-4 w-4" />Zpět
+    </button>
   );
 }
 
@@ -133,7 +150,10 @@ export function Shell({ children, email, household, households, mode }: ShellPro
             <span>Prohlížíte <b>ukázkovou (DEMO) domácnost</b> s vymyšlenými daty. Vaše skutečné finance jsou oddělené.</span>
           </div>
         )}
-        <div className="mx-auto hidden max-w-[1400px] justify-end px-6 pt-5 lg:flex"><QuickAdd /></div>
+        <div className="mx-auto flex max-w-[1400px] items-center justify-between px-4 pt-3 sm:px-6 lg:pt-5">
+          <BackButton path={path} />
+          <div className="hidden lg:block"><QuickAdd /></div>
+        </div>
         <main className="mx-auto max-w-[1400px] px-4 pb-32 pt-4 sm:px-6 lg:pb-12 lg:pt-0">{children}</main>
       </div>
 

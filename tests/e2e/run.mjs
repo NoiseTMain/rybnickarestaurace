@@ -70,8 +70,22 @@ await page.getByText("Shrnutí").waitFor();
 await page.getByRole("button", { name: "Dokončit nastavení" }).click();
 await page.waitForURL((u) => u.pathname === "/", { timeout: 30000 });
 
+step("po registraci nabídka Premium – zavřít jde až po 10 vteřinách");
+await page.getByText("Vítejte! Vyzkoušejte Premium").waitFor();
+assert.equal(await page.getByRole("button", { name: /Pokračovat zdarma \(za/ }).isDisabled(), true, "zavřít hned nejde");
+await page.waitForTimeout(3000);
+assert.equal(await page.getByText("Vítejte! Vyzkoušejte Premium").isVisible(), true, "okno je stále otevřené");
+await page.getByRole("button", { name: "Pokračovat zdarma", exact: true }).click({ timeout: 15000 });
+await page.getByText("Vítejte! Vyzkoušejte Premium").waitFor({ state: "detached" });
+await page.reload();
+await page.getByText("můžete ještě v klidu utratit").waitFor();
+assert.equal(await page.getByText("Vítejte! Vyzkoušejte Premium").count(), 0, "nabídka se ukáže jen jednou");
+
 step("jednoduchý přehled: jedna jasná odpověď, přepnutí na podrobný");
 await page.getByText("můžete ještě v klidu utratit").waitFor();
+await page.goto(B + "/transakce");
+await page.getByRole("button", { name: "Zpět" }).click();
+await page.waitForURL((u) => u.pathname === "/");
 await page.getByText("Co to znamená?").first().click();
 await page.getByText(/Je to částka, kterou můžete utratit za cokoli navíc/).waitFor();
 await page.getByText("Na účtech teď máte").waitFor();
@@ -82,7 +96,7 @@ step("verze zdarma: cestování a AI jsou Premium, úvodní stránka pro nepřih
 await page.goto(B + "/cestovani");
 await page.getByText("Cestování je součástí Premium").waitFor();
 await page.goto(B + "/premium");
-await page.getByText("Online platby zatím nejsou spuštěné").waitFor();
+await page.getByText("Online platby se právě spouštějí").waitFor();
 {
   const anon = await browser.newContext();
   const ap = await anon.newPage();
@@ -357,6 +371,7 @@ await op.getByLabel("Zůstatek").fill("100");
 for (let i = 0; i < 4; i++) { await op.getByRole("button", { name: "Pokračovat" }).click(); await op.waitForTimeout(400); }
 await op.getByRole("button", { name: "Dokončit nastavení" }).click();
 await op.waitForURL((u) => u.pathname === "/");
+await op.getByRole("button", { name: "Pokračovat zdarma", exact: true }).click({ timeout: 20000 });
 assert.equal((await op.request.get(B + docLink)).status(), 404, "cizí dokument je nedostupný");
 // podvržené cookie s cizí domácností se ignoruje
 await other.addCookies([{ name: "homeos_household", value: backup.household.id, url: B }]);

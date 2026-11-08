@@ -20,6 +20,10 @@ export interface Lookups {
   /** Má aktuální domácnost Premium? */
   premium?: boolean;
   isAdmin?: boolean;
+  /** Sekce skryté uživatelem (podle životní situace nebo ručně). */
+  hiddenSections?: string[];
+  profile?: import("@/lib/db/types").LifeProfile | null;
+  locale?: import("@/lib/db/types").Locale;
   /** Probíhající a brzy začínající cesty (pro rychlý zápis výdaje). */
   activeTrips?: { trip: Trip; people: TripPerson[]; wallets: Wallet[] }[];
 }
