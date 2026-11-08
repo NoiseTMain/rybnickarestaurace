@@ -8,7 +8,12 @@ export const DEFAULT_PREFS: Omit<UserPrefs, "user_id" | "created_at" | "updated_
 
 /** Předvolby přihlášeného uživatele (výchozí, když ještě nejsou uložené). */
 export const getPrefs = cache(async (store: Store, user: AppUser): Promise<UserPrefs> => {
-  const row = (await store.select("user_prefs", { user_id: user.id }).catch(() => []))[0];
+  const row = (await store.select("user_prefs", { user_id: user.id }).catch(async (e) => {
+    // předvolby nesmí shodit stránku, ale chyba musí být vidět v administraci
+    const { logAppError } = await import("@/lib/errors-log");
+    await logAppError({ message: `getPrefs: ${e instanceof Error ? e.message : String(e)}`, path: "prefs", userId: user.id });
+    return [];
+  }))[0];
   return row ? { ...row, hidden_sections: row.hidden_sections ?? [] } : { ...DEFAULT_PREFS, user_id: user.id, created_at: "", updated_at: "" };
 });
 

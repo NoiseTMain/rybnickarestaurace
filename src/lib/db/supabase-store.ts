@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DbError, type Filter, type NewRow, type Row, type Store } from "./store";
 import { MONEY_COLUMNS, type Subscription, type TableName } from "./types";
+import { PRIMARY_KEY } from "./schema-meta";
 import { subscriptionActive } from "@/lib/subscription";
 
 const PAGE = 1000;
@@ -36,7 +37,7 @@ export function createSupabaseStore(client: SupabaseClient): Store {
           if (v === undefined) continue;
           q = v === null ? q.is(k, null) : q.eq(k, v as string);
         }
-        return q.order("id").range(from, from + PAGE - 1);
+        return q.order(PRIMARY_KEY[table] ?? "id").range(from, from + PAGE - 1);
       };
       // první stránka zjistí počet; zbylé stránky se načtou souběžně (rychlé i pro tisíce záznamů)
       const first = await page(0, true);

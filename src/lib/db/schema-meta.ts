@@ -143,3 +143,6 @@ export const REFS: Partial<Record<TableName, Ref[]>> = {
 };
 
 export const TABLES_WITH_UPDATED_AT: TableName[] = ["transactions", "household_settings", "work_settings", "user_prefs", "assets"];
+
+/** Tabulky, jejichž primární klíč není `id` (řazení při stránkování v Supabase). Hlídá test tests/unit/schema.test.ts. */
+export const PRIMARY_KEY: Partial<Record<string, string>> = { subscriptions: "user_id", user_prefs: "user_id", ai_usage: "user_id", trial_claims: "email_hash", referral_codes: "user_id", notification_log: "key" };
