@@ -763,6 +763,19 @@ step("cestování: cesta, účastníci, hotovost, trasa, program, výdaje, vyrov
   await page.getByRole("heading", { name: /Uzávěrka:/ }).waitFor();
 }
 
+step("recepty: filtr kuchyně, detail s porcemi, suroviny do nákupního seznamu");
+await page.goto(B + "/recepty?kuchyne=recka");
+await page.getByText(/Nalezeno \d+ receptů/).waitFor();
+await page.getByText("Řecký salát s kuřecím masem a quinoou").click();
+await page.getByText("kuřecí prsa").waitFor();
+await page.getByText("300 g").first().waitFor(); // 2 porce
+await page.getByRole("button", { name: "Více porcí" }).click();
+await page.getByText("450 g").first().waitFor();
+await page.getByRole("button", { name: "Do nákupního seznamu" }).click();
+await toast("Suroviny přidány do nákupního seznamu");
+await page.waitForURL(/\/planovani/);
+await page.getByText("Řecký salát s kuřecím masem a quinoou").first().waitFor();
+
 step("vzhled: interiér na pozadí (DEMO)");
 await page.goto(B + "/nastaveni#vzhled");
 const shot = async () => (await page.screenshot({ clip: { x: 1300, y: 940, width: 120, height: 50 } })).toString("base64");
