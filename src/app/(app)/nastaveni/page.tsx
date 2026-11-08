@@ -7,6 +7,7 @@ import { getPrefs } from "@/lib/prefs";
 import { ProfileForm } from "@/components/forms/ProfileForm";
 import { LanguageCard } from "@/components/forms/LanguageCard";
 import { SecurityCard } from "@/components/forms/SecurityForms";
+import { RestartTourButton } from "@/components/Tour";
 import { FREE_LIMITS } from "@/lib/plans";
 import { addDays, formatDate, todayISO } from "@/lib/dates";
 import { ACCOUNT_KIND_LABEL } from "@/lib/defaults";
@@ -63,6 +64,7 @@ export default async function SettingsPage() {
         </Card>
         <Card id="jazyk" title="Jazyk / Language" subtitle="Čeština · Slovenčina · English" className="xl:col-span-2">
           <LanguageCard />
+          <div className="mt-3 border-t border-white/[0.06] pt-3"><RestartTourButton /></div>
         </Card>
         <Card id="vzhled" title="Vzhled aplikace" subtitle="Platí pro toto zařízení" className="xl:col-span-2">
           <ThemePicker initial={theme} premium={premium.household} />

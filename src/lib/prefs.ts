@@ -4,7 +4,7 @@ import type { AppUser } from "@/lib/auth";
 import type { Store } from "@/lib/db/store";
 import type { UserPrefs } from "@/lib/db/types";
 
-export const DEFAULT_PREFS: Omit<UserPrefs, "user_id" | "created_at" | "updated_at"> = { profile: null, hidden_sections: [], locale: "cs", promo_seen_at: null };
+export const DEFAULT_PREFS: Omit<UserPrefs, "user_id" | "created_at" | "updated_at"> = { profile: null, hidden_sections: [], locale: "cs", promo_seen_at: null, tour_seen_at: null };
 
 /** Předvolby přihlášeného uživatele (výchozí, když ještě nejsou uložené). */
 export const getPrefs = cache(async (store: Store, user: AppUser): Promise<UserPrefs> => {

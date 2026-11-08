@@ -10,6 +10,11 @@ mkdirSync(SHOTS, { recursive: true });
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium" });
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: "cs-CZ", timezoneId: "Europe/Prague" });
 const page = await ctx.newPage();
+// průvodce po aplikaci se testuje jen v hlavním kontextu – ostatní ho mají „hotový“
+{
+  const orig = browser.newContext.bind(browser);
+  browser.newContext = async (o) => { const c = await orig(o); await c.addCookies([{ name: "homeos_tour", value: "done", url: process.env.BASE_URL ?? "http://localhost:3100" }]); return c; };
+}
 const errors = [];
 page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
 page.on("console", (m) => { if (m.type() === "error" && !/favicon|Failed to load resource/.test(m.text())) errors.push(`console: ${m.text()}`); });
@@ -82,6 +87,14 @@ await page.waitForTimeout(3000);
 assert.equal(await page.getByText("Vítejte! Vyzkoušejte Premium").isVisible(), true, "okno je stále otevřené");
 await page.getByRole("button", { name: "Pokračovat zdarma", exact: true }).click({ timeout: 15000 });
 await page.getByText("Vítejte! Vyzkoušejte Premium").waitFor({ state: "detached" });
+await page.reload();
+
+step("průvodce po aplikaci: projít kroky, podruhé se už neukáže");
+await page.getByRole("dialog").getByText("Vítejte v HomeOS").waitFor();
+for (let i = 0; i < 6; i++) await page.getByRole("dialog").getByRole("button", { name: "Další" }).click();
+await page.getByRole("dialog").getByText("Zeptejte se asistenta").waitFor();
+await page.getByRole("button", { name: "Pustit se do toho" }).click();
+await page.getByRole("dialog").waitFor({ state: "detached" });
 await page.reload();
 await page.getByText("můžete ještě v klidu utratit").waitFor();
 assert.equal(await page.getByText("Vítejte! Vyzkoušejte Premium").count(), 0, "nabídka se ukáže jen jednou");

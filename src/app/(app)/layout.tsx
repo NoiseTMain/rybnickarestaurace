@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireContext } from "@/lib/context";
 import { loadData } from "@/lib/data";
@@ -6,6 +7,8 @@ import { wallets } from "@/lib/finance/travel";
 import { getPremium } from "@/lib/premium";
 import { getPrefs } from "@/lib/prefs";
 import { PremiumPromo } from "@/components/premium/PremiumPromo";
+import { Tour } from "@/components/Tour";
+import { TOUR_COOKIE } from "@/lib/tour";
 import { localModeBlocked } from "@/lib/env";
 import { LookupsProvider } from "@/components/Lookups";
 import { Shell } from "@/components/shell/Shell";
@@ -23,6 +26,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     members = await ctx.store.select("members", { household_id: ctx.household.id });
   }
   const [premium, prefs] = await Promise.all([getPremium(ctx), getPrefs(ctx.store, ctx.user)]);
+  const tourCookie = (await cookies()).get(TOUR_COOKIE)?.value === "done";
   return (
     <LookupsProvider
       value={{
@@ -50,6 +54,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Shell email={ctx.user.email} household={ctx.household} households={ctx.households} mode={ctx.store.mode}>
         {children}
         {!premium.household && !prefs.promo_seen_at && !ctx.household.is_demo && <PremiumPromo />}
+        {(premium.household || prefs.promo_seen_at) && !prefs.tour_seen_at && !tourCookie && !ctx.household.is_demo && <Tour />}
       </Shell>
     </LookupsProvider>
   );

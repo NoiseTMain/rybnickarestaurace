@@ -1,5 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { TOUR_COOKIE } from "@/lib/tour";
 import { requireContext } from "@/lib/context";
 import { savePrefs } from "@/lib/prefs";
 import type { LifeProfile } from "@/lib/db/types";
@@ -17,4 +19,14 @@ export async function saveProfile(profile: LifeProfile | null, hidden: string[])
   await savePrefs(ctx.store, ctx.user, { profile, hidden_sections: clean });
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+/** Průvodce po aplikaci: dokončen/přeskočen (null = spustit znovu). */
+export async function setTourSeen(seen: boolean): Promise<void> {
+  const ctx = await requireContext();
+  await savePrefs(ctx.store, ctx.user, { tour_seen_at: seen ? new Date().toISOString() : null });
+  const jar = await cookies();
+  if (seen) jar.set(TOUR_COOKIE, "done", { path: "/", maxAge: 365 * 86_400, sameSite: "lax" });
+  else jar.delete(TOUR_COOKIE);
+  if (!seen) revalidatePath("/", "layout");
 }

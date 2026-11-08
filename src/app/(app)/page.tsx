@@ -136,8 +136,8 @@ export default async function DashboardPage() {
           <DashboardMode mode={mode} />
         </div>
         <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
-          <Stat big label="Disponibilní zůstatek" value={s.planner.available} info="Peníze na běžných účtech a v hotovosti mínus částky odložené na cíle. Očekávané příjmy nejsou započteny." />
-          <Stat big label="Volné k utracení" value={s.planner.safeToSpend} tone="gold" info="Po odečtení závazků do konce měsíce (vč. plateb za cesty), zbytku rozpočtů, rezervy, rezervy na cesty a plánu spoření." />
+          <Stat big label={t("d.25")} value={s.planner.available} info="Peníze na běžných účtech a v hotovosti mínus částky odložené na cíle. Očekávané příjmy nejsou započteny." />
+          <Stat big label={t("d.19")} value={s.planner.safeToSpend} tone="gold" info="Po odečtení závazků do konce měsíce (vč. plateb za cesty), zbytku rozpočtů, rezervy, rezervy na cesty a plánu spoření." />
         </div>
       </div>
 
@@ -159,18 +159,18 @@ export default async function DashboardPage() {
       {/* horní ukazatele */}
       <Card className="!p-4">
         <div className="grid grid-cols-2 gap-x-4 gap-y-5 md:grid-cols-3 xl:grid-cols-6">
-          <Stat label="Disponibilní" value={s.planner.available} hint={`celkem vč. spoření ${formatMoney(s.balance.total, { decimals: "never" })}`} />
-          <Stat label="Příjem tento měsíc" value={s.month.income} hint={s.expectedIncomeTotal > 0 ? `+ očekáváno ${formatMoney(s.expectedIncomeTotal, { decimals: "never" })}` : "přijato"} tone="pos" />
-          <Stat label="Výdaje tento měsíc" value={s.month.expense} hint={spentPct != null ? `${spentPct} % příjmů` : undefined} />
-          <Stat label="Odloženo" value={s.goals.totalSaved} hint={`tento měsíc ${formatMoney(s.goals.contributedThisMonth, { decimals: "never" })}`} />
-          <Stat label="Zbývá do konce měsíce" value={s.planner.afterObligations} hint={`po závazcích ${formatMoney(s.unpaidObligationsTotal, { decimals: "never" })}`} tone={s.planner.afterObligations < 0 ? "neg" : undefined} info="Disponibilní peníze po zaplacení všech nezaplacených závazků do konce měsíce." />
-          <Stat label="Skutečně volné" value={s.planner.safeToSpend} hint={s.planner.needToEarn > 0 ? `chybí ${formatMoney(s.planner.needToEarn, { decimals: "never" })}` : "bezpečně k utracení"} tone={s.planner.needToEarn > 0 ? "neg" : "gold"} />
+          <Stat label={t("d.24")} value={s.planner.available} hint={`celkem vč. spoření ${formatMoney(s.balance.total, { decimals: "never" })}`} />
+          <Stat label={t("d.21")} value={s.month.income} hint={s.expectedIncomeTotal > 0 ? `+ očekáváno ${formatMoney(s.expectedIncomeTotal, { decimals: "never" })}` : "přijato"} tone="pos" />
+          <Stat label={t("d.17")} value={s.month.expense} hint={spentPct != null ? `${spentPct} % příjmů` : undefined} />
+          <Stat label={t("d.22")} value={s.goals.totalSaved} hint={`tento měsíc ${formatMoney(s.goals.contributedThisMonth, { decimals: "never" })}`} />
+          <Stat label={t("d.16")} value={s.planner.afterObligations} hint={`po závazcích ${formatMoney(s.unpaidObligationsTotal, { decimals: "never" })}`} tone={s.planner.afterObligations < 0 ? "neg" : undefined} info="Disponibilní peníze po zaplacení všech nezaplacených závazků do konce měsíce." />
+          <Stat label={t("d.20")} value={s.planner.safeToSpend} hint={s.planner.needToEarn > 0 ? `chybí ${formatMoney(s.planner.needToEarn, { decimals: "never" })}` : "bezpečně k utracení"} tone={s.planner.needToEarn > 0 ? "neg" : "gold"} />
         </div>
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {/* 1. Stav financí */}
-        <Card title="Stav financí" subtitle="Vývoj celkového zůstatku za 90 dní" action={<CardLink href="/transakce" />} className="md:col-span-2">
+        <Card title={t("d.2")} subtitle={t("d.14")} action={<CardLink href="/transakce" />} className="md:col-span-2">
           {series.length > 1 ? <BalanceChart data={series} /> : <p className="py-6 text-center text-sm text-ink-3">Graf se bude plnit každým dnem evidence (od {formatDate(seriesFrom)}).</p>}
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {data.accounts.filter((a) => a.is_active).map((a) => (
@@ -183,14 +183,14 @@ export default async function DashboardPage() {
         </Card>
 
         {/* 5. Rozpočet na jídlo */}
-        <Card title="Rozpočet na jídlo" variant="light" action={<CardLink href="/rozpocty" />}>
+        <Card title={t("d.4")} variant="light" action={<CardLink href="/rozpocty" />}>
           {s.food ? (
             <>
               <div className="flex items-baseline justify-between">
                 <span className="num text-3xl font-semibold">{formatMoney(s.food.dailyLimit, { decimals: "never" })}</span>
                 <span className="text-xs text-ink-2">na den</span>
               </div>
-              <Progress className="mt-3" value={s.food.usedPercent} marker={percent(s.food.expectedByNow, s.food.budget)} tone={s.food.status === "over" ? "neg" : s.food.status === "warning" ? "warn" : "gold"} label="Vyčerpání rozpočtu na jídlo" />
+              <Progress className="mt-3" value={s.food.usedPercent} marker={percent(s.food.expectedByNow, s.food.budget)} tone={s.food.status === "over" ? "neg" : s.food.status === "warning" ? "warn" : "gold"} label={t("d.18")} />
               <div className="mt-3 space-y-0.5">
                 <KV k="Utraceno" v={<><Money value={s.food.spent} decimals="never" /> <span className="text-ink-3">/ {formatMoney(s.food.budget, { decimals: "never" })}</span></>} />
                 <KV k="Zbývá" v={<Money value={s.food.remaining} colored decimals="never" />} />
@@ -205,7 +205,7 @@ export default async function DashboardPage() {
         </Card>
 
         {/* 9. Nadcházející platby */}
-        <Card title="Nadcházející platby" variant="dark" subtitle={`Do konce měsíce ${formatMoney(s.unpaidObligationsTotal, { decimals: "never" })}`} action={<span className="num text-sm text-gold">{formatMoney(s.upcoming.slice(0, 7).reduce((a, o) => a + o.amount, 0), { decimals: "never" })}</span>} className="xl:row-span-2">
+        <Card title={t("d.8")} variant="dark" subtitle={`Do konce měsíce ${formatMoney(s.unpaidObligationsTotal, { decimals: "never" })}`} action={<span className="num text-sm text-gold">{formatMoney(s.upcoming.slice(0, 7).reduce((a, o) => a + o.amount, 0), { decimals: "never" })}</span>} className="xl:row-span-2">
           {s.upcoming.length ? (
             <ul className="space-y-2">
               {s.upcoming.slice(0, 7).map((o) => {
@@ -235,17 +235,17 @@ export default async function DashboardPage() {
         </Card>
 
         {/* 2. Příjmy vs výdaje */}
-        <Card title="Příjmy vs. výdaje" subtitle="Posledních 6 měsíců" action={<CardLink href="/transakce?zobrazeni=mesice" label="Historie měsíců" />} className="md:col-span-2">
+        <Card title={t("d.5")} subtitle={t("d.15")} action={<CardLink href="/transakce?zobrazeni=mesice" label={t("d.23")} />} className="md:col-span-2">
           <IncomeExpenseChart data={months} />
         </Card>
 
         {/* 3. Měsíční rozpočet */}
-        <Card title="Měsíční rozpočet" action={<CardLink href="/rozpocty" />}>
+        <Card title={t("d.9")} action={<CardLink href="/rozpocty" />}>
           {s.totalBudget ? (
             <>
               <div className="num text-2xl font-semibold">{formatMoney(sub(s.totalBudget.amount, s.totalBudget.spent), { decimals: "never" })}</div>
               <p className="text-xs text-ink-3">zbývá z {formatMoney(s.totalBudget.amount, { decimals: "never" })}</p>
-              <Progress className="mt-3" value={percent(s.totalBudget.spent, s.totalBudget.amount)} tone={s.totalBudget.spent > s.totalBudget.amount ? "neg" : "gold"} label="Celkový rozpočet" />
+              <Progress className="mt-3" value={percent(s.totalBudget.spent, s.totalBudget.amount)} tone={s.totalBudget.spent > s.totalBudget.amount ? "neg" : "gold"} label={t("d.26")} />
             </>
           ) : <p className="text-sm text-ink-3">Celkový limit není nastaven.</p>}
           <div className="mt-3 space-y-2.5">
@@ -260,7 +260,7 @@ export default async function DashboardPage() {
         </Card>
 
         {/* 4. Domácí výdaje */}
-        <Card title="Domácí výdaje" subtitle={`Tento měsíc ${formatMoney(s.household.spent, { decimals: "never" })}`} action={<CardLink href="/domacnost" />}>
+        <Card title={t("d.12")} subtitle={`Tento měsíc ${formatMoney(s.household.spent, { decimals: "never" })}`} action={<CardLink href="/domacnost" />}>
           {householdCats.length ? (
             <PillBars values={householdCats.map((c) => ({ label: catName(c.categoryId).slice(0, 5), value: c.amount }))} highlight={0} />
           ) : <p className="text-sm text-ink-3">Zatím žádné domácí výdaje.</p>}
@@ -270,7 +270,7 @@ export default async function DashboardPage() {
         </Card>
 
         {/* 7. Pracovní příjmy */}
-        <Card title="Pracovní příjmy" subtitle={data.workSettings?.company ?? "Práce"} action={<CardLink href="/prace" />}>
+        <Card title={t("d.6")} subtitle={data.workSettings?.company ?? "Práce"} action={<CardLink href="/prace" />}>
           {!icoActive ? <p className="text-sm text-ink-3">Pro podnikání na IČO. <Link href="/nastaveni#ico" className="text-gold underline">Aktivovat IČO</Link></p> : <>
           <div className="num text-2xl font-semibold">{formatMoney(s.work.month.net, { decimals: "never" })}</div>
           <p className="text-xs text-ink-3">čistý výsledek tento měsíc · {s.work.month.days} dní</p>
@@ -284,7 +284,7 @@ export default async function DashboardPage() {
         </Card>
 
         {/* 8. Neuhrazené faktury */}
-        <Card title="Neuhrazené faktury" action={<CardLink href="/faktury" />}>
+        <Card title={t("d.7")} action={<CardLink href="/faktury" />}>
           {!icoActive ? <p className="text-sm text-ink-3">Pro podnikání na IČO. <Link href="/nastaveni#ico" className="text-gold underline">Aktivovat IČO</Link></p> : <>
           <div className="grid grid-cols-2 gap-3">
             <div><p className="text-[11px] uppercase tracking-wider text-ink-3">Dostanu</p><Money value={s.invoices.unpaidIssuedTotal} decimals="never" className="text-lg font-semibold" /><p className="text-xs text-ink-3">{s.invoices.unpaidIssued.length} faktur</p></div>
@@ -304,7 +304,7 @@ export default async function DashboardPage() {
         </Card>
 
         {/* 6. Spoření */}
-        <Card title="Spoření" action={<CardLink href="/sporeni" />}>
+        <Card title={t("d.3")} action={<CardLink href="/sporeni" />}>
           <div className="num text-2xl font-semibold">{formatMoney(s.goals.totalSaved, { decimals: "never" })}</div>
           <p className="text-xs text-ink-3">naspořeno na cílech</p>
           <div className="mt-3 space-y-0.5">
@@ -316,7 +316,7 @@ export default async function DashboardPage() {
         </Card>
 
         {/* Motivace */}
-        <Card title="Úspěchy" subtitle={ach.streak.current > 0 ? `🔥 ${ach.streak.current} ${ach.streak.current === 1 ? "den" : ach.streak.current < 5 ? "dny" : "dní"} v řadě${ach.streak.todayDone ? "" : " – dnes ještě nic nezapsáno"}` : "Zapisujte každý den a sbírejte odznaky"} data-testid="badges">
+        <Card title={t("d.0")} subtitle={ach.streak.current > 0 ? `🔥 ${ach.streak.current} ${ach.streak.current === 1 ? "den" : ach.streak.current < 5 ? "dny" : "dní"} v řadě${ach.streak.todayDone ? "" : " – dnes ještě nic nezapsáno"}` : "Zapisujte každý den a sbírejte odznaky"} data-testid="badges">
           <div className="flex flex-wrap gap-1.5">
             {ach.list.map((b) => <span key={b.key} title={`${b.title} – ${b.detail}${!b.earned && b.progress ? ` (${b.progress.value.toLocaleString("cs-CZ")}/${b.progress.target.toLocaleString("cs-CZ")})` : ""}`} className={`flex h-9 w-9 items-center justify-center rounded-xl text-lg ${b.earned ? "bg-gold/15 ring-1 ring-gold/40" : "bg-white/[0.04] opacity-35 grayscale"}`} aria-label={`${b.title}${b.earned ? " – získáno" : ""}`}>{b.emoji}</span>)}
           </div>
@@ -327,19 +327,19 @@ export default async function DashboardPage() {
         {premium.household && <TravelCard items={trips} today={today} className="md:col-span-2" />}
 
         {/* Kategorie */}
-        <Card title="Výdaje podle kategorií" subtitle={monthName(today)} className="md:col-span-2">
+        <Card title={t("d.1")} subtitle={monthName(today)} className="md:col-span-2">
           <CategoryDonut data={s.month.byCategory.map((c) => ({ name: catName(c.categoryId), amount: c.amount }))} />
         </Card>
 
         {/* Doporučení */}
-        <Card title="Finanční asistent" subtitle="Z vašich skutečných dat" action={<CardLink href="/asistent" />} className="md:col-span-2">
+        <Card title={t("d.11")} subtitle={t("d.13")} action={<CardLink href="/asistent" />} className="md:col-span-2">
           <div className="space-y-2">
             {insights.slice(0, 4).map((i) => <InsightItem key={i.id} i={i} />)}
             {!insights.length && <p className="text-sm text-ink-3">Zatím nemám dost dat pro doporučení.</p>}
           </div>
         </Card>
         {/* 10. Finanční cíle */}
-        <Card title="Finanční cíle" action={<CardLink href="/sporeni" />} className="md:col-span-2">
+        <Card title={t("d.10")} action={<CardLink href="/sporeni" />} className="md:col-span-2">
           {s.goals.progress.length ? (
             <div className="grid gap-3 sm:grid-cols-2">
               {s.goals.progress.slice(0, 4).map((g) => (
