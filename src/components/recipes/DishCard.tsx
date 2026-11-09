@@ -15,7 +15,7 @@ export function DishCard({ d, v, locked, reaction, likes, wide = false }: { d: D
     <Link href={href} className={`glass relative flex h-full flex-col overflow-hidden rounded-[var(--radius-card)] transition hover:border-gold/40 ${wide ? "w-64 shrink-0 snap-start" : ""}`} data-testid="dish-card">
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-black/30">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={recipeImage(v.id)} alt={phrase(d.title)} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+        <img src={recipeImage(v)} alt={phrase(d.title)} loading="lazy" decoding="async" className="h-full w-full object-cover" />
         <div className="absolute left-2 top-2 flex items-center gap-1">
           <span className="rounded-full bg-black/55 px-2 py-0.5 text-xs backdrop-blur" aria-hidden>{COURSES[d.course].emoji}</span>
           {locked ? <span className="rounded-full bg-black/55 p-1 backdrop-blur"><Crown className="h-3.5 w-3.5 text-gold" aria-label="Premium" /></span> : d.free ? <span className="rounded-full bg-pos/80 px-2 py-0.5 text-[10px] text-white">zdarma</span> : null}

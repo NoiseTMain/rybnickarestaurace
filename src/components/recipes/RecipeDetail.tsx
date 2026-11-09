@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { recipeImage } from "@/lib/recipes/image";
+import { hasPhoto, recipeImage } from "@/lib/recipes/image";
 import { Clock, Flame, Minus, Plus, ShoppingCart } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -30,8 +30,8 @@ export function RecipeDetail({ r, lists, cuisine, meals, goals, top, image }: { 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.15fr)_1fr]">
         <figure className="overflow-hidden rounded-[var(--radius-card)] border border-white/10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={image ?? recipeImage(r.id)} alt={recipeName(r)} className="aspect-[4/3] w-full object-cover" data-testid="recipe-image" />
-          {!image && <figcaption className="bg-black/30 px-3 py-1.5 text-[11px] text-ink-3">Ilustrace podle surovin a gramáží tohoto receptu</figcaption>}
+          <img src={image ?? recipeImage(r)} alt={recipeName(r)} className="aspect-[4/3] w-full object-cover" data-testid="recipe-image" />
+          {!image && <figcaption className="bg-black/30 px-3 py-1.5 text-[11px] text-ink-3">{hasPhoto(r.dishId) ? "Ilustrační fotografie jídla (vytvořeno AI podle surovin receptu)" : "Ilustrace podle surovin a gramáží tohoto receptu"}</figcaption>}
         </figure>
         <div className="min-w-0">{top}</div>
       </div>
